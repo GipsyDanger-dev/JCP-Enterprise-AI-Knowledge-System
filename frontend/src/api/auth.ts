@@ -3,10 +3,6 @@ import { USE_MOCK } from './config'
 import { mockLogin, mockMe } from './mockAuth'
 import type { LoginRequest, LoginResponse, MeResponse } from './types'
 
-export function isMockAuth(): boolean {
-  return USE_MOCK
-}
-
 export function login(credentials: LoginRequest): Promise<LoginResponse> {
   return USE_MOCK ? mockLogin(credentials) : request<LoginResponse>('/auth/login', { method: 'POST', body: credentials })
 }

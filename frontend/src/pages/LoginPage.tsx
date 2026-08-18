@@ -3,7 +3,6 @@ import type { FormEvent } from 'react'
 import { LoaderCircle, Lock, ShieldAlert, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { errorMessage } from '@/api/client'
-import { isMockAuth } from '@/api/auth'
 import { useAuth } from '@/hooks/useAuth'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -40,8 +39,6 @@ export function LoginPage() {
     }
   }
 
-  const demoMode = isMockAuth()
-
   return (
     <main className="auth-shell">
       <form className="auth-card" onSubmit={handleSubmit} noValidate>
@@ -70,13 +67,7 @@ export function LoginPage() {
           {submitting ? <><LoaderCircle size={16} className="spin" /> Memproses…</> : <><Lock size={16} /> Masuk</>}
         </button>
 
-        {demoMode && (
-          <div className="auth-demo">
-            <strong>Mode demo (mock auth)</strong>
-            <p>Admin: <code>admin@jcp.co.id</code> / <code>admin123</code></p>
-            <p>Employee: <code>nadia@jcp.co.id</code> / <code>employee123</code></p>
-          </div>
-        )}
+
       </form>
     </main>
   )
