@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bell, ChevronDown, LogOut, Menu, Search, ShieldCheck, User, Users } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
 export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
   const { role, changeRole, person } = useWorkspace()
   const { logout } = useAuth()
+  const navigate = useNavigate()
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [searchValue, setSearchValue] = useState('')
   const notifRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdowns on click outside
   useEffect(() => {
     if (!showNotifications && !showProfile) return
     const handler = (e: MouseEvent) => {
@@ -22,16 +24,31 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [showNotifications, showProfile])
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchValue.trim()) {
+      navigate(`/documents?q=${encodeURIComponent(searchValue.trim())}`)
+      setSearchValue('')
+    }
+  }
+
   return (
     <header className="topbar">
       <button className="menu-button" title="Open navigation" onClick={onMenuOpen}><Menu size={20} /></button>
-      <div className="search-shell"><Search size={17} /><input aria-label="Search workspace" placeholder="Search documents, answers, or people" /></div>
+      <form className="search-shell" onSubmit={handleSearch}>
+        <Search size={17} />
+        <input
+          aria-label="Search workspace"
+          placeholder="Search documents, answers, or people"
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+        />
+      </form>
       <div className="role-switch" aria-label="Preview dashboard role">
         <button className={role === 'admin' ? 'selected' : ''} onClick={() => changeRole('admin')}><ShieldCheck size={14} /> Admin</button>
         <button className={role === 'employee' ? 'selected' : ''} onClick={() => changeRole('employee')}><Users size={14} /> Employee</button>
       </div>
       <div className="top-actions">
-        {/* Notifications */}
         <div className="topbar-dropdown-wrap" ref={notifRef}>
           <button className="icon-button" title="Notifications" onClick={() => { setShowNotifications(!showNotifications); setShowProfile(false) }}>
             <Bell size={18} /><span className="notification-dot" />
@@ -47,7 +64,6 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
           )}
         </div>
 
-        {/* Profile */}
         <div className="topbar-dropdown-wrap" ref={profileRef}>
           <button className="top-profile" onClick={() => { setShowProfile(!showProfile); setShowNotifications(false) }}>
             <span className="avatar small">{person.initials}</span><ChevronDown size={14} />

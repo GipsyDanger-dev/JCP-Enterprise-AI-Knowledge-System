@@ -82,8 +82,8 @@ function EmployeeOverview() {
           <section className="required-section">
             <SectionHeading title="Required reading" detail="Policies assigned to you" />
             <div className="required-list">
-              <RequiredRead title="Information Security Policy" category="IT & Security" due="Due 22 Aug" progress={72} />
-              <RequiredRead title="2026 Employee Handbook" category="People" due="Completed" progress={100} />
+              <RequiredRead title="Information Security Policy" category="IT & Security" due="Due 22 Aug" progress={72} onClick={() => navigate('/documents?collection=IT%20%26%20Security')} />
+              <RequiredRead title="2026 Employee Handbook" category="People" due="Completed" progress={100} onClick={() => navigate('/documents?collection=People')} />
             </div>
           </section>
         </div>
