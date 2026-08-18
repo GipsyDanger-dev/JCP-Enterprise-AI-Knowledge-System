@@ -49,7 +49,7 @@ button { cursor: pointer; }
 .workspace-switcher strong, .workspace-switcher small, .profile-row strong, .profile-row small { display: block; }
 .workspace-switcher strong { font-size: 11px; }.workspace-switcher small { color: #8a8984; font-size: 9px; margin-top: 2px; }
 .sidebar nav > p { margin: 0 9px 7px; color: #a19f99; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
-.nav-item { position: relative; width: 100%; min-height: 39px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #65635e; text-align: left; font-size: 12px; }
+.nav-item { position: relative; width: 100%; min-height: 39px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #65635e; text-align: left; font-size: 12px; text-decoration: none; }
 .nav-item:hover { background: #f0efeb; color: #222220; }.nav-item.active { background: #eeeeea; color: #1d1d1b; font-weight: 650; }.nav-item.active i { width: 3px; height: 18px; border-radius: 3px; background: #ff7043; position: absolute; left: 0; }
 .sidebar-lower { margin-top: auto; }.profile-row { margin-top: 12px; border-top: 1px solid #e7e5e0; padding: 16px 8px 0; display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 9px; }.profile-row strong { font-size: 11px; }.profile-row small { color: #8b8984; font-size: 9px; margin-top: 2px; }
 .avatar { width: 30px; height: 30px; border-radius: 50%; background: #ffe2d8; color: #b43e1c; display: grid; place-items: center; font-size: 10px; font-weight: 750; }.avatar.small { width: 26px; height: 26px; }
