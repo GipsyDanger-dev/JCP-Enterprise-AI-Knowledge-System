@@ -1,18 +1,26 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { toDomainRole } from '@/api/mappers'
+import { useAuth } from '@/hooks/useAuth'
 import { initialDocuments, navigationFor, personFor } from '@/types/domain'
 import type { Role } from '@/types/domain'
 import { WorkspaceContext } from './workspaceContextValue'
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<Role>('admin')
+  const { user } = useAuth()
+  const [role, setRole] = useState<Role>(() => (user ? toDomainRole(user.role) : 'admin'))
   const [documents, setDocuments] = useState(initialDocuments)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
   const uploadRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
+
+  // Role mengikuti akun yang login (ADMIN/EMPLOYEE); reset saat logout
+  useEffect(() => {
+    setRole(user ? toDomainRole(user.role) : 'admin')
+  }, [user])
 
   const changeRole = (nextRole: Role) => {
     setRole(nextRole)

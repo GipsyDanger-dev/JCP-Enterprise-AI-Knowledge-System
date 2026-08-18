@@ -1,9 +1,11 @@
-import { ChevronDown, CircleHelp, MoreHorizontal, Settings, Sparkles, X } from 'lucide-react'
+import { ChevronDown, CircleHelp, LogOut, MoreHorizontal, Settings, Sparkles, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
 export function Sidebar({ menuOpen, onClose }: { menuOpen: boolean; onClose: () => void }) {
   const { role, person, navigation } = useWorkspace()
+  const { logout } = useAuth()
   return (
     <aside className={menuOpen ? 'sidebar open' : 'sidebar'}>
       <div className="brand-lockup"><span className="brand-mark"><Sparkles size={17} /></span><strong>Enterprise AI</strong></div>
@@ -21,6 +23,7 @@ export function Sidebar({ menuOpen, onClose }: { menuOpen: boolean; onClose: () 
       <div className="sidebar-lower">
         <button className="nav-item"><CircleHelp size={18} /><span>Help center</span></button>
         <button className="nav-item"><Settings size={18} /><span>Settings</span></button>
+        <button className="nav-item" title="Log out" onClick={logout}><LogOut size={18} /><span>Log out</span></button>
         <div className="profile-row"><span className="avatar">{person.initials}</span><div><strong>{person.name}</strong><small>{person.label}</small></div><MoreHorizontal size={17} /></div>
       </div>
     </aside>

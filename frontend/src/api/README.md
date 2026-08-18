@@ -72,6 +72,14 @@ Saat retrieval tidak menemukan bukti cukup, backend mengembalikan `answer: null`
 
 `document_id` · `filename` · `version` · `page_number` · `section_title` · `chunk_id` — citation di UI berasal dari metadata ini, **bukan dibuat ulang oleh LLM**.
 
+### Mock mode (development)
+Mock auth aktif **secara default di development** (`mockAuth.ts`) — tidak butuh backend:
+
+- Admin: `admin@jcp.co.id` / `admin123`
+- Employee: `nadia@jcp.co.id` / `employee123`
+
+Set `VITE_USE_MOCK_AUTH=false` saat backend sudah siap untuk memakai API asli. Di produksi, mock hanya aktif bila `VITE_USE_MOCK_AUTH=true` dieksplisitkan.
+
 ## Implementasi frontend
 
 - `client.ts` — `request<T>()` + `ApiError` (status, code); base URL dari `VITE_API_BASE_URL`
