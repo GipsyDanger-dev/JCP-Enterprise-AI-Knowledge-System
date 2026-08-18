@@ -1,0 +1,2 @@
+# PDF parsing (optional — TXT/MD/DOCX work without any dependency).
+pypdf>=4.0

@@ -1,0 +1,22 @@
+# Milestone M0 — reproducible local environment.
+# Only the AI service exists today; Backend/ and Frontend/ services are added
+# here when those modules are merged into the monorepo.
+#
+# Usage (see AI/README.md):
+#   docker compose build
+#   docker compose run --rm ai ask "Berapa maksimal biaya hotel Manager?"
+#   docker compose run --rm ai ingest sample_docs --embed
+#   docker compose run --rm --entrypoint python ai -m unittest discover -s tests -v
+#   docker compose run --rm --entrypoint python ai evaluate.py --llm
+services:
+  ai:
+    build: ./AI
+    image: jcp-ai-engine:local
+    entrypoint: ["python", "ai_engine.py"]
+    working_dir: /app
+    volumes:
+      - ./AI:/app          # live code mount: no rebuild needed while developing
+    environment:
+      # Read from .env or the host environment; optional when not using --llm
+      # or embeddings. Never commit the real key.
+      SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
