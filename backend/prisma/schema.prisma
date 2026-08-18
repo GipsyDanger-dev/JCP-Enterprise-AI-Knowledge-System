@@ -7,5 +7,155 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Domain models will be added in later milestones.
+enum UserRole {
+  ADMIN
+  USER
+}
 
+enum DocumentStatus {
+  UPLOADED
+  QUEUED
+  PROCESSING
+  READY
+  FAILED
+  DELETED
+}
+
+enum ProcessingJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  displayName   String         @map("display_name")
+  role          UserRole       @default(USER)
+  isActive      Boolean        @default(true) @map("is_active")
+  lastLoginAt   DateTime?      @map("last_login_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  documents     Document[]
+  conversations Conversation[]
+
+  @@map("users")
+}
+
+model Document {
+  id           String            @id @default(uuid()) @db.Uuid
+  title        String
+  status       DocumentStatus    @default(UPLOADED)
+  uploadedById String            @map("uploaded_by_id") @db.Uuid
+  uploadedBy   User              @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  versions     DocumentVersion[]
+  deletedAt    DateTime?         @map("deleted_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([uploadedById])
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id               String          @id @default(uuid()) @db.Uuid
+  documentId       String          @map("document_id") @db.Uuid
+  document         Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionNumber    Int             @map("version_number")
+  originalFilename String          @map("original_filename")
+  mimeType         String          @map("mime_type")
+  storageKey       String?         @unique @map("storage_key")
+  fileSize         Int             @map("file_size")
+  checksum         String?
+  pageCount        Int?            @map("page_count")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  file             DocumentFile?
+  processingJobs   ProcessingJob[]
+  citations        Citation[]
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId])
+  @@map("document_versions")
+}
+
+model DocumentFile {
+  id                String          @id @default(uuid()) @db.Uuid
+  documentVersionId String          @unique @map("document_version_id") @db.Uuid
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  content           Bytes           @db.ByteA
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  @@map("document_files")
+}
+
+model ProcessingJob {
+  id                String              @id @default(uuid()) @db.Uuid
+  documentVersionId String              @map("document_version_id") @db.Uuid
+  documentVersion   DocumentVersion     @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  idempotencyKey    String              @unique @map("idempotency_key")
+  status            ProcessingJobStatus @default(QUEUED)
+  attemptCount      Int                 @default(0) @map("attempt_count")
+  errorMessage      String?             @map("error_message") @db.Text
+  startedAt         DateTime?           @map("started_at")
+  completedAt       DateTime?           @map("completed_at")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  @@index([documentVersionId])
+  @@index([status, createdAt])
+  @@map("processing_jobs")
+}
+
+model Conversation {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  title     String?
+  messages  Message[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId, updatedAt])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           MessageRole
+  content        String       @db.Text
+  citations      Citation[]
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model Citation {
+  id                String          @id @default(uuid()) @db.Uuid
+  messageId         String          @map("message_id") @db.Uuid
+  message           Message         @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  documentVersionId String          @map("document_version_id") @db.Uuid
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  chunkId           String          @map("chunk_id")
+  pageNumber        Int?            @map("page_number")
+  sectionTitle      String?         @map("section_title")
+  excerpt           String?         @db.Text
+  sortOrder         Int             @default(0) @map("sort_order")
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  @@unique([messageId, chunkId])
+  @@index([messageId, sortOrder])
+  @@index([documentVersionId])
+  @@map("citations")
+}

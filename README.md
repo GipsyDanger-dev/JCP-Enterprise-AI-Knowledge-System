@@ -40,3 +40,44 @@ Hentikan dengan `docker compose down`. Flag `-v` juga menghapus seluruh data di 
 Source backend dan frontend di-mount ke container. NestJS watch mode dan Vite polling membuat perubahan kode ter-reload. Jalankan ulang `docker compose up --build` setelah dependency berubah.
 
 Image PostgreSQL sudah membawa pgvector. Aktivasi `CREATE EXTENSION vector` sengaja ditunda sampai model embedding dibuat pada milestone berikutnya.
+
+## Database dan autentikasi lokal
+
+Schema inti dan migration Prisma berada di `backend/prisma`. Setelah database hidup, migration dapat diperiksa atau diterapkan dengan:
+
+```bash
+docker compose exec backend npx prisma migrate status
+docker compose exec backend npx prisma migrate dev
+```
+
+Buat atau perbarui akun development `ADMIN` dan `USER` dari nilai `SEED_*` di `.env`:
+
+```bash
+docker compose exec backend npm run prisma:seed
+```
+
+Seed bersifat idempotent dan tidak mencetak password. Endpoint autentikasi awal:
+
+- `POST /auth/login` menerima `email` dan `password`, lalu mengembalikan JWT serta profil aman dengan role.
+- `GET /auth/me` membutuhkan header `Authorization: Bearer <token>`.
+
+Role yang tersedia adalah `ADMIN` dan `USER`. Backend memakai JWT guard dan role guard; pemilihan tampilan dashboard berdasarkan role dilakukan oleh frontend.
+
+## Penyimpanan dokumen Backend
+
+Keputusan MVP saat ini adalah menyimpan binary PDF/DOCX langsung di PostgreSQL, terpisah dari metadata:
+
+- `document_versions` menyimpan filename, MIME type, ukuran, checksum, dan nomor versi.
+- `document_files` menyimpan binary sebagai `bytea` dengan relasi satu-ke-satu ke versi dokumen.
+- Query daftar dan status tidak mengambil atau mengembalikan binary.
+- Upload dibatasi maksimal 10 MB dan menerima PDF/DOCX dengan pemeriksaan ekstensi, MIME type, dan signature awal file.
+- Delete mempertahankan metadata sebagai `DELETED`, menghapus binary, dan menggagalkan job yang masih aktif.
+
+Endpoint awal:
+
+- `POST /documents` — khusus `ADMIN`, multipart field `file` dan optional `title`.
+- `GET /documents` — `ADMIN` melihat dokumen aktif; `USER` hanya dokumen `READY`.
+- `GET /documents/:id/status` — khusus `ADMIN`.
+- `DELETE /documents/:id` — khusus `ADMIN`.
+
+Backend tidak menggunakan MinIO untuk alur dokumen ini. Service MinIO di environment tetap dibiarkan sampai keputusan infrastructure diperbarui oleh owner DevOps.

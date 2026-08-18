@@ -46,6 +46,12 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET}
       LLM_API_KEY: ${LLM_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_USER_EMAIL: ${SEED_USER_EMAIL:-}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-}
       PORT: ${BACKEND_PORT:-8000}
       TSC_WATCHFILE: UsePolling
     ports:
@@ -59,7 +65,7 @@ services:
       minio:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health | grep -q OK"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/health | grep -q OK"]
       interval: 5s
       timeout: 5s
       retries: 20
