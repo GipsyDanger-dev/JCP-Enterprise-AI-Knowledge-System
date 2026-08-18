@@ -220,6 +220,7 @@ button { cursor: pointer; }
 .status-badge, .active-user { display: inline-flex; align-items: center; gap: 4px; width: max-content; padding: 4px 7px; border-radius: var(--radius-pill); font-size: var(--fs-xs); font-weight: var(--fw-bold); }
 .status-badge.ready, .active-user { color: var(--success); background: var(--success-bg); }
 .status-badge.processing, .status-badge.queued { color: var(--warning); background: var(--warning-bg); }
+.status-badge.failed { color: var(--brand-800); background: var(--brand-100); }
 .status-badge.processing svg { animation: spin 1.2s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .collection-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }

@@ -9,7 +9,7 @@ import {
 
 export type View = 'overview' | 'documents' | 'chat' | 'users'
 export type Role = 'admin' | 'employee'
-export type DocumentStatus = 'Ready' | 'Processing' | 'Queued'
+export type DocumentStatus = 'Ready' | 'Processing' | 'Queued' | 'Failed'
 
 export interface DocumentItem {
   id: number
