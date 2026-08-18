@@ -42,9 +42,9 @@ function AdminOverview() {
         <section className="collection-section">
           <SectionHeading title="Collections" detail="Organized sources available to your team" />
           <div className="collection-grid">
-            <Collection name="Operations" count="18 documents" color="orange" />
-            <Collection name="IT & Security" count="12 documents" color="mint" />
-            <Collection name="People" count="9 documents" color="violet" />
+            <Collection name="Operations" count="18 documents" color="orange" onClick={() => navigate('/documents?collection=Operations')} />
+            <Collection name="IT & Security" count="12 documents" color="mint" onClick={() => navigate('/documents?collection=IT%20%26%20Security')} />
+            <Collection name="People" count="9 documents" color="violet" onClick={() => navigate('/documents?collection=People')} />
           </div>
         </section>
       </section>
@@ -74,8 +74,8 @@ function EmployeeOverview() {
           <section>
             <SectionHeading title="Continue where you left off" detail="Recent answers and documents" action={<button className="link-button" onClick={() => navigate('/chat')}>View history <ArrowUpRight size={15} /></button>} />
             <div className="recent-grid">
-              <button className="recent-item"><span className="recent-icon orange"><MessageSquareText size={18} /></span><div><small>AI ANSWER</small><strong>How does annual leave carry over?</strong><p>Answered from Employee Handbook · 2 sources</p></div><ArrowUpRight size={16} /></button>
-              <button className="recent-item"><span className="recent-icon mint"><FileText size={18} /></span><div><small>DOCUMENT</small><strong>IT Security Quick Guide</strong><p>Viewed yesterday · Page 4</p></div><ArrowUpRight size={16} /></button>
+              <button className="recent-item" onClick={() => navigate('/chat')}><span className="recent-icon orange"><MessageSquareText size={18} /></span><div><small>AI ANSWER</small><strong>How does annual leave carry over?</strong><p>Answered from Employee Handbook · 2 sources</p></div><ArrowUpRight size={16} /></button>
+              <button className="recent-item" onClick={() => navigate('/documents')}><span className="recent-icon mint"><FileText size={18} /></span><div><small>DOCUMENT</small><strong>IT Security Quick Guide</strong><p>Viewed yesterday · Page 4</p></div><ArrowUpRight size={16} /></button>
             </div>
           </section>
 
@@ -90,7 +90,7 @@ function EmployeeOverview() {
 
         <aside className="employee-sidebar">
           <section className="employee-summary"><div className="summary-head"><span className="avatar employee-avatar">NS</span><div><strong>Nadia S.</strong><small>Creative Operations</small></div></div><div className="summary-stats"><div><strong>8</strong><span>Saved answers</span></div><div><strong>3</strong><span>Collections</span></div></div></section>
-          <section className="quick-library"><SectionHeading title="Quick access" detail="Your available collections" /><button><span className="collection-icon orange"><BookOpen size={17} /></span><div><strong>Operations</strong><small>18 documents</small></div><ChevronRight size={16} /></button><button><span className="collection-icon mint"><ShieldCheck size={17} /></span><div><strong>IT & Security</strong><small>12 documents</small></div><ChevronRight size={16} /></button><button><span className="collection-icon violet"><Users size={17} /></span><div><strong>People</strong><small>9 documents</small></div><ChevronRight size={16} /></button></section>
+          <section className="quick-library"><SectionHeading title="Quick access" detail="Your available collections" /><button onClick={() => navigate('/documents?collection=Operations')}><span className="collection-icon orange"><BookOpen size={17} /></span><div><strong>Operations</strong><small>18 documents</small></div><ChevronRight size={16} /></button><button onClick={() => navigate('/documents?collection=IT%20%26%20Security')}><span className="collection-icon mint"><ShieldCheck size={17} /></span><div><strong>IT & Security</strong><small>12 documents</small></div><ChevronRight size={16} /></button><button onClick={() => navigate('/documents?collection=People')}><span className="collection-icon violet"><Users size={17} /></span><div><strong>People</strong><small>9 documents</small></div><ChevronRight size={16} /></button></section>
         </aside>
       </div>
     </div>
