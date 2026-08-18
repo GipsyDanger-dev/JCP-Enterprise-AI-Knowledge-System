@@ -94,6 +94,24 @@ python ai_engine.py ask "Berapa maksimal biaya hotel Manager?" --retriever vecto
 dipakai offline). Catatan: no-answer paling ketat dengan TF-IDF; vector search
 bersifat semantik sehingga threshold-nya lebih tinggi (0.45).
 
+## Filtering metadata (slide 6: top-k + filtering metadata)
+
+`ask` bisa dipersempit ke dokumen/bagian tertentu lewat filter metadata —
+berguna saat knowledge base sudah berisi banyak file:
+
+```powershell
+python ai_engine.py ask "Berapa biaya hotel Manager?" --doc sop_perjalanan.txt
+python ai_engine.py ask "biaya hotel" --section "KETENTUAN UMUM"
+python ai_engine.py ask "cuti" --doc sop_b.txt --retriever vector
+```
+
+- `--doc`    → hanya cari di chunk dokumen dengan nama tersebut (case-insensitive substring)
+- `--section` → hanya cari di chunk dengan section_title tersebut
+
+Bisa dikombinasikan dengan `--retriever`/`--llm`. Kalau filter tidak
+mencocokkan dokumen apa pun, hasilnya no-answer (bukan error). Filter juga
+tersedia di API Python: `kb.ask(query, filters={"filename": ...})`.
+
 ## Evaluasi golden question set
 
 ```powershell

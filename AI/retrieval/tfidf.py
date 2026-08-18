@@ -12,6 +12,8 @@ import re
 from collections import Counter
 from typing import Any
 
+from retrieval.filters import match_metadata
+
 TOKEN_RE = re.compile(r"[\wÀ-ÿ]+", re.UNICODE)
 
 
@@ -44,7 +46,12 @@ class TfidfRetriever:
         denominator = math.sqrt(sum(value * value for value in left.values())) * math.sqrt(sum(value * value for value in right.values()))
         return sum(left.get(key, 0.0) * value for key, value in right.items()) / denominator if denominator else 0.0
 
-    def search(self, query: str, top_k: int = 5) -> list[tuple[float, dict[str, Any]]]:
+    def search(self, query: str, top_k: int = 5,
+               filters: dict[str, Any] | None = None) -> list[tuple[float, dict[str, Any]]]:
+        """Rank chunks by cosine similarity, optionally narrowed by metadata filters."""
         query_vector = self._vector(query)
-        ranked = [(self._cosine(query_vector, vector), chunk) for vector, chunk in zip(self.vectors, self.chunks)]
+        candidates = range(len(self.chunks))
+        if filters:
+            candidates = [i for i, chunk in enumerate(self.chunks) if match_metadata(chunk, filters)]
+        ranked = [(self._cosine(query_vector, self.vectors[i]), self.chunks[i]) for i in candidates]
         return sorted(ranked, key=lambda item: item[0], reverse=True)[:top_k]

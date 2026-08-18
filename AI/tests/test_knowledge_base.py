@@ -126,6 +126,53 @@ class KnowledgeBaseLifecycleTests(unittest.TestCase):
             self.assertIn("Direktur", third.chunks[0]["text"])
 
 
+class MetadataFilterTests(unittest.TestCase):
+    def _two_doc_kb(self):
+        chunks_a = chunk_pages([(1, "Biaya hotel untuk level Manager maksimal Rp900.000 per malam.")],
+                               "sop_a.txt", "doc-a", 1, sections={1: text_headings("BAB I KETENTUAN UMUM")})
+        chunks_b = chunk_pages([(1, "Cuti tahunan berhak diambil setelah 12 bulan bekerja.")],
+                               "sop_b.txt", "doc-b", 1, sections={1: text_headings("BAB II KETENTUAN KHUSUS")})
+        return KnowledgeBase(chunks_a + chunks_b)
+
+    def test_filter_by_filename_narrows_results(self):
+        kb = self._two_doc_kb()
+        result = kb.ask("cuti", top_k=5, filters={"filename": "sop_b.txt"})
+        self.assertTrue(result["grounded"])
+        self.assertEqual([c["filename"] for c in result["citations"]], ["sop_b.txt"])
+
+    def test_filter_by_filename_substring(self):
+        kb = self._two_doc_kb()
+        result = kb.ask("cuti", top_k=5, filters={"filename": "sop_b"})
+        self.assertTrue(result["grounded"])
+        self.assertEqual([c["filename"] for c in result["citations"]], ["sop_b.txt"])
+
+    def test_filter_excludes_other_document(self):
+        kb = self._two_doc_kb()
+        result = kb.ask("hotel", top_k=5, filters={"filename": "sop_b.txt"})
+        self.assertFalse(result["grounded"])  # hotel is only in sop_a -> filtered out
+        self.assertEqual(result["answer"], "Informasi tidak ditemukan pada dokumen yang tersedia.")
+
+    def test_filter_by_section_title(self):
+        kb = self._two_doc_kb()
+        result = kb.ask("biaya", top_k=5, filters={"section_title": "KETENTUAN UMUM"})
+        self.assertTrue(result["grounded"])
+        self.assertEqual([c["section_title"] for c in result["citations"]], ["BAB I KETENTUAN UMUM"])
+
+    def test_filter_with_vector_retriever(self):
+        chunks_a = chunk_pages([(1, "Biaya hotel untuk level Manager maksimal Rp900.000 per malam.")],
+                               "sop_a.txt", "doc-a", 1)
+        chunks_b = chunk_pages([(1, "Cuti tahunan berhak diambil setelah 12 bulan bekerja.")],
+                               "sop_b.txt", "doc-b", 1)
+        kb = KnowledgeBase(chunks_a + chunks_b, embeddings={
+            chunks_a[0]["chunk_id"]: [1.0, 0.0],
+            chunks_b[0]["chunk_id"]: [0.0, 1.0],
+        })
+        with mock.patch("retrieval.embeddings.embed_texts", return_value=[[0.0, 1.0]]):
+            result = kb.ask("cuti", top_k=5, filters={"filename": "sop_b.txt"})
+        self.assertTrue(result["grounded"])
+        self.assertEqual([c["filename"] for c in result["citations"]], ["sop_b.txt"])
+
+
 class VectorRetrieverTests(unittest.TestCase):
     def test_vector_search_with_stored_embeddings(self):
         chunks = chunk_pages([(1, "Biaya hotel untuk level Manager maksimal Rp900.000 per malam.")],

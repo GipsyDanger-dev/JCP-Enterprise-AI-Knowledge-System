@@ -109,10 +109,13 @@ class KnowledgeBase:
 
     def ask(self, query: str, top_k: int = 5, minimum_score: float | None = None,
             use_llm: bool = False, model: str = DEFAULT_MODEL,
-            retriever: str = "auto", api_key: str | None = None) -> dict[str, Any]:
+            retriever: str = "auto", api_key: str | None = None,
+            filters: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Answer ``query``, optionally narrowed to chunks matching ``filters``
+        (e.g. {"filename": "sop.pdf"} or {"section_title": "KETENTUAN UMUM"})."""
         engine = build_retriever(self, mode=retriever, api_key=api_key)
         threshold = engine.minimum_score if minimum_score is None else minimum_score
-        matches = [(score, chunk) for score, chunk in engine.search(query, top_k) if score >= threshold]
+        matches = [(score, chunk) for score, chunk in engine.search(query, top_k, filters=filters) if score >= threshold]
         if not matches:
             return no_answer_response()
         citations = citations_from_matches(matches)

@@ -16,6 +16,7 @@ import urllib.request
 from typing import Any
 
 from config import EMBEDDING_MODEL, SUMOPOD_API_KEY_ENV, SUMOPOD_BASE_URL
+from retrieval.filters import match_metadata
 
 
 def _api_key(api_key: str | None) -> str:
@@ -84,10 +85,14 @@ class VectorRetriever:
         self.api_key = api_key
         self.model = model
 
-    def search(self, query: str, top_k: int = 5) -> list[tuple[float, dict[str, Any]]]:
+    def search(self, query: str, top_k: int = 5,
+               filters: dict[str, Any] | None = None) -> list[tuple[float, dict[str, Any]]]:
+        """Rank chunks by cosine similarity, optionally narrowed by metadata filters."""
         query_vector = _normalize(embed_texts([query], model=self.model, api_key=self.api_key)[0])
         ranked: list[tuple[float, dict[str, Any]]] = []
         for chunk in self.chunks:
+            if filters and not match_metadata(chunk, filters):
+                continue
             vector = self.embeddings.get(chunk["chunk_id"])
             if vector is None:
                 continue

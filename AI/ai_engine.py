@@ -46,6 +46,10 @@ def main() -> int:
     ask_parser.add_argument("--model", default=DEFAULT_MODEL, help="SumoPod chat model id (default: %(default)s)")
     ask_parser.add_argument("--retriever", choices=["auto", "tfidf", "vector"], default="auto",
                             help="Retrieval mode (default: auto -> vector if embeddings stored, else TF-IDF)")
+    ask_parser.add_argument("--doc", default=None,
+                            help="Only search chunks from this document (filename, case-insensitive substring)")
+    ask_parser.add_argument("--section", default=None,
+                            help="Only search chunks in this section (case-insensitive substring)")
 
     delete_parser = subparsers.add_parser("delete")
     delete_parser.add_argument("filename")
@@ -59,8 +63,10 @@ def main() -> int:
         if args.command == "ingest":
             ingest(args.input_dir, args.output, embed=args.embed, embed_model=args.embed_model)
         elif args.command == "ask":
+            filters = {"filename": args.doc, "section_title": args.section} if (args.doc or args.section) else None
             result = KnowledgeBase.load(args.index).ask(
                 args.query, args.top_k, use_llm=args.llm, model=args.model, retriever=args.retriever,
+                filters=filters,
             )
             print(json.dumps(result, ensure_ascii=False, indent=2))
         elif args.command == "delete":
