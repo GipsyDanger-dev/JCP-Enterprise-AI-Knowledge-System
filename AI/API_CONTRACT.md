@@ -155,3 +155,110 @@ Response `200`:
 ```
 Ini kontrak minimum slide 7. Perubahan apa pun pada schema/response harus
 lewat PR + disepakati sebelum merge (slide 13).
+
+---
+
+## Contoh integrasi NestJS (buat Backend Engineer)
+
+### 0. Yang perlu disiapkan Backend Engineer
+
+1. Pastikan AI Service jalan (dari root repo):
+   `docker compose up -d postgres ai-api`
+2. Set env di backend:
+   - `AI_SERVICE_URL=http://ai-api:8000` (dalam docker network, nama service =
+     hostname) atau `http://localhost:8000` (kalau AI jalan lokal)
+3. (Opsional) Eksplorasi endpoint interaktif: `http://localhost:8000/docs`
+   (Swagger, auto-generated). `SUMOPOD_API_KEY` & `DATABASE_URL` diurus AI
+   Service — Backend tidak perlu tahu isinya.
+
+### 1. Service wrapper (taruh di `src/ai/ai.service.ts`)
+
+```typescript
+import { Injectable } from '@nestjs/common';
+
+export interface Citation {
+  document_id: string;
+  filename: string;
+  version: number;
+  page_number: number;
+  section_title: string;
+  chunk_id: string;
+}
+
+export interface AskResult {
+  answer: string;
+  citations: Citation[];
+  grounded: boolean;
+  retrieval?: { chunk_id: string; score: number }[];
+}
+
+@Injectable()
+export class AiService {
+  // Di docker: http://ai-api:8000 — lokal: http://localhost:8000
+  private readonly baseUrl = process.env.AI_SERVICE_URL ?? 'http://localhost:8000';
+
+  async ask(
+    query: string,
+    options?: { useLlm?: boolean; filters?: Record<string, string> },
+  ): Promise<AskResult> {
+    const res = await fetch(`${this.baseUrl}/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        top_k: 5,
+        filters: options?.filters,
+        use_llm: options?.useLlm ?? true,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`AI service error ${res.status}: ${await res.text()}`);
+    }
+    return (await res.json()) as AskResult;
+  }
+
+  async ingest(inputDir: string) {
+    const res = await fetch(`${this.baseUrl}/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input_dir: inputDir, embed: true }),
+    });
+    if (!res.ok) {
+      throw new Error(`AI ingest error ${res.status}: ${await res.text()}`);
+    }
+    return res.json();
+  }
+}
+```
+
+Register di module (jangan lupa `@Module({ providers: [AiService], exports: [AiService] })`).
+
+### 2. Contoh pemakaian di chat flow
+
+```typescript
+// src/chat/chat.service.ts (potongan)
+const result = await this.aiService.ask(question);
+
+// grounded=false -> ini NO-ANSWER, bukan error:
+// kirim state ke frontend supaya UI menampilkan "informasi tidak ditemukan"
+return {
+  answer: result.answer,
+  citations: result.citations,
+  grounded: result.grounded,
+};
+```
+
+### 3. Catatan alur upload
+
+Endpoint `/ingest` sekarang menerima `input_dir` (path di sisi AI Service).
+Untuk alur upload asli (Frontend kirim file → Backend simpan), ada 2 opsi yang
+harus disepakati di kickoff:
+
+- **Opsi A (paling sederhana):** Backend menulis file upload ke direktori
+  bersama yang bisa dibaca AI Service (misal volume docker), lalu panggil
+  `POST /ingest` dengan path-nya.
+- **Opsi B:** AI Service menambah endpoint `POST /documents` (multipart)
+  supaya file dikirim langsung. Ini perubahan kontrak → perlu PR + review.
+
+Apapun opsi yang dipilih, alur tetap: upload → `POST /ingest` → dapat
+`document_id` → update status job `ready` → frontend polling.
