@@ -28,6 +28,7 @@ Kesepakatan **Frontend ↔ Backend** (per slide 12 Technical Briefing). Semua pe
 |---|---|---|---|
 | GET | `/users` | — | `200 User[]` |
 | POST | `/users` | `{ name, email, role, password? }` | `201 User` |
+| DELETE | `/users/:id` | — | `204` |
 
 ### Documents (admin: upload/delete; semua role: list)
 | Method | Path | Request | Response |

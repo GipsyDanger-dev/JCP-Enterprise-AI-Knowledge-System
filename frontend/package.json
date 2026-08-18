@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:e2e": "node e2e/login.spec.mjs && node e2e/chat.spec.mjs"
+    "test:e2e": "node e2e/login.spec.mjs && node e2e/chat.spec.mjs && node e2e/users.spec.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
