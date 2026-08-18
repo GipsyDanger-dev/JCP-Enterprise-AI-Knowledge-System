@@ -82,6 +82,8 @@ Set `VITE_USE_MOCK_AUTH=false` saat backend sudah siap untuk memakai API asli. D
 
 Endpoint dokumen juga di-mock (`mockDocuments.ts`): upload langsung masuk antrean dan statusnya berjalan `queued → processing → ready` otomatis.
 
+Chat juga di-mock (`mockChat.ts`): pertanyaan dengan keyword (hotel, cuti, reimburse, gaji, absen) mengembalikan jawaban + citation. Pertanyaan lain mengembalikan no-answer.
+
 ## Implementasi frontend
 
 - `client.ts` — `request<T>()` + `ApiError` (status, code); base URL dari `VITE_API_BASE_URL`

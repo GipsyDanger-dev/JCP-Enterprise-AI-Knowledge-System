@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import type { DocumentItem, NavigationItem, Person, Role } from '@/types/domain'
+import type { Citation, DocumentItem, NavigationItem, Person, Role } from '@/types/domain'
 
 export interface WorkspaceContextValue {
   role: Role
@@ -11,6 +11,9 @@ export interface WorkspaceContextValue {
   question: string
   setQuestion: (value: string) => void
   answer: string
+  citations: Citation[]
+  isLoadingAnswer: boolean
+  chatError: string | null
   onAsk: (event: FormEvent) => void
   askQuestion: (value: string) => void
   triggerUpload: () => void

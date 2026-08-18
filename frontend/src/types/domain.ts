@@ -7,6 +7,8 @@ import {
   Users,
 } from 'lucide-react'
 
+export type { Citation } from '@/api/types'
+
 export type View = 'overview' | 'documents' | 'chat' | 'users'
 export type Role = 'admin' | 'employee'
 export type DocumentStatus = 'Ready' | 'Processing' | 'Queued' | 'Failed'

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { queryChat } from '@/api/chat'
 import { errorMessage } from '@/api/client'
 import { deleteDocument, getDocumentStatus, listDocuments, uploadDocument } from '@/api/documents'
 import { toDomainDocument, toDomainDocumentStatus, toDomainRole } from '@/api/mappers'
 import { useAuth } from '@/hooks/useAuth'
+import type { Citation } from '@/types/domain'
 import { initialDocuments, navigationFor, personFor } from '@/types/domain'
 import type { Role } from '@/types/domain'
 import { WorkspaceContext } from './workspaceContextValue'
@@ -17,6 +19,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [documents, setDocuments] = useState(initialDocuments)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
+  const [citations, setCitations] = useState<Citation[]>([])
+  const [isLoadingAnswer, setIsLoadingAnswer] = useState(false)
+  const [chatError, setChatError] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const uploadRef = useRef<HTMLInputElement>(null)
@@ -96,15 +101,34 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const sendQuestion = async (q: string) => {
+    if (!q.trim()) return
+    setIsLoadingAnswer(true)
+    setChatError(null)
+    setAnswer('')
+    setCitations([])
+    try {
+      const res = await queryChat({ question: q }, token ?? undefined)
+      setAnswer(res.answer ?? '')
+      setCitations(res.citations)
+      if (!res.answer && res.message) {
+        setChatError(res.message)
+      }
+    } catch (err) {
+      setChatError(errorMessage(err))
+    } finally {
+      setIsLoadingAnswer(false)
+    }
+  }
+
   const onAsk = (event: FormEvent) => {
     event.preventDefault()
-    if (!question.trim()) return
-    setAnswer('Manager-level hotel expenses are capped at Rp900,000 per night. The policy requires an itemized receipt and prior approval for exceptions.')
+    sendQuestion(question)
   }
 
   const askQuestion = (value: string) => {
     setQuestion(value)
-    setAnswer('Manager-level hotel expenses are capped at Rp900,000 per night. The policy requires an itemized receipt and prior approval for exceptions.')
+    sendQuestion(value)
   }
 
   const triggerUpload = () => uploadRef.current?.click()
@@ -119,6 +143,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       question,
       setQuestion,
       answer,
+      citations,
+      isLoadingAnswer,
+      chatError,
       onAsk,
       askQuestion,
       triggerUpload,
