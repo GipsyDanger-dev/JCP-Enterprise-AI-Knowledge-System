@@ -51,6 +51,40 @@ try {
   check('dashboard admin (Good morning Adam)', adminText.includes('Good morning, Adam.'), adminText.includes('Good morning, Adam.') ? '' : 'tidak ketemu teks admin')
   check('tombol logout ada di sidebar', (await page.$('.sidebar-lower .nav-item[title="Log out"]')) !== null)
 
+  // 3b. Upload dokumen → queued → processing → ready (mock pipeline)
+  await page.goto(BASE + '/documents', { waitUntil: 'networkidle0' })
+  await new Promise((r) => setTimeout(r, 800))
+  const fileInput = await page.$('input[type="file"]')
+  if (fileInput) {
+    await fileInput.uploadFile('e2e/fixtures/sample-policy.pdf')
+    // tombol berubah jadi "Mengunggah…" lalu selesai
+    await new Promise((r) => setTimeout(r, 2000))
+    check('dokumen muncul setelah upload', (await bodyText()).includes('sample-policy.pdf'))
+
+    // tunggu status berubah jadi Ready (polling frontend 2s + mock ~5s)
+    let status = null
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 1500))
+      status = await page.evaluate(() => {
+        const row = [...document.querySelectorAll('tbody tr')].find((r) => r.textContent.includes('sample-policy.pdf'))
+        return row ? row.querySelector('.status-badge')?.textContent.trim() : null
+      })
+      if (status === 'Ready') break
+    }
+    check('status dokumen jadi Ready', status === 'Ready', `status terakhir: ${status}`)
+
+    // hapus dokumen
+    page.on('dialog', (d) => d.accept())
+    const del = await page.evaluate(() => {
+      const row = [...document.querySelectorAll('tbody tr')].find((r) => r.textContent.includes('sample-policy.pdf'))
+      row?.querySelector('.icon-button.danger')?.click()
+    })
+    await new Promise((r) => setTimeout(r, 1000))
+    check('dokumen terhapus', !(await bodyText()).includes('sample-policy.pdf'))
+  } else {
+    check('input file tersedia', false)
+  }
+
   // 4. Logout → /login
   if (await page.$('.sidebar-lower .nav-item[title="Log out"]')) {
     await page.click('.sidebar-lower .nav-item[title="Log out"]')

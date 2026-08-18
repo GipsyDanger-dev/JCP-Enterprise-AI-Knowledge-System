@@ -1,14 +1,7 @@
 import { request } from './client'
+import { USE_MOCK } from './config'
 import { mockLogin, mockMe } from './mockAuth'
 import type { LoginRequest, LoginResponse, MeResponse } from './types'
-
-/**
- * true = pakai mock auth (tanpa backend).
- * Default aktif di development; matikan dengan VITE_USE_MOCK_AUTH=false.
- * Di produksi hanya aktif bila eksplisit VITE_USE_MOCK_AUTH=true.
- */
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_AUTH === 'true'
-  || (import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_AUTH !== 'false')
 
 export function isMockAuth(): boolean {
   return USE_MOCK

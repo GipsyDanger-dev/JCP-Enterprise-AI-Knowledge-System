@@ -34,7 +34,7 @@ Kesepakatan **Frontend ↔ Backend** (per slide 12 Technical Briefing). Semua pe
 |---|---|---|---|
 | POST | `/documents` | multipart `file` | `201 Document` (status `queued`) |
 | GET | `/documents` | — | `200 Document[]` |
-| GET | `/documents/:id/status` | — | `200 { id, status, error? }` |
+| GET | `/documents/:id/status` | — | `200 { id, status, error?, chunks? }` |
 | DELETE | `/documents/:id` | — | `204` |
 
 ### Chat
@@ -79,6 +79,8 @@ Mock auth aktif **secara default di development** (`mockAuth.ts`) — tidak butu
 - Employee: `nadia@jcp.co.id` / `employee123`
 
 Set `VITE_USE_MOCK_AUTH=false` saat backend sudah siap untuk memakai API asli. Di produksi, mock hanya aktif bila `VITE_USE_MOCK_AUTH=true` dieksplisitkan.
+
+Endpoint dokumen juga di-mock (`mockDocuments.ts`): upload langsung masuk antrean dan statusnya berjalan `queued → processing → ready` otomatis.
 
 ## Implementasi frontend
 

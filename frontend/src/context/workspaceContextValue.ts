@@ -15,6 +15,9 @@ export interface WorkspaceContextValue {
   askQuestion: (value: string) => void
   triggerUpload: () => void
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void
+  isUploading: boolean
+  uploadError: string | null
+  removeDocument: (id: number) => Promise<void>
 }
 
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)

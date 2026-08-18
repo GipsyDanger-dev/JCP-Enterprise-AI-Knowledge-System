@@ -64,6 +64,8 @@ export interface DocumentStatusResponse {
   id: number
   status: ApiDocumentStatus
   error?: string | null
+  /** Jumlah chunk; terisi saat status = ready */
+  chunks?: number | null
 }
 
 /* ============ Chat ============ */

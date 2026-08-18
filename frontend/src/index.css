@@ -197,6 +197,8 @@ button { cursor: pointer; }
 .secondary-button { background: var(--bg-card); color: var(--text-card); border: 1px solid var(--border-strong); }
 .secondary-button:hover { background: var(--bg-hover); }
 .link-button { border: 0; background: transparent; color: var(--brand-500); padding: 0; }
+.inline-alert { display: flex; align-items: center; gap: 7px; margin: 0 0 14px; padding: 9px 12px; border-radius: var(--radius-md); background: var(--brand-100); color: var(--brand-800); font-size: var(--fs-sm); }
+.icon-button.danger:hover { background: var(--brand-100); color: var(--brand-800); }
 
 /* ============ Overview (admin) ============ */
 .metrics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-xl); overflow: hidden; }

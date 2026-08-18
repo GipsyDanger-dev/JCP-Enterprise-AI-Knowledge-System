@@ -32,6 +32,16 @@ export function authHeaders(token?: string): Record<string, string> {
 
 type ErrorBody = { error?: { code?: string; message?: string } }
 
+/** Pesan error yang ramah pengguna (401/403/network) */
+export function errorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 401) return 'Email atau password salah.'
+    if (error.status === 403) return 'Akun Anda tidak memiliki akses.'
+    return error.message
+  }
+  return 'Tidak dapat terhubung ke server. Pastikan backend berjalan.'
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, ...rest } = options
   const headers = new Headers(rest.headers)

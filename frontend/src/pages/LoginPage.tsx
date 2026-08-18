@@ -2,20 +2,11 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { LoaderCircle, Lock, ShieldAlert, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { ApiError } from '@/api/client'
+import { errorMessage } from '@/api/client'
 import { isMockAuth } from '@/api/auth'
 import { useAuth } from '@/hooks/useAuth'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.status === 401) return 'Email atau password salah.'
-    if (error.status === 403) return 'Akun Anda tidak memiliki akses.'
-    return error.message
-  }
-  return 'Tidak dapat terhubung ke server. Pastikan backend berjalan.'
-}
 
 export function LoginPage() {
   const navigate = useNavigate()
