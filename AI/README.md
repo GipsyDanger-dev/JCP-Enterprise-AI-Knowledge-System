@@ -81,6 +81,34 @@ docker compose run --rm --entrypoint python ai evaluate.py --llm
 `./AI` di-mount ke `/app`, jadi kode lokal langsung kebaca (tidak perlu rebuild
 setiap ganti kode). `SUMOPOD_API_KEY` diambil dari `.env` atau environment host.
 
+## HTTP API + PostgreSQL/pgvector (integrasi Backend)
+
+AI Service dibungkus jadi HTTP API yang dipanggil NestJS (Backend). Frontend
+tidak pernah memanggil AI Service langsung.
+
+```bash
+# 1. Jalankan database + API (dari root repo)
+docker compose up -d postgres ai-api
+# 2. Cek docs Swagger: http://localhost:8000/docs
+```
+
+Tanpa Docker, jalan lokal:
+```powershell
+# store JSON (tanpa DB) — tetap jalan:
+python -m uvicorn http_api:app --host 0.0.0.0 --port 8000
+# store pgvector (butuh Postgres dengan extension pgvector):
+$env:DATABASE_URL="postgresql://ai:aipassword@localhost:5432/ai"
+python -m uvicorn http_api:app --host 0.0.0.0 --port 8000
+```
+
+Endpoint: `POST /ask`, `POST /ingest`, `GET /documents`,
+`DELETE /documents/{filename}`, `GET /health`. Spesifikasi lengkap +
+alur integrasi ada di **`API_CONTRACT.md`** — lempar ke Backend Engineer.
+
+- `DATABASE_URL` diset → chunk + embedding disimpan di pgvector (`<=>` cosine
+  search), TF-IDF offline tetap ada via store JSON.
+- `DATABASE_URL` kosong → fallback ke `knowledge_base.json` (perilaku lama).
+
 ## Embedding + vector search (opsional)
 
 ```powershell

@@ -1,13 +1,14 @@
-# Milestone M0 — reproducible local environment.
-# Only the AI service exists today; Backend/ and Frontend/ services are added
-# here when those modules are merged into the monorepo.
+# Milestone M0/M1 — reproducible local environment.
+# AI service (CLI + HTTP API) + PostgreSQL with pgvector for the shared
+# Data Layer. Backend/ and Frontend/ services are added here when those
+# modules are merged into the monorepo.
 #
 # Usage (see AI/README.md):
 #   docker compose build
 #   docker compose run --rm ai ask "Berapa maksimal biaya hotel Manager?"
 #   docker compose run --rm ai ingest sample_docs --embed
 #   docker compose run --rm --entrypoint python ai -m unittest discover -s tests -v
-#   docker compose run --rm --entrypoint python ai evaluate.py --llm
+#   docker compose up -d postgres ai-api     # start the HTTP API + database
 services:
   ai:
     build: ./AI
@@ -20,3 +21,39 @@ services:
       # Read from .env or the host environment; optional when not using --llm
       # or embeddings. Never commit the real key.
       SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
+
+  ai-api:
+    build: ./AI
+    image: jcp-ai-engine:local
+    entrypoint: ["uvicorn", "http_api:app", "--host", "0.0.0.0", "--port", "8000"]
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./AI:/app
+    environment:
+      SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
+      # With DATABASE_URL set, the API stores chunks+embeddings in pgvector.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://ai:aipassword@postgres:5432/ai}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai}
+      POSTGRES_USER: ${POSTGRES_USER:-ai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aipassword}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai} -d ${POSTGRES_DB:-ai}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

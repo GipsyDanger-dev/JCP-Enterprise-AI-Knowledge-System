@@ -1,2 +1,12 @@
+# Core engine runs on the Python stdlib; everything here is optional.
 # PDF parsing (optional — TXT/MD/DOCX work without any dependency).
 pypdf>=4.0
+
+# HTTP API (http_api.py) — required to serve the NestJS backend.
+fastapi>=0.111
+uvicorn>=0.30
+pydantic>=2.7
+
+# PostgreSQL + pgvector store (store.py) — required for the shared Data Layer.
+psycopg[binary]>=3.1
+pgvector>=0.2
