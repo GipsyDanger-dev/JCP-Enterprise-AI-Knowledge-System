@@ -60,12 +60,12 @@ function EmployeeOverview() {
       <PageHeading eyebrow="Tuesday, 18 August" title={<>Good morning, <span>Nadia.</span></>} detail="Find trusted answers and continue learning from company knowledge." action={<button className="secondary-button" onClick={() => navigate('/documents')}><Library size={17} /> Browse library</button>} />
 
       <section className="employee-ask">
-        <div className="employee-ask-copy"><span><Sparkles size={19} /></span><div><small>JCP KNOWLEDGE AGENT</small><h2>What can we help you find today?</h2></div></div>
+        <div className="employee-ask-copy"><span><Sparkles size={19} /></span><div><small>ENTERPRISE AI</small><h2>What can we help you find today?</h2></div></div>
         <form onSubmit={onAsk}><input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about policies, benefits, SOPs, or procedures" aria-label="Ask company knowledge" /><button title="Send question"><Send size={18} /></button></form>
         <div className="employee-prompts">{quickQuestions.slice(0, 2).map((item) => <button key={item} onClick={() => askQuestion(item)}>{item}<ArrowUpRight size={14} /></button>)}</div>
       </section>
 
-      {answer && <section className="employee-answer"><div className="answer-label"><Sparkles size={16} /> Answer from JCP AI</div><p>{answer}</p><SourceCard title="SOP Perjalanan Dinas 2026" detail="Page 7 · Hotel allowance" /></section>}
+      {answer && <section className="employee-answer"><div className="answer-label"><Sparkles size={16} /> Answer from Enterprise AI</div><p>{answer}</p><SourceCard title="SOP Perjalanan Dinas 2026" detail="Page 7 · Hotel allowance" /></section>}
 
       <div className="employee-dashboard-grid">
         <div className="employee-primary-column">

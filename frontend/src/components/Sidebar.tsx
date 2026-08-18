@@ -6,7 +6,7 @@ export function Sidebar({ menuOpen, onClose }: { menuOpen: boolean; onClose: () 
   const { role, person, navigation } = useWorkspace()
   return (
     <aside className={menuOpen ? 'sidebar open' : 'sidebar'}>
-      <div className="brand-lockup"><span className="brand-mark"><Sparkles size={17} /></span><strong>JCP AI</strong></div>
+      <div className="brand-lockup"><span className="brand-mark"><Sparkles size={17} /></span><strong>Enterprise AI</strong></div>
       <button className="mobile-close" title="Close navigation" onClick={onClose}><X size={20} /></button>
       <div className="workspace-switcher"><span>JC</span><div><strong>Jogja Creative</strong><small>{role === 'admin' ? 'Admin workspace' : 'Employee portal'}</small></div><ChevronDown size={15} /></div>
       <nav aria-label="Primary navigation">

@@ -13,7 +13,7 @@ export function ChatPage() {
         {answer ? <div className="conversation">
           <div className="user-message">{question || quickQuestions[0]}</div>
           <div className="assistant-message">
-            <div className="answer-label"><Sparkles size={16} /> JCP AI</div>
+            <div className="answer-label"><Sparkles size={16} /> Enterprise AI</div>
             <p>{answer}</p>
             <SourceCard title="SOP Perjalanan Dinas 2026" detail="Page 7 · Hotel allowance" trailing={<ArrowUpRight size={15} />} />
           </div>

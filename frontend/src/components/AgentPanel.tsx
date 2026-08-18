@@ -16,7 +16,7 @@ export function AgentPanel() {
           <div className="agent-intro"><span><Bot size={24} /></span><h2>Ask company knowledge</h2><p>Answers include the exact document evidence used.</p></div>
           <div className="question-list">{quickQuestions.map((item) => <button key={item} onClick={() => askQuestion(item)}>{item}<ChevronRight size={15} /></button>)}</div>
         </> : <div className="agent-answer">
-          <div className="answer-label"><Bot size={16} /> JCP AI</div>
+          <div className="answer-label"><Bot size={16} /> Enterprise AI</div>
           <p>{answer}</p>
           <SourceCard title="SOP Perjalanan Dinas 2026" detail="Page 7 · Hotel allowance" />
           <div className="verified"><ShieldCheck size={15} /> Evidence verified</div>
