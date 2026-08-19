@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowUpRight, ChevronDown, FileText, FolderOpen, LoaderCircle, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { ArrowUpRight, ChevronDown, Download, FileText, FolderOpen, LoaderCircle, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { useWorkspace } from '@/hooks/useWorkspace'
@@ -132,13 +132,39 @@ export function DocumentsPage() {
               <p>Document ini sudah ter-index dan tersedia untuk AI search. {selectedDoc.status === 'Ready' ? 'Status: siap digunakan.' : selectedDoc.status === 'Processing' ? 'Sedang diproses oleh pipeline indexing.' : selectedDoc.status === 'Queued' ? 'Menunggu giliran diproses.' : 'Gagal diproses.'}</p>
             </div>
 
-            {canManage && (
-              <div className="doc-detail-actions">
+            {selectedDoc.status === 'Ready' && (
+              <div className="doc-preview-content">
+                <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 8, display: 'block' }}>Document preview</label>
+                <div className="doc-preview-chunks">
+                  <div className="doc-preview-chunk">
+                    <label>Section 1 · Page 1</label>
+                    <p>This document contains standard operating procedures for business travel. All employees must follow the guidelines outlined below when requesting travel approvals.</p>
+                  </div>
+                  <div className="doc-preview-chunk">
+                    <label>Section 2 · Page 3</label>
+                    <p>Hotel allowances are determined by employee grade level. Managers are entitled to up to Rp 1,500,000 per night, while staff members receive up to Rp 800,000 per night.</p>
+                  </div>
+                  <div className="doc-preview-chunk">
+                    <label>Section 3 · Page 5</label>
+                    <p>Transportation costs are reimbursed based on actual expenses with a maximum limit per destination. Receipts must be submitted within 7 business days.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="doc-detail-actions">
+              {selectedDoc.status === 'Ready' && (
+                <button className="secondary-button" onClick={() => window.alert('Download dimulai. Dalam produksi, file akan diunduh dari backend.')}
+                >
+                  <Download size={15} /> Download document
+                </button>
+              )}
+              {canManage && (
                 <button className="danger-button" onClick={() => { handleDelete(selectedDoc.id, selectedDoc.name) }}>
                   <Trash2 size={15} /> Hapus dokumen
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
