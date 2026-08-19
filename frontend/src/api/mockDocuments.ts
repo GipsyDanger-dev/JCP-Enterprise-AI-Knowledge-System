@@ -41,12 +41,12 @@ export async function mockListDocuments(): Promise<ApiDocument[]> {
   return DOCUMENTS.map((doc) => ({ ...doc }))
 }
 
-export async function mockUploadDocument(file: File): Promise<ApiDocument> {
+export async function mockUploadDocument(file: File, collection?: string): Promise<ApiDocument> {
   await delay(900) // simulasi upload
   const doc: ApiDocument = {
     id: nextId++,
     name: file.name,
-    collection: 'Unassigned',
+    collection: collection || 'Unassigned',
     updatedAt: iso(new Date()),
     status: 'queued',
     chunks: null,

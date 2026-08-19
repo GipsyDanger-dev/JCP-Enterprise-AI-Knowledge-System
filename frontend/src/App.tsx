@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { RequireAuth, RequireRole } from '@/components/RequireAuth'
@@ -13,9 +14,20 @@ import { OverviewPage } from '@/pages/OverviewPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { UsersPage } from '@/pages/UsersPage'
 
+function ThemeInitializer() {
+  useEffect(() => {
+    const stored = localStorage.getItem('jcp-theme')
+    if (stored === 'dark' || stored === 'light') {
+      document.documentElement.setAttribute('data-theme', stored)
+    }
+  }, [])
+  return null
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <ThemeInitializer />
       <AuthProvider>
         <WorkspaceProvider>
           <Routes>
