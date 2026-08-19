@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bell, ChevronDown, LogOut, Menu, Search, ShieldCheck, User, Users } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, Menu, Search, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
 export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
-  const { role, changeRole, person } = useWorkspace()
+  const { person } = useWorkspace()
   const { logout } = useAuth()
   const navigate = useNavigate()
   const [showNotifications, setShowNotifications] = useState(false)
@@ -44,10 +44,6 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
           onChange={(e) => setSearchValue(e.target.value)}
         />
       </form>
-      <div className="role-switch" aria-label="Preview dashboard role">
-        <button className={role === 'admin' ? 'selected' : ''} onClick={() => changeRole('admin')}><ShieldCheck size={14} /> Admin</button>
-        <button className={role === 'employee' ? 'selected' : ''} onClick={() => changeRole('employee')}><Users size={14} /> Employee</button>
-      </div>
       <div className="top-actions">
         <div className="topbar-dropdown-wrap" ref={notifRef}>
           <button className="icon-button" title="Notifications" onClick={() => { setShowNotifications(!showNotifications); setShowProfile(false) }}>

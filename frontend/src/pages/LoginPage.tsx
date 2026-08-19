@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Eye, EyeOff, FileText, LoaderCircle, Lock, Mail, ShieldAlert, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, LoaderCircle, Lock, Mail, ShieldAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { errorMessage } from '@/api/client'
 import { useAuth } from '@/hooks/useAuth'
+import { LogoMark } from '@/components/Logo'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -46,59 +47,21 @@ export function LoginPage() {
   }
 
   return (
-    <main className="login-layout">
-      {/* Left: branding panel */}
-      <div className="login-brand-panel">
-        <div className="brand-panel-content">
-          <div className="brand-panel-logo">
-            <span className="brand-panel-icon"><Sparkles size={28} /></span>
-          </div>
-          <h1 className="brand-panel-title">Enterprise AI</h1>
-          <p className="brand-panel-tagline">Knowledge management platform with AI-powered search & citation.</p>
-
-          <div className="brand-features">
-            <div className="brand-feature">
-              <span className="feature-icon"><FileText size={18} /></span>
-              <div>
-                <strong>Document Intelligence</strong>
-                <small>Upload, index, and search across all company documents</small>
-              </div>
-            </div>
-            <div className="brand-feature">
-              <span className="feature-icon"><Sparkles size={18} /></span>
-              <div>
-                <strong>AI-Powered Answers</strong>
-                <small>Ask questions and get grounded answers with source citations</small>
-              </div>
-            </div>
-            <div className="brand-feature">
-              <span className="feature-icon"><Lock size={18} /></span>
-              <div>
-                <strong>Role-Based Access</strong>
-                <small>Secure workspace with admin and employee role controls</small>
-              </div>
-            </div>
-          </div>
+    <main className="login-centered">
+      <div className="login-card-centered">
+        <div className="login-card-header">
+          <LogoMark size={48} />
+          <h1>Enterprise AI</h1>
+          <p>Sign in to your knowledge workspace</p>
         </div>
 
-        <div className="brand-panel-dots" />
-      </div>
-
-      {/* Right: login form */}
-      <div className="login-form-panel">
-        <form className="login-form" onSubmit={handleSubmit} noValidate>
-          <div className="login-form-header">
-            <span className="login-form-logo"><Sparkles size={20} /></span>
-            <h2>Welcome back</h2>
-            <p>Sign in to access your knowledge workspace.</p>
+        {error && (
+          <div className="login-error" role="alert">
+            <ShieldAlert size={15} /> {error}
           </div>
+        )}
 
-          {error && (
-            <div className="login-error" role="alert">
-              <ShieldAlert size={15} /> {error}
-            </div>
-          )}
-
+        <form className="login-form-centered" onSubmit={handleSubmit} noValidate>
           <div className={`login-field ${emailInvalid ? 'invalid' : ''}`}>
             <label htmlFor="login-email">Email address</label>
             <div className="login-input-wrap">
@@ -148,14 +111,12 @@ export function LoginPage() {
             {submitting ? (
               <><LoaderCircle size={16} className="spin" /> Signing in…</>
             ) : (
-              <><Lock size={16} /> Sign in</>
+              'Sign in'
             )}
           </button>
-
-          <p className="login-footer">
-            Enterprise AI Knowledge System
-          </p>
         </form>
+
+        <p className="login-footer">Enterprise AI Knowledge System</p>
       </div>
     </main>
   )

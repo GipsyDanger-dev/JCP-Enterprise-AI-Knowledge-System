@@ -176,9 +176,7 @@ button { cursor: pointer; }
 .notification-dot { width: 6px; height: 6px; background: var(--brand-600); border: 2px solid var(--bg-card); border-radius: var(--radius-round); position: absolute; top: 5px; right: 5px; }
 .top-profile { border: 0; background: transparent; display: flex; align-items: center; gap: 5px; padding: 3px; }
 .menu-button { display: none; position: absolute; left: 18px; }
-.role-switch { position: absolute; left: 25px; height: 31px; padding: 3px; display: flex; align-items: center; gap: 2px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-soft); }
-.role-switch button { height: 23px; padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); display: flex; align-items: center; gap: 5px; font-size: var(--fs-xs); font-weight: var(--fw-semibold); }
-.role-switch button.selected { background: var(--bg-card); color: var(--text-strong); box-shadow: var(--shadow-xs); }
+
 
 /* Topbar dropdowns */
 .topbar-dropdown-wrap { position: relative; }
@@ -390,34 +388,19 @@ button { cursor: pointer; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; clip-path: inset(50%); }
 
 /* ============ Login ============ */
-.login-layout { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
-
-/* Left branding panel */
-.login-brand-panel { position: relative; display: flex; flex-direction: column; justify-content: center; padding: 48px 56px; background: linear-gradient(135deg, var(--ink) 0%, #2a2520 50%, #3b2a1e 100%); color: var(--on-dark); overflow: hidden; }
-.brand-panel-content { position: relative; z-index: 1; max-width: 420px; }
-.brand-panel-logo { width: 56px; height: 56px; border-radius: var(--radius-lg); background: rgba(255,112,67,.15); border: 1px solid rgba(255,112,67,.25); display: grid; place-items: center; color: var(--brand-600); margin-bottom: 28px; }
-.brand-panel-title { margin: 0 0 12px; font-size: 36px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
-.brand-panel-tagline { margin: 0 0 40px; font-size: var(--fs-md); color: rgba(255,255,255,.55); line-height: 1.6; }
-.brand-features { display: flex; flex-direction: column; gap: 20px; }
-.brand-feature { display: flex; gap: 14px; align-items: flex-start; }
-.feature-icon { flex-shrink: 0; width: 36px; height: 36px; border-radius: var(--radius-md); background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); display: grid; place-items: center; color: var(--brand-600); }
-.brand-feature strong { display: block; font-size: var(--fs-sm); font-weight: 600; margin-bottom: 2px; color: rgba(255,255,255,.9); }
-.brand-feature small { font-size: var(--fs-xs); color: rgba(255,255,255,.4); line-height: 1.4; }
-.brand-panel-dots { position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,112,67,.08) 1px, transparent 1px); background-size: 24px 24px; pointer-events: none; }
-
-/* Right form panel */
-.login-form-panel { display: flex; align-items: center; justify-content: center; padding: 40px 32px; background: var(--bg-shell); }
-.login-form { width: 100%; max-width: 380px; }
-.login-form-header { text-align: center; margin-bottom: 32px; }
-.login-form-logo { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--radius-lg); background: var(--brand-50); border: 1px solid var(--brand-200); color: var(--brand-600); margin-bottom: 18px; }
-.login-form-header h2 { margin: 0 0 6px; font-size: var(--fs-2xl); font-weight: 700; color: var(--text-card); }
-.login-form-header p { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); }
+/* ============ Login — Centered Card ============ */
+.login-centered { min-height: 100vh; display: grid; place-items: center; background: var(--bg-page); padding: 32px 20px; }
+.login-card-centered { width: 100%; max-width: 400px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 40px 36px 36px; box-shadow: var(--shadow-lg); }
+.login-card-header { text-align: center; margin-bottom: 28px; }
+.login-card-header h1 { margin: 14px 0 6px; font-size: 22px; font-weight: 700; color: var(--text-card); }
+.login-card-header p { margin: 0; font-size: 13px; color: var(--text-muted); }
 
 /* Error */
 .login-error { display: flex; align-items: center; gap: 7px; margin-bottom: 18px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--brand-100); color: var(--brand-800); font-size: var(--fs-sm); animation: fadeIn .2s ease; }
 
 /* Fields */
-.login-field { margin-bottom: 18px; }
+.login-form-centered { display: grid; gap: 16px; }
+.login-field { margin-bottom: 0; }
 .login-field label { display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: var(--fs-xs); font-weight: var(--fw-semibold); }
 .login-input-wrap { position: relative; display: flex; align-items: center; }
 .login-input-icon { position: absolute; left: 12px; color: var(--text-muted); pointer-events: none; }
@@ -431,11 +414,11 @@ button { cursor: pointer; }
 .password-toggle:hover { color: var(--text-secondary); background: var(--bg-subtle); }
 
 /* Submit */
-.login-submit { width: 100%; height: 44px; border: 0; border-radius: var(--radius-md); background: var(--brand-600); color: var(--on-dark); font-weight: var(--fw-semibold); font-size: var(--fs-md); display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-shadow: var(--shadow-primary); transition: background var(--ease-fast), transform var(--ease-fast); cursor: pointer; }
+.login-submit { width: 100%; height: 44px; border: 0; border-radius: var(--radius-md); background: var(--brand-600); color: var(--on-dark); font-weight: var(--fw-semibold); font-size: var(--fs-md); display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-shadow: var(--shadow-primary); transition: background var(--ease-fast), transform var(--ease-fast); cursor: pointer; margin-top: 4px; }
 .login-submit:hover:not(:disabled) { background: var(--brand-700); transform: translateY(-1px); }
 .login-submit:active:not(:disabled) { transform: translateY(0); }
 .login-submit:disabled { opacity: .65; cursor: not-allowed; }
-.login-footer { margin-top: 28px; text-align: center; font-size: var(--fs-2xs); color: var(--text-muted); letter-spacing: .03em; }
+.login-footer { margin-top: 24px; text-align: center; font-size: 11px; color: var(--text-muted); letter-spacing: .03em; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .spin { animation: spin 1.2s linear infinite; }
@@ -589,14 +572,9 @@ button { cursor: pointer; }
 
 /* ============ Responsive: mobile ============ */
 @media (max-width: 760px) {
-  /* Login: brand panel di atas, form di bawah */
-  .login-layout { grid-template-columns: 1fr; }
-  .login-brand-panel { padding: 32px 24px; min-height: auto; }
-  .brand-panel-title { font-size: 28px; }
-  .brand-panel-tagline { margin-bottom: 24px; font-size: var(--fs-sm); }
-  .brand-features { gap: 14px; }
-  .login-form-panel { padding: 28px 20px; }
-  .login-form { max-width: 100%; }
+  /* Login: responsive */
+  .login-centered { padding: 20px 16px; }
+  .login-card-centered { padding: 32px 24px 28px; }
 
   .app-shell { grid-template-columns: 1fr; }
   .workspace { grid-column: 1; }
@@ -608,8 +586,7 @@ button { cursor: pointer; }
   .topbar { padding: 0 17px; justify-content: space-between; }
   .menu-button { display: grid; position: static; }
   .search-shell { display: none; }
-  .role-switch { position: static; }
-  .role-switch button { padding: 0 6px; }
+
   .top-actions { position: static; }
   .top-profile { display: none; }
 
@@ -652,7 +629,7 @@ button { cursor: pointer; }
 /* ============ Responsive: layar sangat kecil ============ */
 @media (max-width: 480px) {
   .topbar { padding: 0 10px; }
-  .role-switch button { font-size: var(--fs-2xs); padding: 0 5px; gap: 4px; }
+
   .top-actions { gap: 2px; }
   .overview-main, .standard-page, .chat-page, .employee-page { padding: 22px 14px 36px; }
   .heading-actions { flex-wrap: wrap; }
