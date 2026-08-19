@@ -13,7 +13,10 @@ CITATION_FIELDS = ("document_id", "filename", "version", "page_number", "section
 
 
 def citation_from_chunk(chunk: dict[str, Any]) -> dict[str, Any]:
-    return {key: chunk[key] for key in CITATION_FIELDS}
+    citation = {key: chunk[key] for key in CITATION_FIELDS}
+    if "document_version_id" in chunk:
+        citation["document_version_id"] = chunk["document_version_id"]
+    return citation
 
 
 def citations_from_matches(matches: list[tuple[float, dict[str, Any]]]) -> list[dict[str, Any]]:

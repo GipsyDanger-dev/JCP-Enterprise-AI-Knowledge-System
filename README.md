@@ -19,10 +19,10 @@ integrasi end-to-end belum selesai.
 | AI Service | Ingestion, retrieval, generation, citation, dan evaluasi tersedia |
 | Integrasi Backend–AI | Belum selesai |
 
-Masalah integrasi utama:
+Masalah integrasi utama yang tersisa:
 
-1. Prisma dan AI Service sama-sama memakai tabel `documents` dengan struktur berbeda.
-2. ID dokumen AI belum terhubung ke `DocumentVersion.id` Backend.
+1. Backend belum mengirim binary dokumen ke endpoint ingestion AI.
+2. Modul Backend chat, AI wrapper, dan users masih skeleton.
 3. Kontrak Frontend belum sama dengan Backend (field, UUID, role, dan status).
 
 ## Tech stack
@@ -73,8 +73,9 @@ docker compose up --build
 Hentikan service dengan `docker compose down`. Jangan gunakan flag `-v` kecuali
 memang ingin menghapus seluruh data PostgreSQL pada volume lokal.
 
-> AI Service dan Backend memakai database yang sama, tetapi ingestion pgvector
-> belum aman dijalankan sebelum konflik schema `documents` diperbaiki.
+> AI Service dan Backend memakai database yang sama. Schema chunk sudah
+> mereferensikan `document_versions`, tetapi alur pengiriman file dari Backend
+> ke AI belum diimplementasikan.
 
 ## Environment
 

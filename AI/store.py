@@ -1,27 +1,20 @@
 """PostgreSQL + pgvector store for the AI service.
 
-Mirrors the JSON ``KnowledgeBase`` contract so the pipeline (ingestion,
-retrieval, generation) can run against a shared Postgres database — the
-Data Layer in the briefing architecture. Backend (NestJS) owns the schema
-and migrations; this module only writes/reads the tables it needs:
+Prisma owns the shared database schema and migrations. The AI service only
+reads backend document metadata and writes retrieval chunks:
 
-    documents(document_id, filename, version, content_hash, num_chunks)
-    chunks(chunk_id, document_id, filename, version, page_number,
-           section_title, text, embedding vector(1536))
+    document_versions(id, document_id, original_filename, version_number, checksum)
+        -> chunks(chunk_id, document_version_id, page_number, section_title,
+                  text, embedding vector(1536))
 
-Vector search uses the pgvector cosine distance operator (``<=>``); TF-IDF
-stays available in the JSON store for fully offline mode.
-
-Dependencies are optional on purpose (like ``pypdf``): importing this
-module never fails, only *using* it without ``psycopg``/``pgvector``
-installed raises a clear error.
+No AI-owned ``documents`` table is created. Every chunk is tied to the exact
+backend ``DocumentVersion`` that produced it, and database cascade deletion
+removes its chunks when that version is deleted.
 """
 
 from __future__ import annotations
 
-import json
 import os
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +28,7 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     register_vector = None
 
-from config import EMBEDDING_MODEL, SUMOPOD_API_KEY_ENV
+from config import EMBEDDING_MODEL
 from generation.citations import citations_from_matches
 from generation.guardrails import no_answer_response
 from generation.llm import DEFAULT_MODEL, generate_answer
@@ -44,38 +37,8 @@ from ingestion.parsers import read_document
 from ingestion.sections import extract_sections
 from retrieval.embeddings import embed_texts
 
-# Matches text-embedding-3-small output size.
-EMBEDDING_DIM = 1536
-# Same threshold as the local vector retriever (calibrated against the live API).
 VECTOR_MINIMUM_SCORE = 0.45
-
 DATABASE_URL_ENV = "DATABASE_URL"
-
-SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS documents (
-    document_id   UUID PRIMARY KEY,
-    filename      TEXT NOT NULL,
-    version       INT NOT NULL,
-    content_hash  TEXT NOT NULL,
-    num_chunks    INT NOT NULL DEFAULT 0,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS chunks (
-    chunk_id      TEXT PRIMARY KEY,
-    document_id   UUID NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
-    filename      TEXT NOT NULL,
-    version       INT NOT NULL,
-    page_number   INT,
-    section_title TEXT NOT NULL DEFAULT '',
-    text          TEXT NOT NULL,
-    embedding     vector({dim})
-);
-
-CREATE INDEX IF NOT EXISTS chunks_document_idx ON chunks(document_id);
-CREATE INDEX IF NOT EXISTS chunks_embedding_idx
-    ON chunks USING hnsw (embedding vector_cosine_ops);
-""".format(dim=EMBEDDING_DIM)
 
 
 def _require_deps() -> None:
@@ -90,7 +53,7 @@ def default_dsn() -> str | None:
 
 
 class PgVectorStore:
-    """Store + retriever backed by PostgreSQL/pgvector (mirrors KnowledgeBase)."""
+    """Chunk store backed by the Prisma-managed PostgreSQL schema."""
 
     def __init__(self, dsn: str | None = None, model: str = EMBEDDING_MODEL):
         _require_deps()
@@ -98,70 +61,105 @@ class PgVectorStore:
         if not self.dsn:
             raise RuntimeError(
                 f"{DATABASE_URL_ENV} is not set. Run e.g.: "
-                '$env:DATABASE_URL="postgresql://user:pass@localhost:5432/ai"'
+                '$env:DATABASE_URL="postgresql://user:pass@localhost:5432/rag_knowledge"'
             )
         self.model = model
-        with psycopg.connect(self.dsn) as conn:
-            conn.execute(SCHEMA_SQL)
-            conn.commit()
 
-    # ---------- documents ----------
+    # ---------- backend document metadata ----------
 
     def list_documents(self) -> list[dict[str, Any]]:
+        """List active backend document versions and their indexed chunk count."""
+        sql = """
+            SELECT d.id, dv.id, dv.original_filename, dv.version_number,
+                   COUNT(c.chunk_id)::int
+            FROM document_versions AS dv
+            JOIN documents AS d ON d.id = dv.document_id
+            LEFT JOIN chunks AS c ON c.document_version_id = dv.id
+            WHERE d.deleted_at IS NULL
+            GROUP BY d.id, dv.id, dv.original_filename, dv.version_number
+            ORDER BY dv.original_filename, dv.version_number DESC
+        """
         with psycopg.connect(self.dsn) as conn:
-            rows = conn.execute(
-                "SELECT document_id, filename, version, num_chunks FROM documents ORDER BY filename"
-            ).fetchall()
+            rows = conn.execute(sql).fetchall()
         return [
-            {"document_id": str(row[0]), "filename": row[1], "version": row[2], "num_chunks": row[3]}
+            {
+                "document_id": str(row[0]),
+                "document_version_id": str(row[1]),
+                "filename": row[2],
+                "version": row[3],
+                "chunks": row[4],
+            }
             for row in rows
         ]
 
-    def get_document(self, document_id: str) -> dict[str, Any] | None:
+    def get_document_version(self, document_version_id: str) -> dict[str, Any] | None:
+        sql = """
+            SELECT d.id, dv.id, dv.original_filename, dv.version_number,
+                   dv.checksum, COUNT(c.chunk_id)::int
+            FROM document_versions AS dv
+            JOIN documents AS d ON d.id = dv.document_id
+            LEFT JOIN chunks AS c ON c.document_version_id = dv.id
+            WHERE dv.id = %s AND d.deleted_at IS NULL
+            GROUP BY d.id, dv.id, dv.original_filename, dv.version_number, dv.checksum
+        """
         with psycopg.connect(self.dsn) as conn:
-            row = conn.execute(
-                "SELECT document_id, filename, version, content_hash, num_chunks "
-                "FROM documents WHERE document_id = %s",
-                (document_id,),
-            ).fetchone()
+            row = conn.execute(sql, (document_version_id,)).fetchone()
         if row is None:
             return None
         return {
-            "document_id": str(row[0]), "filename": row[1], "version": row[2],
-            "content_hash": row[3], "num_chunks": row[4],
+            "document_id": str(row[0]),
+            "document_version_id": str(row[1]),
+            "filename": row[2],
+            "version": row[3],
+            "content_hash": row[4],
+            "num_chunks": row[5],
         }
 
-    def replace_document(self, document_id: str, filename: str, version: int,
-                         content_hash: str, chunks: list[dict[str, Any]]) -> None:
-        """Swap a document's chunks in one transaction (used on re-ingest)."""
+    def replace_document_version(
+        self,
+        document_version_id: str,
+        chunks: list[dict[str, Any]],
+    ) -> None:
+        """Replace one version's chunks atomically; the version must exist."""
         with psycopg.connect(self.dsn) as conn:
             with conn.transaction():
-                conn.execute("DELETE FROM chunks WHERE document_id = %s", (document_id,))
                 conn.execute(
-                    "INSERT INTO documents (document_id, filename, version, content_hash, num_chunks) "
-                    "VALUES (%s, %s, %s, %s, %s) "
-                    "ON CONFLICT (document_id) DO UPDATE SET "
-                    "filename = EXCLUDED.filename, version = EXCLUDED.version, "
-                    "content_hash = EXCLUDED.content_hash, num_chunks = EXCLUDED.num_chunks",
-                    (document_id, filename, version, content_hash, len(chunks)),
+                    "DELETE FROM chunks WHERE document_version_id = %s",
+                    (document_version_id,),
                 )
                 for chunk in chunks:
                     conn.execute(
-                        "INSERT INTO chunks (chunk_id, document_id, filename, version, "
-                        "page_number, section_title, text) "
-                        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                        (chunk["chunk_id"], document_id, filename, version,
-                         chunk.get("page_number"), chunk.get("section_title", ""), chunk["text"]),
+                        "INSERT INTO chunks (chunk_id, document_version_id, page_number, "
+                        "section_title, text) VALUES (%s, %s, %s, %s, %s)",
+                        (
+                            chunk["chunk_id"],
+                            document_version_id,
+                            chunk.get("page_number"),
+                            chunk.get("section_title", ""),
+                            chunk["text"],
+                        ),
                     )
 
     def delete(self, filename: str) -> bool:
-        """Delete a document and all its chunks (ON DELETE CASCADE handles chunks)."""
+        """Delete AI chunks for the latest active version, not backend metadata."""
+        select_sql = """
+            SELECT dv.id
+            FROM document_versions AS dv
+            JOIN documents AS d ON d.id = dv.document_id
+            WHERE dv.original_filename = %s AND d.deleted_at IS NULL
+            ORDER BY dv.version_number DESC
+            LIMIT 1
+        """
         with psycopg.connect(self.dsn) as conn:
             with conn.transaction():
-                row = conn.execute(
-                    "DELETE FROM documents WHERE filename = %s RETURNING document_id", (filename,)
-                ).fetchone()
-        return row is not None
+                row = conn.execute(select_sql, (filename,)).fetchone()
+                if row is None:
+                    return False
+                conn.execute(
+                    "DELETE FROM chunks WHERE document_version_id = %s",
+                    (row[0],),
+                )
+        return True
 
     # ---------- embeddings ----------
 
@@ -171,106 +169,178 @@ class PgVectorStore:
             with conn.transaction():
                 for chunk_id, vector in zip(chunk_ids, vectors):
                     conn.execute(
-                        "UPDATE chunks SET embedding = %s WHERE chunk_id = %s", (vector, chunk_id)
+                        "UPDATE chunks SET embedding = %s WHERE chunk_id = %s",
+                        (vector, chunk_id),
                     )
 
     # ---------- retrieval ----------
 
-    def search(self, query_vector: list[float], top_k: int = 5,
-               filters: dict[str, Any] | None = None) -> list[tuple[float, dict[str, Any]]]:
-        """Cosine search over stored embeddings, optionally filtered by metadata.
-
-        Returns [(score, chunk)] with score in [0, 1] (1 = identical direction).
-        """
-        conditions = ["embedding IS NOT NULL"]
-        params: list[Any] = []
+    def search(
+        self,
+        query_vector: list[float],
+        top_k: int = 5,
+        filters: dict[str, Any] | None = None,
+    ) -> list[tuple[float, dict[str, Any]]]:
+        """Cosine search joined to authoritative backend document metadata."""
+        conditions = ["c.embedding IS NOT NULL", "d.deleted_at IS NULL"]
+        filter_params: list[Any] = []
         if filters:
-            for key in ("filename", "section_title"):
-                value = filters.get(key)
-                if value:
-                    conditions.append(f"{key} ILIKE %s")
-                    params.append(f"%{value}%")
+            filename = filters.get("filename")
+            if filename:
+                conditions.append("dv.original_filename ILIKE %s")
+                filter_params.append(f"%{filename}%")
+            section_title = filters.get("section_title")
+            if section_title:
+                conditions.append("c.section_title ILIKE %s")
+                filter_params.append(f"%{section_title}%")
+
         where = " AND ".join(conditions)
-        params.append(query_vector)
-        params.append(top_k)
-        sql = (
-            f"SELECT chunk_id, document_id, filename, version, page_number, section_title, text, "
-            f"1 - (embedding <=> %s::vector) AS score "
-            f"FROM chunks WHERE {where} ORDER BY embedding <=> %s::vector LIMIT %s"
-        )
+        sql = f"""
+            SELECT c.chunk_id, d.id, dv.id, dv.original_filename,
+                   dv.version_number, c.page_number, c.section_title, c.text,
+                   1 - (c.embedding <=> %s::vector) AS score
+            FROM chunks AS c
+            JOIN document_versions AS dv ON dv.id = c.document_version_id
+            JOIN documents AS d ON d.id = dv.document_id
+            WHERE {where}
+            ORDER BY c.embedding <=> %s::vector
+            LIMIT %s
+        """
+        params = [query_vector, *filter_params, query_vector, top_k]
         with psycopg.connect(self.dsn) as conn:
             register_vector(conn)
             rows = conn.execute(sql, params).fetchall()
+
         results: list[tuple[float, dict[str, Any]]] = []
         for row in rows:
             chunk = {
-                "chunk_id": row[0], "document_id": str(row[1]), "filename": row[2],
-                "version": row[3], "page_number": row[4],
-                "section_title": row[5] or "", "text": row[6],
+                "chunk_id": row[0],
+                "document_id": str(row[1]),
+                "document_version_id": str(row[2]),
+                "filename": row[3],
+                "version": row[4],
+                "page_number": row[5],
+                "section_title": row[6] or "",
+                "text": row[7],
             }
-            results.append((float(row[7]), chunk))
+            results.append((float(row[8]), chunk))
         return results
 
-    # ---------- orchestration (same contract as KnowledgeBase) ----------
+    # ---------- orchestration ----------
 
-    def ask(self, query: str, top_k: int = 5, minimum_score: float = VECTOR_MINIMUM_SCORE,
-            use_llm: bool = False, model: str = DEFAULT_MODEL,
-            api_key: str | None = None, filters: dict[str, Any] | None = None) -> dict[str, Any]:
+    def ask(
+        self,
+        query: str,
+        top_k: int = 5,
+        minimum_score: float = VECTOR_MINIMUM_SCORE,
+        use_llm: bool = False,
+        model: str = DEFAULT_MODEL,
+        api_key: str | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         query_vector = embed_texts([query], model=self.model, api_key=api_key)[0]
-        matches = [(score, chunk) for score, chunk in self.search(query_vector, top_k, filters=filters)
-                   if score >= minimum_score]
+        matches = [
+            (score, chunk)
+            for score, chunk in self.search(query_vector, top_k, filters=filters)
+            if score >= minimum_score
+        ]
         if not matches:
             return no_answer_response()
         citations = citations_from_matches(matches)
-        if use_llm:
-            answer = generate_answer(query, matches, model=model, api_key=api_key)
-        else:
-            answer = matches[0][1]["text"]
+        answer = (
+            generate_answer(query, matches, model=model, api_key=api_key)
+            if use_llm
+            else matches[0][1]["text"]
+        )
         return {
             "answer": answer,
             "citations": citations,
             "grounded": True,
-            "retrieval": [{"chunk_id": chunk["chunk_id"], "score": round(score, 4)} for score, chunk in matches],
+            "retrieval": [
+                {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
+                for score, chunk in matches
+            ],
         }
-
-
-def document_id(filename: str) -> str:
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, filename))
 
 
 def content_hash(path: Path) -> str:
     import hashlib
+
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def ingest_to_pg(input_dir: Path, store: PgVectorStore, embed: bool = True,
-                 api_key: str | None = None) -> list[dict[str, Any]]:
-    """Parse -> chunk -> (embed) -> upsert every supported file into Postgres.
-
-    Idempotent: unchanged files are skipped, changed files get version+1.
-    """
+def ingest_to_pg(
+    input_dir: Path,
+    store: PgVectorStore,
+    document_version_id: str,
+    embed: bool = True,
+    api_key: str | None = None,
+) -> list[dict[str, Any]]:
+    """Ingest exactly one file for an existing backend DocumentVersion."""
     from knowledge_base import SUPPORTED_SUFFIXES
-    results: list[dict[str, Any]] = []
-    for path in sorted(Path(input_dir).rglob("*")):
-        if not (path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES):
-            continue
-        filename = path.name
-        doc_id = document_id(filename)
-        digest = content_hash(path)
-        existing = store.get_document(doc_id)
-        if existing and existing["content_hash"] == digest:
-            results.append({"filename": filename, "document_id": doc_id,
-                            "version": existing["version"], "num_chunks": existing["num_chunks"],
-                            "status": "unchanged"})
-            continue
-        pages = read_document(path)
-        sections = extract_sections(path.suffix.lower(), path, pages)
-        version = (existing["version"] + 1) if existing else 1
-        chunks = chunk_pages(pages, filename, doc_id, version, sections=sections)
-        store.replace_document(doc_id, filename, version, digest, chunks)
-        if embed:
-            vectors = embed_texts([chunk["text"] for chunk in chunks], model=store.model, api_key=api_key)
-            store.store_embeddings(vectors, [chunk["chunk_id"] for chunk in chunks])
-        results.append({"filename": filename, "document_id": doc_id, "version": version,
-                        "num_chunks": len(chunks), "status": "indexed"})
-    return results
+
+    paths = [
+        path
+        for path in sorted(Path(input_dir).rglob("*"))
+        if path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES
+    ]
+    if len(paths) != 1:
+        raise ValueError(
+            "PostgreSQL ingestion requires exactly one supported file per document_version_id"
+        )
+
+    metadata = store.get_document_version(document_version_id)
+    if metadata is None:
+        raise ValueError(f"document version not found: {document_version_id}")
+
+    path = paths[0]
+    if path.name != metadata["filename"]:
+        raise ValueError(
+            f"filename does not match document version: expected {metadata['filename']}"
+        )
+
+    digest = content_hash(path)
+    expected_hash = metadata.get("content_hash")
+    if expected_hash and digest != expected_hash:
+        raise ValueError("file checksum does not match document version")
+
+    if metadata["num_chunks"] > 0:
+        return [{
+            "filename": metadata["filename"],
+            "document_id": metadata["document_id"],
+            "document_version_id": metadata["document_version_id"],
+            "version": metadata["version"],
+            "num_chunks": metadata["num_chunks"],
+            "status": "unchanged",
+        }]
+
+    pages = read_document(path)
+    sections = extract_sections(path.suffix.lower(), path, pages)
+    chunks = chunk_pages(
+        pages,
+        metadata["filename"],
+        metadata["document_version_id"],
+        metadata["version"],
+        sections=sections,
+    )
+    for chunk in chunks:
+        chunk["document_id"] = metadata["document_id"]
+        chunk["document_version_id"] = metadata["document_version_id"]
+
+    store.replace_document_version(document_version_id, chunks)
+    if embed and chunks:
+        vectors = embed_texts(
+            [chunk["text"] for chunk in chunks],
+            model=store.model,
+            api_key=api_key,
+        )
+        store.store_embeddings(vectors, [chunk["chunk_id"] for chunk in chunks])
+
+    return [{
+        "filename": metadata["filename"],
+        "document_id": metadata["document_id"],
+        "document_version_id": metadata["document_version_id"],
+        "version": metadata["version"],
+        "num_chunks": len(chunks),
+        "status": "indexed",
+    }]

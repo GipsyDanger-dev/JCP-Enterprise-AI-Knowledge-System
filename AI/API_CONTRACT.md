@@ -1,8 +1,8 @@
 # API Contract — Backend dan AI Service
 
-Version: `0.1`
+Version: `0.2`
 
-Status: draft; kontrak query tersedia, kontrak ingestion end-to-end belum final.
+Status: draft; schema chunk terintegrasi, transport file end-to-end belum final.
 
 AI Service adalah service HTTP internal yang dipanggil oleh Backend NestJS.
 Frontend React/Vite tidak boleh memanggil AI Service secara langsung.
@@ -23,21 +23,20 @@ Frontend React/Vite tidak boleh memanggil AI Service secara langsung.
 
 ## Status integrasi
 
-Endpoint di bawah sudah ada pada FastAPI, tetapi integrasi PostgreSQL bersama
-Backend masih memiliki kendala:
+Schema chunk sudah diperbaiki:
 
-1. AI dan Prisma membuat tabel bernama `documents` dengan schema berbeda.
-2. AI membuat `document_id` dari nama file, bukan memakai
-   `DocumentVersion.id` Backend.
-3. Backend menyimpan file sebagai `bytea`, sementara `/ingest` hanya menerima
-   path direktori pada filesystem AI.
-4. PostgreSQL `list_documents()` menghasilkan `num_chunks`, tetapi response
-   model `/documents` mengharuskan `chunks`.
-5. Parameter query vector search perlu diperbaiki dan diuji pada PostgreSQL
-   asli, termasuk metadata filter.
+- Prisma menjadi pemilik schema dan migration.
+- AI tidak lagi membuat tabel `documents` atau `chunks` saat startup.
+- `chunks.document_version_id` mereferensikan `document_versions.id` dengan
+  `ON DELETE CASCADE`.
+- Metadata dokumen dibaca melalui join ke schema Backend.
+- Vector search dan metadata filter memakai parameter SQL yang sesuai urutan.
+- Citation PostgreSQL membawa `document_version_id` hasil retrieval.
 
-Karena itu, endpoint JSON store dapat dipakai untuk pengembangan mandiri, tetapi
-alur upload–ingest end-to-end belum boleh dianggap selesai.
+Kendala tersisa adalah transport file: Backend menyimpan file sebagai `bytea`,
+sedangkan `/ingest` masih membaca satu file dari direktori AI. Alur
+upload–ingest end-to-end belum boleh dianggap selesai sebelum multipart atau
+mekanisme transport lain diimplementasikan dan diuji pada PostgreSQL nyata.
 
 ## 1. Health
 
@@ -146,6 +145,7 @@ Request:
 ```json
 {
   "input_dir": "sample_docs",
+  "document_version_id": "document-version-uuid",
   "embed": true,
   "model": "text-embedding-3-small"
 }
@@ -159,6 +159,7 @@ Response `200`:
     {
       "filename": "sop_perjalanan.txt",
       "document_id": "document-id",
+      "document_version_id": "document-version-uuid",
       "version": 1,
       "num_chunks": 1,
       "status": "indexed"
@@ -168,8 +169,10 @@ Response `200`:
 }
 ```
 
-Pada PostgreSQL, `status` dapat bernilai `indexed` atau `unchanged`. JSON store
-saat ini tidak selalu menyertakan `status` pada item response.
+Pada PostgreSQL, `document_version_id` wajib berupa UUID dan direktori harus
+memuat tepat satu file yang nama serta checksum-nya sesuai metadata Backend.
+`status` dapat bernilai `indexed` atau `unchanged`. JSON store tidak memerlukan
+`document_version_id` dan saat ini tidak selalu menyertakan `status`.
 
 Direktori yang tidak ditemukan menghasilkan HTTP `400`:
 
@@ -181,7 +184,7 @@ Keterbatasan:
 
 - Path dipahami dari sisi AI Service/container, bukan dari Backend atau browser.
 - Endpoint belum menerima file multipart atau binary dari PostgreSQL.
-- Endpoint belum menerima `documentVersionId` Backend.
+- Endpoint PostgreSQL sudah menerima `document_version_id` Backend.
 - Kontrak ini belum sesuai untuk alur upload production MVP.
 
 ## 4. Daftar dokumen AI
@@ -201,9 +204,8 @@ Target response:
 ]
 ```
 
-Mode JSON menghasilkan bentuk tersebut. Mode PostgreSQL saat ini memiliki
-ketidaksesuaian `num_chunks` versus `chunks` yang harus diperbaiki sebelum
-endpoint dianggap stabil.
+Mode JSON dan PostgreSQL menghasilkan field `chunks`. Response PostgreSQL juga
+menyertakan `document_version_id`.
 
 ## 5. Delete dokumen AI
 
@@ -241,8 +243,8 @@ Metadata minimum yang harus dipertahankan dari ingestion sampai response:
 }
 ```
 
-Untuk integrasi final, `document_id` perlu diganti atau dilengkapi dengan
-`document_version_id` UUID yang berasal dari Backend/Prisma.
+Pada PostgreSQL, metadata citation dilengkapi dengan `document_version_id` UUID
+yang berasal dari Backend/Prisma.
 
 ## Kontrak ingestion yang dituju
 
@@ -294,11 +296,9 @@ mengubahnya menjadi error atau jawaban karangan.
 
 ## Checklist sebelum kontrak dinyatakan stabil
 
-1. Hilangkan konflik tabel `documents`.
-2. Jadikan `document_versions.id` sebagai referensi chunk.
-3. Perbaiki parameter SQL vector search dan test dengan PostgreSQL asli.
-4. Samakan field `chunks` pada response semua store.
-5. Tetapkan endpoint ingestion file dan ukuran maksimal request.
-6. Tambahkan timeout serta penanganan error pada Backend AI client.
-7. Uji idempotency, delete cascade, no-answer, dan citation end-to-end.
-8. Perbarui version dokumen ini setelah kontrak disepakati tim.
+1. Terapkan migration `chunks` pada PostgreSQL development.
+2. Uji vector search dan metadata filter terhadap pgvector asli.
+3. Tetapkan endpoint ingestion file dan ukuran maksimal request.
+4. Tambahkan timeout serta penanganan error pada Backend AI client.
+5. Uji idempotency, delete cascade, no-answer, dan citation end-to-end.
+6. Perbarui version dokumen setelah kontrak transport file disepakati tim.

@@ -81,6 +81,7 @@ model DocumentVersion {
   file             DocumentFile?
   processingJobs   ProcessingJob[]
   citations        Citation[]
+  chunks           DocumentChunk[]
 
   @@unique([documentId, versionNumber])
   @@index([documentId])
@@ -95,6 +96,20 @@ model DocumentFile {
   createdAt         DateTime        @default(now()) @map("created_at")
 
   @@map("document_files")
+}
+
+model DocumentChunk {
+  chunkId           String          @id @map("chunk_id")
+  documentVersionId String          @map("document_version_id") @db.Uuid
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  pageNumber        Int?            @map("page_number")
+  sectionTitle      String          @default("") @map("section_title")
+  text              String          @db.Text
+  embedding         Unsupported("vector(1536)")?
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  @@index([documentVersionId])
+  @@map("chunks")
 }
 
 model ProcessingJob {

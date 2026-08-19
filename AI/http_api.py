@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 try:
     from fastapi import FastAPI, HTTPException
@@ -62,6 +63,7 @@ class AskResponse(BaseModel):
 
 class IngestRequest(BaseModel):
     input_dir: str  # path relative to the AI service container/workdir
+    document_version_id: UUID | None = None  # required by the PostgreSQL store
     embed: bool = True
     model: str | None = None
 
@@ -74,6 +76,7 @@ class IngestResponse(BaseModel):
 class DocumentSummary(BaseModel):
     filename: str
     document_id: str
+    document_version_id: str | None = None
     version: int
     chunks: int
 
@@ -121,7 +124,21 @@ def ingest_documents(request: IngestRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"input_dir not found: {input_dir}")
     store = current_store()
     if isinstance(store, PgVectorStore):
-        documents = ingest_to_pg(input_dir, store, embed=request.embed, api_key=os.environ.get("SUMOPOD_API_KEY"))
+        if request.document_version_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="document_version_id is required for PostgreSQL ingestion",
+            )
+        try:
+            documents = ingest_to_pg(
+                input_dir,
+                store,
+                str(request.document_version_id),
+                embed=request.embed,
+                api_key=os.environ.get("SUMOPOD_API_KEY"),
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
         return {"documents": documents, "store": "pgvector"}
     # JSON store: reuse the CLI ingest path.
     from knowledge_base import ingest

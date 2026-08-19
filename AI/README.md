@@ -17,25 +17,27 @@ http_api.py     FastAPI untuk integrasi Backend
 evaluate.py     evaluasi golden question
 ```
 
-Integrasi PostgreSQL bersama Backend belum aman untuk ingestion sampai konflik
-tabel `documents` dan hubungan ID ke `DocumentVersion` diperbaiki. Mode JSON
-tetap dapat digunakan untuk pengembangan AI secara mandiri.
+Schema PostgreSQL sekarang dimiliki Prisma. Tabel `chunks` mereferensikan
+`document_versions.id`, sehingga AI tidak lagi membuat tabel `documents`
+sendiri. Mode JSON tetap tersedia untuk pengembangan AI secara mandiri.
 
-### Kendala integrasi yang diketahui
+### Status desain database
 
-1. `AI/store.py` membuat tabel `documents` sendiri, bertabrakan dengan tabel
-   `documents` milik Prisma.
-2. AI membentuk `document_id` dari nama file dan belum menerima
-   `documentVersionId` dari Backend.
-3. Endpoint `/ingest` menerima path direktori, sedangkan file Backend disimpan
-   sebagai PostgreSQL `bytea`.
-4. Hasil PostgreSQL `list_documents()` memakai field `num_chunks`, sedangkan
-   response model `GET /documents` mengharuskan field `chunks`.
-5. Parameter SQL vector search perlu diperbaiki dan diuji terhadap PostgreSQL
-   asli, terutama saat metadata filter digunakan.
+Sudah diperbaiki:
 
-Gunakan JSON store untuk demo AI mandiri. Jangan menyatakan integrasi pgvector
-siap sebelum kelima poin tersebut diselesaikan dan diuji.
+1. Tidak ada lagi schema creation dari `AI/store.py`.
+2. `chunks.document_version_id` menjadi foreign key ke `document_versions.id`.
+3. Metadata filename, version, dan document dibaca melalui join ke tabel Backend.
+4. Response daftar dokumen memakai field `chunks` secara konsisten.
+5. Urutan parameter SQL vector search sudah diperbaiki dan dikunci unit test.
+6. Citation PostgreSQL membawa `document_version_id` dari chunk hasil retrieval.
+
+Yang masih perlu diselesaikan:
+
+1. `/ingest` masih menerima `input_dir`; Backend belum mengirim binary `bytea`
+   atau multipart ke AI.
+2. Migration dan vector query belum diuji terhadap instance PostgreSQL nyata di
+   environment ini.
 
 ## Aturan utama
 
@@ -95,7 +97,7 @@ service menggunakan `knowledge_base.json`.
 | Kondisi | Store | Status penggunaan |
 | --- | --- | --- |
 | `DATABASE_URL` kosong | JSON | Dapat dipakai untuk pengembangan standalone |
-| `DATABASE_URL` terisi | PostgreSQL/pgvector | Belum aman bersama schema Backend |
+| `DATABASE_URL` terisi | PostgreSQL/pgvector | Schema siap; alur pengiriman file belum terhubung |
 
 ## Menjalankan melalui Docker
 
@@ -127,12 +129,13 @@ Port `8001` hanya merupakan port yang diekspos ke host.
 | --- | --- | --- |
 | GET | `/health` | Status service dan store aktif |
 | POST | `/ask` | Retrieval dan grounded answer |
-| POST | `/ingest` | Ingestion direktori dokumen (kontrak sementara) |
+| POST | `/ingest` | Ingestion satu file untuk `document_version_id` (kontrak sementara) |
 | GET | `/documents` | Daftar dokumen yang telah diindeks |
 | DELETE | `/documents/{filename}` | Menghapus dokumen dan chunk terkait |
 
-Spesifikasi lengkap terdapat di `API_CONTRACT.md`. Endpoint `/ingest` masih
-menerima `input_dir` dan belum terhubung dengan file `bytea` milik Backend.
+Spesifikasi lengkap terdapat di `API_CONTRACT.md`. Pada PostgreSQL, endpoint
+`/ingest` wajib menerima `document_version_id` milik Backend dan tepat satu file
+dalam `input_dir`. Endpoint belum terhubung langsung dengan file `bytea` Backend.
 
 ## LLM dan embedding
 
