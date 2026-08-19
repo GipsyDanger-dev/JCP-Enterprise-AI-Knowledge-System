@@ -18,6 +18,10 @@ async function bootstrap() {
     .setDescription('Internal RAG knowledge base API')
     .setVersion('0.1.0')
     .addBearerAuth()
+    .addApiKey(
+      { type: 'apiKey', name: 'X-Worker-Token', in: 'header' },
+      'worker-token',
+    )
     .build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
   await app.listen(process.env.PORT ?? 8000, '0.0.0.0');

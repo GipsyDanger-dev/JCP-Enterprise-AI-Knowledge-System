@@ -63,6 +63,11 @@ Seed bersifat idempotent dan tidak mencetak password. Endpoint autentikasi awal:
 
 Role yang tersedia adalah `ADMIN` dan `USER`. Backend memakai JWT guard dan role guard; pemilihan tampilan dashboard berdasarkan role dilakukan oleh frontend.
 
+Endpoint pengelolaan akun berikut hanya dapat digunakan oleh `ADMIN`:
+
+- `GET /users` — menampilkan profil aman seluruh akun tanpa `passwordHash`.
+- `POST /users` — membuat akun aktif dengan role `USER` (default) atau `ADMIN`; password minimal 12 karakter dan disimpan sebagai hash `scrypt`.
+
 ## Penyimpanan dokumen Backend
 
 Keputusan MVP saat ini adalah menyimpan binary PDF/DOCX langsung di PostgreSQL, terpisah dari metadata:
@@ -81,3 +86,38 @@ Endpoint awal:
 - `DELETE /documents/:id` — khusus `ADMIN`.
 
 Backend tidak menggunakan MinIO untuk alur dokumen ini. Service MinIO di environment tetap dibiarkan sampai keputusan infrastructure diperbarui oleh owner DevOps.
+
+## Kontrak pemrosesan dokumen
+
+Backend menyediakan kontrak internal bagi worker milik AI Engineer. Kontrak ini hanya mengatur antrean, akses file, dan perubahan status; parsing, chunking, embedding, retrieval, dan LLM tidak diimplementasikan oleh Backend.
+
+Semua endpoint berikut membutuhkan header `X-Worker-Token` yang nilainya sama dengan `WORKER_TOKEN`:
+
+- `POST /internal/processing-jobs/claim` — mengambil job `QUEUED` paling lama dan mengubah job serta dokumen menjadi `PROCESSING`.
+- `GET /internal/processing-jobs/:id/file` — mengambil binary PDF/DOCX untuk job yang sudah di-claim.
+- `PATCH /internal/processing-jobs/:id/result` — menerima hasil `COMPLETED` atau `FAILED` dan memperbarui status dokumen menjadi `READY` atau `FAILED` secara transaksional.
+
+Nilai `WORKER_TOKEN` harus berbeda dari `JWT_SECRET` dan tidak boleh dikirim ke frontend atau disimpan di Git.
+
+## Persistence percakapan
+
+Endpoint percakapan membutuhkan JWT `ADMIN` atau `USER`. Setiap akun hanya dapat mengakses percakapan miliknya sendiri:
+
+- `POST /conversations` — membuat percakapan kosong dengan judul opsional.
+- `GET /conversations` — menampilkan daftar percakapan sendiri, jumlah pesan, dan preview pesan terakhir.
+- `GET /conversations/:id` — menampilkan riwayat pesan dan metadata citation dari percakapan sendiri.
+- `POST /conversations/:id/messages` — menyimpan pesan `USER` tanpa menjalankan AI.
+
+Judul percakapan yang kosong otomatis diambil dari 100 karakter pertama pesan pertama. Endpoint publik tidak menerima field role, sehingga client tidak dapat membuat pesan `ASSISTANT` atau `SYSTEM`. Penyimpanan jawaban AI dan citation akan dilakukan melalui kontrak internal pada tahap integrasi AI berikutnya.
+
+## Audit logs
+
+Backend menyimpan aktivitas penting ke tabel PostgreSQL `audit_logs` dalam transaksi yang sama dengan aksi utamanya. Event yang dicatat:
+
+- Login berhasil.
+- Pembuatan akun.
+- Upload dan delete dokumen.
+- Claim processing job.
+- Processing job selesai atau gagal.
+
+`GET /audit-logs` hanya dapat digunakan `ADMIN` dan mendukung pagination serta filter `action`, `actorUserId`, `targetType`, dan `targetId`. Audit metadata hanya berisi identifier dan metadata operasional yang aman; password, JWT, worker token, dan binary dokumen tidak disimpan.

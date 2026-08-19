@@ -1,5 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { AuditAction, AuditActorType } from '@prisma/client';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { PrismaService } from '../database/prisma.service';
 import { JwtPayload } from './auth.types';
 import { LoginDto } from './dto/login.dto';
@@ -10,6 +12,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly auditLogs: AuditLogsService,
   ) {}
 
   async login(input: LoginDto) {
@@ -23,9 +26,19 @@ export class AuthService {
 
     const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = await this.jwtService.signAsync(payload);
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      });
+      await this.auditLogs.record(transaction, {
+        actorType: AuditActorType.USER,
+        actorUserId: user.id,
+        action: AuditAction.AUTH_LOGIN,
+        targetType: 'USER',
+        targetId: user.id,
+        metadata: { role: user.role },
+      });
     });
 
     return {

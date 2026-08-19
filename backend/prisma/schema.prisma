@@ -34,6 +34,22 @@ enum MessageRole {
   SYSTEM
 }
 
+enum AuditActorType {
+  USER
+  WORKER
+  SYSTEM
+}
+
+enum AuditAction {
+  AUTH_LOGIN
+  USER_CREATED
+  DOCUMENT_UPLOADED
+  DOCUMENT_DELETED
+  PROCESSING_JOB_CLAIMED
+  PROCESSING_JOB_COMPLETED
+  PROCESSING_JOB_FAILED
+}
+
 model User {
   id            String         @id @default(uuid()) @db.Uuid
   email         String         @unique
@@ -46,6 +62,7 @@ model User {
   updatedAt     DateTime       @updatedAt @map("updated_at")
   documents     Document[]
   conversations Conversation[]
+  auditLogs     AuditLog[]
 
   @@map("users")
 }
@@ -158,4 +175,22 @@ model Citation {
   @@index([messageId, sortOrder])
   @@index([documentVersionId])
   @@map("citations")
+}
+
+model AuditLog {
+  id          String         @id @default(uuid()) @db.Uuid
+  actorType   AuditActorType @map("actor_type")
+  actorUserId String?        @map("actor_user_id") @db.Uuid
+  actorUser   User?          @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  action      AuditAction
+  targetType  String         @map("target_type")
+  targetId    String?        @map("target_id") @db.Uuid
+  metadata    Json?
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([action, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([targetType, targetId])
+  @@map("audit_logs")
 }
