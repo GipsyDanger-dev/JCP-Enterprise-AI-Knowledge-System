@@ -2,6 +2,7 @@ import { AlertTriangle, Bot, ChevronRight, Loader2, MoreHorizontal, Send, Sparkl
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
 import { SourceCard } from './SourceCard'
+import { VerifiedBadge } from './VerifiedBadge'
 
 export function AgentPanel() {
   const { question, setQuestion, answer, citations, isLoadingAnswer, chatError, onAsk, askQuestion } = useWorkspace()
@@ -48,7 +49,7 @@ export function AgentPanel() {
                     detail={[c.sectionTitle, c.pageNumber ? `Page ${c.pageNumber}` : null, c.version].filter(Boolean).join(' · ')}
                   />
                 ))}
-                <div className="verified">✓ Evidence verified</div>
+                <VerifiedBadge />
               </>
             )}
           </div>

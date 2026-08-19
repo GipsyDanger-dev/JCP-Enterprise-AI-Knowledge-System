@@ -1,6 +1,7 @@
 import { AlertTriangle, ArrowUpRight, Loader2, Send, Sparkles } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { SourceCard } from '@/components/SourceCard'
+import { VerifiedBadge } from '@/components/VerifiedBadge'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
 
@@ -41,12 +42,13 @@ export function ChatPage() {
                         key={`${c.documentId}-${c.chunkId}-${i}`}
                         title={c.filename}
                         detail={[c.sectionTitle, c.pageNumber ? `Page ${c.pageNumber}` : null, c.version].filter(Boolean).join(' · ')}
+                        excerpt={c.excerpt}
                         trailing={<ArrowUpRight size={15} />}
                       />
                     ))}
                   </div>
                 )}
-                <div className="verified">✓ Evidence verified</div>
+                <VerifiedBadge />
               </div>
             )}
           </div>

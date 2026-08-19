@@ -64,8 +64,8 @@ export const quickQuestions = [
 
 export function personFor(role: Role): Person {
   return role === 'admin'
-    ? { name: 'Adam', initials: 'AR', label: 'Workspace admin' }
-    : { name: 'Nadia', initials: 'NS', label: 'Employee' }
+    ? { name: 'Adam', initials: 'AR', label: '' }
+    : { name: 'Nadia', initials: 'NS', label: '' }
 }
 
 export function navigationFor(role: Role): NavigationItem[] {

@@ -76,6 +76,8 @@ export interface Citation {
   pageNumber: number | null
   sectionTitle: string | null
   chunkId: number
+  /** Kutipan langsung dari dokumen sumber */
+  excerpt?: string
 }
 
 export interface ChatQueryRequest {

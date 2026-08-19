@@ -1,17 +1,23 @@
-import { Activity, ChevronDown, CircleHelp, Clock, LogOut, MoreHorizontal, Settings, X } from 'lucide-react'
+import { Activity, CircleHelp, Clock, LogOut, Settings, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { LogoMark } from '@/components/Logo'
 
 export function Sidebar({ menuOpen, onClose }: { menuOpen: boolean; onClose: () => void }) {
-  const { role, person, navigation } = useWorkspace()
-  const { logout } = useAuth()
+  const { person, navigation } = useWorkspace()
+  const { user, logout } = useAuth()
   return (
     <aside className={menuOpen ? 'sidebar open' : 'sidebar'}>
       <div className="brand-lockup"><LogoMark size={28} /><strong>Enterprise AI</strong></div>
       <button className="mobile-close" title="Close navigation" onClick={onClose}><X size={20} /></button>
-      <div className="workspace-switcher"><span>JC</span><div><strong>Jogja Creative</strong><small>{role === 'admin' ? 'Admin workspace' : 'Employee portal'}</small></div><ChevronDown size={15} /></div>
+      <div className="sidebar-user-info">
+        <span className="avatar">{person.initials}</span>
+        <div>
+          <strong>{user?.name ?? person.name}</strong>
+          <small className="workspace-label">Jogja Creative</small>
+        </div>
+      </div>
       <nav aria-label="Primary navigation">
         <p>Workspace</p>
         {navigation.map(({ id, label, icon: Icon }) => (
@@ -28,7 +34,6 @@ export function Sidebar({ menuOpen, onClose }: { menuOpen: boolean; onClose: () 
         <NavLink to="/help" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} onClick={onClose}><CircleHelp size={18} /><span>Help center</span></NavLink>
         <NavLink to="/settings" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} onClick={onClose}><Settings size={18} /><span>Settings</span></NavLink>
         <button className="nav-item" title="Log out" onClick={logout}><LogOut size={18} /><span>Log out</span></button>
-        <div className="profile-row"><span className="avatar">{person.initials}</span><div><strong>{person.name}</strong><small>{person.label}</small></div><MoreHorizontal size={17} /></div>
       </div>
     </aside>
   )
