@@ -1,109 +1,161 @@
-# Enterprise AI Knowledge System — Merged (BE + FE + AI)
+# Enterprise AI Knowledge System
 
-> **Status:** Hasil penggabungan 3 branch (`backend`, `frontend`, `AI`) ke satu
-> struktur mengikuti tata letak folder BE. Ini gabungan STRUKTUR saja — bug
-> integrasi berikut **belum** diperbaiki dan perlu ditangani sebelum fitur
-> upload/chat dites end-to-end:
->
-> 1. Tabel `documents` dibuat dua kali dengan skema berbeda (oleh Prisma di
->    `backend/` dan oleh raw SQL di `AI/store.py`) — perlu rename/refactor.
-> 2. `document_id` yang di-generate AI Service belum terhubung ke `Document.id`
->    milik backend — perlu keputusan bersama (lihat `AI/API_CONTRACT.md`).
-> 3. Kontrak field antara `frontend/src/api/types.ts` dan response asli
->    backend belum sama persis (nama field, casing, tipe ID) — lihat catatan
->    review sebelumnya.
->
-> Yang SUDAH disesuaikan supaya bisa `docker compose up` tanpa crash:
-> - Port `ai-api` digeser ke `8001` di host (internal tetap `8000`) supaya
->   tidak bentrok dengan `backend`.
-> - Satu Postgres dipakai bersama oleh `backend` dan `ai-api` (bukan dua
->   database terpisah).
-> - Service `minio` dihapus dari compose (storage dokumen pakai VPS internal,
->   bukan object storage pihak ketiga).
-> - `VITE_API_BASE_URL` di `.env.example` diperbaiki ke `http://localhost:8000`.
+Monorepo MVP gudang dokumen internal dengan AI chat berbasis RAG. Admin dapat
+mengunggah PDF/DOCX, sistem memproses dan mengindeks isinya, lalu user bertanya
+dan menerima jawaban dengan citation dari chunk hasil retrieval.
 
----
+## Status project
 
-# Enterprise AI Knowledge System — M0
+Project ini merupakan hasil penggabungan Backend, Frontend, dan AI Service yang
+sebelumnya dikembangkan terpisah. Fondasi setiap service sudah tersedia, tetapi
+integrasi end-to-end belum selesai.
 
-Monorepo MVP knowledge base internal berbasis RAG. M0 hanya menyiapkan infrastruktur dan skeleton modular; logic auth, upload, dan chat belum diimplementasikan.
+| Komponen | Status |
+| --- | --- |
+| Backend auth | Sudah diimplementasikan (JWT dan role guard) |
+| Backend documents | Sudah diimplementasikan (upload, list, status, delete) |
+| Backend chat, AI, users | Masih skeleton |
+| Frontend | UI dan mock API tersedia; belum teruji penuh dengan Backend asli |
+| AI Service | Ingestion, retrieval, generation, citation, dan evaluasi tersedia |
+| Integrasi Backend–AI | Belum selesai |
+
+Masalah integrasi utama:
+
+1. Prisma dan AI Service sama-sama memakai tabel `documents` dengan struktur berbeda.
+2. ID dokumen AI belum terhubung ke `DocumentVersion.id` Backend.
+3. Kontrak Frontend belum sama dengan Backend (field, UUID, role, dan status).
+
+## Tech stack
+
+| Layer | Teknologi |
+| --- | --- |
+| Frontend | React + Vite + TypeScript |
+| Backend | NestJS 11 + Prisma + TypeScript |
+| AI Service | Python + FastAPI |
+| Database | PostgreSQL + pgvector |
+| Penyimpanan file | PostgreSQL `bytea` |
+| Deployment | Docker Compose |
+
+Project tidak menggunakan MinIO, S3, atau object storage pihak ketiga.
+
+## Struktur repository
+
+```text
+JCP-Enterprise-AI-Knowledge-System/
+├── AI/                 # FastAPI dan pipeline RAG
+├── backend/            # NestJS, Prisma, auth, dan documents
+├── frontend/           # React/Vite UI dan mock API
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
 
 ## Menjalankan seluruh service
 
-Prasyarat: Git dan Docker Desktop/Docker Engine dengan Docker Compose v2.
+Prasyarat: Git, Docker Desktop/Docker Engine, dan Docker Compose v2.
 
-```bash
-git clone <repository-url>
-cd JCP-Enterprise-AI-Knowledge-System
-cp .env.example .env
+```powershell
+Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Di PowerShell, gunakan `Copy-Item .env.example .env` sebagai pengganti `cp`.
+| Service | URL |
+| --- | --- |
+| Frontend | http://localhost:5173 |
+| Backend | http://localhost:8000 |
+| Backend health | http://localhost:8000/health |
+| Backend Swagger | http://localhost:8000/api/docs |
+| AI Service | http://localhost:8001 |
+| AI health | http://localhost:8001/health |
+| AI Swagger | http://localhost:8001/docs |
+| PostgreSQL | localhost:5432 |
 
-- Frontend: http://localhost:5173 — menampilkan **Backend connected**
-- Health: http://localhost:8000/health — mengembalikan `OK`
-- Swagger UI: http://localhost:8000/api/docs
-- MinIO API/Console: http://localhost:9000 dan http://localhost:9001
-- PostgreSQL: `localhost:5432`
+Hentikan service dengan `docker compose down`. Jangan gunakan flag `-v` kecuali
+memang ingin menghapus seluruh data PostgreSQL pada volume lokal.
 
-Hentikan dengan `docker compose down`. Flag `-v` juga menghapus seluruh data di volume.
+> AI Service dan Backend memakai database yang sama, tetapi ingestion pgvector
+> belum aman dijalankan sebelum konflik schema `documents` diperbaiki.
 
-## File dan struktur
+## Environment
 
-- `docker-compose.yml`: orkestrasi Postgres/pgvector, MinIO, NestJS, Vite, health checks, dan persistent volumes.
-- `.env.example`: template konfigurasi bersama untuk database, storage, backend, LLM, dan URL frontend.
-- `backend/Dockerfile`: image development NestJS; `package.json` dan konfigurasi TypeScript/Nest mengatur build serta hot-reload.
-- `backend/prisma/schema.prisma`: koneksi Prisma/PostgreSQL; model domain ditunda ke milestone fitur.
-- `backend/src/main.ts`: bootstrap, CORS, port 8000, dan Swagger; `health.controller.ts` menyediakan `GET /health`.
-- `backend/src/database/`: Prisma client dan lifecycle koneksi database.
-- `backend/src/{auth,users,documents,chat,ai}/`: skeleton modul terpisah untuk pengembangan paralel.
-- `frontend/Dockerfile`: image development Vite dengan port 5173.
-- `frontend/src/api/health.ts`: client health API memakai `VITE_API_URL`.
-- `frontend/src/pages/HealthPage.tsx`: halaman pengecekan koneksi; `components/ConnectionStatus.tsx` menampilkan hasilnya.
-- `.gitignore` dan `.dockerignore`: mengecualikan secret, dependency, output build, dan file yang tidak diperlukan image.
+Salin `.env.example` menjadi `.env`. Jangan commit `.env` atau credential asli.
 
-Source backend dan frontend di-mount ke container. NestJS watch mode dan Vite polling membuat perubahan kode ter-reload. Jalankan ulang `docker compose up --build` setelah dependency berubah.
+| Variable | Kegunaan |
+| --- | --- |
+| `DATABASE_URL` | Koneksi PostgreSQL bersama |
+| `JWT_SECRET` | Penandatanganan JWT Backend |
+| `AI_SERVICE_URL` | URL internal AI dari container Backend |
+| `SUMOPOD_API_KEY` | Akses embedding/LLM AI Service |
+| `VITE_API_BASE_URL` | Base URL Backend dari Frontend |
+| `VITE_USE_MOCK_AUTH` | Mengaktifkan atau mematikan mock frontend |
 
-Image PostgreSQL sudah membawa pgvector. Aktivasi `CREATE EXTENSION vector` sengaja ditunda sampai model embedding dibuat pada milestone berikutnya.
+Di jaringan Docker, Backend memanggil AI melalui `http://ai-api:8000`. Port
+`8001` hanya merupakan port AI yang diekspos ke host.
 
-## Database dan autentikasi lokal
+## Database dan seed
 
-Schema inti dan migration Prisma berada di `backend/prisma`. Setelah database hidup, migration dapat diperiksa atau diterapkan dengan:
+Schema dan migration Prisma berada di `backend/prisma`.
 
-```bash
+```powershell
 docker compose exec backend npx prisma migrate status
-docker compose exec backend npx prisma migrate dev
-```
-
-Buat atau perbarui akun development `ADMIN` dan `USER` dari nilai `SEED_*` di `.env`:
-
-```bash
+docker compose exec backend npx prisma migrate deploy
 docker compose exec backend npm run prisma:seed
 ```
 
-Seed bersifat idempotent dan tidak mencetak password. Endpoint autentikasi awal:
+Seed menggunakan variabel `SEED_*` dan bersifat idempotent.
 
-- `POST /auth/login` menerima `email` dan `password`, lalu mengembalikan JWT serta profil aman dengan role.
-- `GET /auth/me` membutuhkan header `Authorization: Bearer <token>`.
+```text
+users
+├── documents
+│   └── document_versions
+│       ├── document_files
+│       ├── processing_jobs
+│       └── citations
+└── conversations
+    └── messages
+        └── citations
+```
 
-Role yang tersedia adalah `ADMIN` dan `USER`. Backend memakai JWT guard dan role guard; pemilihan tampilan dashboard berdasarkan role dilakukan oleh frontend.
+Binary PDF/DOCX disimpan pada `document_files.content` sebagai PostgreSQL
+`bytea`. Query daftar dokumen tidak mengambil binary file.
 
-## Penyimpanan dokumen Backend
+## Endpoint Backend yang tersedia
 
-Keputusan MVP saat ini adalah menyimpan binary PDF/DOCX langsung di PostgreSQL, terpisah dari metadata:
+Auth:
 
-- `document_versions` menyimpan filename, MIME type, ukuran, checksum, dan nomor versi.
-- `document_files` menyimpan binary sebagai `bytea` dengan relasi satu-ke-satu ke versi dokumen.
-- Query daftar dan status tidak mengambil atau mengembalikan binary.
-- Upload dibatasi maksimal 10 MB dan menerima PDF/DOCX dengan pemeriksaan ekstensi, MIME type, dan signature awal file.
-- Delete mempertahankan metadata sebagai `DELETED`, menghapus binary, dan menggagalkan job yang masih aktif.
+- `POST /auth/login`
+- `GET /auth/me`
 
-Endpoint awal:
+Documents:
 
-- `POST /documents` — khusus `ADMIN`, multipart field `file` dan optional `title`.
-- `GET /documents` — `ADMIN` melihat dokumen aktif; `USER` hanya dokumen `READY`.
-- `GET /documents/:id/status` — khusus `ADMIN`.
-- `DELETE /documents/:id` — khusus `ADMIN`.
+- `POST /documents` — khusus `ADMIN`, multipart `file`, optional `title`
+- `GET /documents` — admin melihat dokumen aktif; user hanya dokumen `READY`
+- `GET /documents/:id/status` — khusus `ADMIN`
+- `DELETE /documents/:id` — khusus `ADMIN`
 
-Backend tidak menggunakan MinIO untuk alur dokumen ini. Service MinIO di environment tetap dibiarkan sampai keputusan infrastructure diperbarui oleh owner DevOps.
+Role Backend adalah `ADMIN` dan `USER`. Modul chat, AI wrapper, dan users masih
+perlu diimplementasikan.
+
+## Pengujian
+
+```powershell
+# AI
+cd AI
+python -m unittest discover -s tests -v
+python evaluate.py
+
+# Frontend
+cd ../frontend
+npm install
+npm run lint
+npm run build
+npm run test:e2e
+
+# Backend
+cd ../backend
+npm install
+npm run build
+```
+
+Citation harus berasal dari metadata chunk yang benar-benar diretrieval. Jika
+bukti tidak cukup, sistem mengembalikan state no-answer dan tidak menebak.

@@ -1,120 +1,97 @@
-# Enterprise AI — Frontend
+# Enterprise AI Knowledge System — Frontend
 
-Web UI untuk **Enterprise AI Knowledge System** — platform knowledge management dengan AI assistant, citation verification, dan role-based access control.
+Web UI internal untuk pengelolaan dokumen dan AI assistant berbasis citation.
+Frontend menggunakan React, Vite, dan TypeScript (bukan Next.js).
 
-**Stack:** React 19 · TypeScript · Vite · React Router · Tailwind-free (CSS custom properties)
+## Status
 
-## Quick Start
+Halaman login, documents, chat, dan users sudah tersedia. Untuk development,
+seluruh alur dapat didemonstrasikan dengan mock API. Integrasi Backend asli
+belum selesai karena kontrak field Frontend masih perlu disesuaikan dengan
+kontrak NestJS.
 
-```bash
+## Menjalankan UI dengan mock
+
+```powershell
 cd frontend
 npm install
+Copy-Item .env.example .env
 npm run dev
 ```
 
-Buka http://localhost:5173 — otomatis redirect ke halaman login.
+Buka http://localhost:5173.
 
-## Mock Auth (Development)
-
-Tanpa backend, aplikasi menggunakan **mock auth** secara default. Gunakan akun demo ini untuk login:
-
-| Role | Email | Password |
-|---|---|---|
+| Role UI | Email | Password |
+| --- | --- | --- |
 | Admin | `admin@jcp.co.id` | `admin123` |
 | Employee | `nadia@jcp.co.id` | `employee123` |
 
-**Admin** bisa akses: Overview, Documents, AI Assistant, People & access.
-**Employee** bisa akses: Home, Ask AI, Knowledge library.
+Pastikan environment berisi:
 
-Untuk mematikan mock mode (saat backend sudah siap):
-
-```bash
-VITE_USE_MOCK_AUTH=false npm run dev
+```env
+VITE_API_BASE_URL=http://localhost:8000
+VITE_USE_MOCK_AUTH=true
 ```
+
+Untuk integrasi Backend asli, gunakan `VITE_USE_MOCK_AUTH=false`. Kontrak tipe
+Frontend belum sepenuhnya sama dengan Backend sehingga integrasi masih perlu
+dikerjakan.
+
+## Mode development
+
+| Kebutuhan | `VITE_USE_MOCK_AUTH` | Backend diperlukan |
+| --- | --- | --- |
+| Demo UI sementara | `true` | Tidak |
+| Integrasi API | `false` | Ya, port 8000 |
+
+Gunakan file `.env` di folder `frontend` agar base URL selalu eksplisit. Source
+API client saat ini masih memiliki fallback URL lama jika variable tersebut
+tidak tersedia; fallback itu perlu diperbaiki pada tahap integrasi source code.
 
 ## Scripts
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start dev server (port 5173) |
-| `npm run build` | TypeScript check + production build |
-| `npm run lint` | Run oxlint |
+| Command | Kegunaan |
+| --- | --- |
+| `npm run dev` | Menjalankan Vite pada port 5173 |
+| `npm run build` | TypeScript check dan production build |
+| `npm run lint` | Menjalankan oxlint |
 | `npm run preview` | Preview production build |
-| `npm run test:e2e` | Run E2E tests (login + chat + users) |
+| `npm run test:e2e` | Menjalankan E2E login, chat, dan users |
 
-## E2E Tests
+E2E menggunakan `puppeteer-core` dan membutuhkan Chrome. Suite saat ini berisi
+38 skenario mock: 14 login, 11 chat, dan 13 users.
 
-```bash
-npm run test:e2e
-```
+## Struktur
 
-Requires Chrome installed. Tests use `puppeteer-core` with system Chrome.
-
-| Suite | Scenarios | Coverage |
-|---|---|---|
-| Login | 14 | Auth flow, role guard, session restore, logout |
-| Chat | 11 | Answer, citation, no-answer, loading, AgentPanel |
-| Users | 13 | List, filter, create, delete, employee guard |
-| **Total** | **38** | **All passing** |
-
-## Architecture
-
-```
+```text
 src/
-├── api/                  # API client + typed schema
-│   ├── client.ts         # Base fetch + ApiError
-│   ├── config.ts         # USE_MOCK flag
-│   ├── types.ts          # TypeScript interfaces (kontrak API)
-│   ├── auth.ts           # login(), me()
-│   ├── documents.ts      # list, upload, status, delete
-│   ├── chat.ts           # query, conversations
-│   ├── users.ts          # list, create, delete
-│   ├── mappers.ts        # API ↔ UI type conversion
-│   ├── mockAuth.ts       # Mock auth (development)
-│   ├── mockDocuments.ts  # Mock documents (development)
-│   ├── mockChat.ts       # Mock chat (development)
-│   └── mockUsers.ts      # Mock users (development)
-├── components/           # Reusable UI components
-│   ├── Sidebar.tsx       # Navigation sidebar
-│   ├── Topbar.tsx        # Top bar with role switch
-│   ├── AgentPanel.tsx    # Knowledge Agent (overview)
-│   ├── SourceCard.tsx    # Citation card
-│   ├── DashboardLayout.tsx
-│   ├── RequireAuth.tsx   # Route guard
-│   └── ...               # PageHeading, StatusBadge, Metric, etc.
-├── context/              # React context providers
-│   ├── AuthProvider.tsx   # Token + user state
-│   └── WorkspaceProvider.tsx  # Documents, chat, role
-├── hooks/                # Custom hooks
-│   ├── useAuth.ts
-│   └── useWorkspace.ts
-├── pages/                # Route pages
-│   ├── LoginPage.tsx
-│   ├── OverviewPage.tsx  # Admin + Employee
-│   ├── DocumentsPage.tsx
-│   ├── ChatPage.tsx
-│   └── UsersPage.tsx
-├── types/                # Domain types
-│   └── domain.ts
-├── App.tsx               # Router setup
-└── index.css             # Design tokens + all styles
+├── api/          # API client, tipe, mapper, dan mock
+├── components/   # Komponen UI reusable
+├── context/      # Auth dan workspace state
+├── hooks/        # Custom hooks
+├── pages/        # Login, documents, chat, users, dan halaman lain
+├── types/        # Tipe domain UI
+├── App.tsx       # Routing
+└── main.tsx      # Entry point
 ```
 
-## Design System
+## Environment
 
-- **Brand:** Coral/Orange accent (`#ff7043`) on warm off-white (`#f5f5f2`)
-- **Font:** Inter (system-ui fallback)
-- **Tokens:** CSS custom properties di `:root` (`--brand-600`, `--text-*`, `--bg-*`, etc.)
-- **Radius:** 6-8px default, 99px pill/badge
-- **Icons:** Lucide React 14-18px
+| Variable | Nilai contoh | Kegunaan |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | `http://localhost:8000` | Base URL NestJS tanpa trailing slash |
+| `VITE_USE_MOCK_AUTH` | `true` | Menggunakan mock API saat demo lokal |
 
-## Env Variables
+Dokumentasi kontrak dan status integrasi tersedia di `src/api/README.md`.
 
-| Variable | Default | Description |
-|---|---|---|
-| `VITE_API_BASE_URL` | `http://localhost:8080/api` | Backend API base URL |
-| `VITE_USE_MOCK_AUTH` | `true` (dev) | Enable/disable mock backend |
+## Batasan integrasi saat ini
 
-## API Contract
+- Login Frontend membaca `token`, sedangkan Backend mengirim `accessToken`.
+- Frontend menggunakan ID angka, sedangkan Backend menggunakan UUID string.
+- Role UI `EMPLOYEE` belum dipetakan ke role Backend `USER`.
+- Status dan bentuk response dokumen belum sama.
+- Format error Frontend belum menangani format error standar NestJS.
+- Endpoint users, chat, dan conversations belum tersedia di Backend.
 
-Lihat `src/api/README.md` untuk dokumentasi lengkap kontrak API Frontend ↔ Backend.
+Karena batasan tersebut, gunakan mock mode untuk demo sampai tahap penyesuaian
+API Frontend selesai.

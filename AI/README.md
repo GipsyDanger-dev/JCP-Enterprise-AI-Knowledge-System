@@ -1,153 +1,181 @@
-# JCP Enterprise AI Knowledge System
+# Enterprise AI Knowledge System — AI Service
 
-## Standalone AI milestone (AI Engineer scope)
+Service Python/FastAPI untuk pipeline RAG: dokumen diparse, dibagi menjadi
+chunk, diretrieval, lalu digunakan sebagai bukti jawaban dan citation.
 
-Pipeline dokumen mentah → konteks yang bisa dipercaya LLM, sesuai Technical
-Briefing (Programmer 1 — AI Engineer). Modular:
+## Status
 
+Pipeline standalone sudah menyediakan:
+
+```text
+ingestion/      parser TXT/MD/DOCX/PDF, section detection, dan chunking
+retrieval/      TF-IDF dan embedding/vector search
+generation/     prompt, grounded answer, citation, dan guardrail
+knowledge_base.py
+                JSON store, versioning, idempotency, dan delete
+http_api.py     FastAPI untuk integrasi Backend
+evaluate.py     evaluasi golden question
 ```
-ingestion/   parsers (txt/md/docx/pdf) + section detection + chunking
-retrieval/   TF-IDF (default) / embedding-vector search (SumoPod)
-generation/  prompt assembly, grounded answer (LLM), citations, guardrails
-knowledge_base.py   store + versioning (idempotent, delete cleanly)
-ai_engine.py        CLI
-evaluate.py         golden question evaluation (release gate)
-golden_set.json     golden dataset untuk QA AI
+
+Integrasi PostgreSQL bersama Backend belum aman untuk ingestion sampai konflik
+tabel `documents` dan hubungan ID ke `DocumentVersion` diperbaiki. Mode JSON
+tetap dapat digunakan untuk pengembangan AI secara mandiri.
+
+### Kendala integrasi yang diketahui
+
+1. `AI/store.py` membuat tabel `documents` sendiri, bertabrakan dengan tabel
+   `documents` milik Prisma.
+2. AI membentuk `document_id` dari nama file dan belum menerima
+   `documentVersionId` dari Backend.
+3. Endpoint `/ingest` menerima path direktori, sedangkan file Backend disimpan
+   sebagai PostgreSQL `bytea`.
+4. Hasil PostgreSQL `list_documents()` memakai field `num_chunks`, sedangkan
+   response model `GET /documents` mengharuskan field `chunks`.
+5. Parameter SQL vector search perlu diperbaiki dan diuji terhadap PostgreSQL
+   asli, terutama saat metadata filter digunakan.
+
+Gunakan JSON store untuk demo AI mandiri. Jangan menyatakan integrasi pgvector
+siap sebelum kelima poin tersebut diselesaikan dan diuji.
+
+## Aturan utama
+
+- Citation selalu disalin dari metadata chunk yang benar-benar diretrieval.
+- LLM tidak boleh membuat citation sendiri.
+- Re-ingest file yang tidak berubah harus menjadi no-op.
+- File yang berubah menaikkan version dan mengganti chunk lama.
+- Delete membersihkan dokumen, chunk, dan embedding terkait.
+- Jika bukti tidak cukup, response harus `grounded: false` dengan jawaban:
+
+```text
+Informasi tidak ditemukan pada dokumen yang tersedia.
 ```
 
-## Quickstart
+Metadata minimum chunk:
+
+```text
+document_id
+filename
+version
+page_number
+section_title
+chunk_id
+text
+```
+
+## Quickstart standalone
+
+Dari folder `AI`:
 
 ```powershell
 python ai_engine.py ingest sample_docs --output knowledge_base.json
 python ai_engine.py ask "Berapa maksimal biaya hotel Manager?" --index knowledge_base.json
-python -m unittest discover -s tests -v
+python ai_engine.py docs
 ```
 
-Kontrak respons: `answer`, `citations`, `grounded`. Citation selalu disalin dari
-metadata chunk yang benar-benar di-retrieval — LLM tidak pernah membuat citation
-sendiri. Bila tidak ada bukti cukup: `grounded: false` dan jawaban persis
-"Informasi tidak ditemukan pada dokumen yang tersedia." (aturan MVP
-*no evidence = no answer*).
-
-## Metadata contract
-
-Setiap chunk membawa provenance lengkap yang bertahan sampai citation:
-
-```json
-{ "document_id", "filename", "version", "page_number", "section_title", "chunk_id", "text" }
-```
-
-`section_title` dideteksi dari heading (txt/md: pola BAB / penomoran / judul;
-docx: paragraph style Heading/Title).
-
-## Versioning, delete, dan idempotency
+Perintah lifecycle:
 
 ```powershell
-python ai_engine.py docs                      # daftar dokumen + version
-python ai_engine.py delete sop_perjalanan.txt # hapus dokumen + chunk + embeddings
-python ai_engine.py ingest sample_docs        # idempotent: file tidak berubah = skip
+python ai_engine.py ingest sample_docs
+python ai_engine.py delete sop_perjalanan.txt
 ```
 
-- Re-ingest file yang tidak berubah = no-op (content hash).
-- File berubah → `version` naik, chunk lama diganti (tidak dobel).
-- `delete` membersihkan dokumen, chunk, dan embedding-nya sekaligus.
+## Menjalankan HTTP API tanpa Docker
 
-## LLM mode (SumoPod)
-
-Rangkum jawaban dengan LLM (OpenAI-compatible gateway) berdasarkan chunk yang
-di-retrieval. Retrieval tetap lokal; LLM hanya menulis jawaban.
+Mode JSON tanpa database:
 
 ```powershell
-$env:SUMOPOD_API_KEY="sk-xxxx"
-python ai_engine.py ask "Berapa maksimal biaya hotel Manager?" --index knowledge_base.json --llm --model gpt-5-nano
+python -m uvicorn http_api:app --host 0.0.0.0 --port 8000
 ```
 
-API key dibaca dari environment variable `SUMOPOD_API_KEY`; jangan pernah
-simpan di file project atau commit ke Git.
+Swagger tersedia di http://localhost:8000/docs.
 
-## Docker (Milestone M0)
+Jika `DATABASE_URL` tersedia, service memilih PostgreSQL/pgvector. Jika tidak,
+service menggunakan `knowledge_base.json`.
 
-```bash
-# dari root repo
-cp .env.example .env        # isi SUMOPOD_API_KEY kalau mau pakai --llm / --embed
-docker compose build
-docker compose run --rm ai ask "Berapa maksimal biaya hotel Manager?"
-docker compose run --rm ai ingest sample_docs --embed
-# Tes & evaluasi (override entrypoint):
-docker compose run --rm --entrypoint python ai -m unittest discover -s tests -v
-docker compose run --rm --entrypoint python ai evaluate.py --llm
-```
+| Kondisi | Store | Status penggunaan |
+| --- | --- | --- |
+| `DATABASE_URL` kosong | JSON | Dapat dipakai untuk pengembangan standalone |
+| `DATABASE_URL` terisi | PostgreSQL/pgvector | Belum aman bersama schema Backend |
 
-`./AI` di-mount ke `/app`, jadi kode lokal langsung kebaca (tidak perlu rebuild
-setiap ganti kode). `SUMOPOD_API_KEY` diambil dari `.env` atau environment host.
+## Menjalankan melalui Docker
 
-## HTTP API + PostgreSQL/pgvector (integrasi Backend)
+Dari root repository:
 
-AI Service dibungkus jadi HTTP API yang dipanggil NestJS (Backend). Frontend
-tidak pernah memanggil AI Service langsung.
-
-```bash
-# 1. Jalankan database + API (dari root repo)
+```powershell
+Copy-Item .env.example .env
 docker compose up -d postgres ai-api
-# 2. Cek docs Swagger: http://localhost:8000/docs
 ```
 
-Tanpa Docker, jalan lokal:
-```powershell
-# store JSON (tanpa DB) — tetap jalan:
-python -m uvicorn http_api:app --host 0.0.0.0 --port 8000
-# store pgvector (butuh Postgres dengan extension pgvector):
-$env:DATABASE_URL="postgresql://ai:aipassword@localhost:5432/ai"
-python -m uvicorn http_api:app --host 0.0.0.0 --port 8000
+Alamat dari host:
+
+| Endpoint | URL |
+| --- | --- |
+| Health | http://localhost:8001/health |
+| Swagger | http://localhost:8001/docs |
+
+Di dalam jaringan Docker, Backend mengakses AI melalui:
+
+```text
+http://ai-api:8000
 ```
 
-Endpoint: `POST /ask`, `POST /ingest`, `GET /documents`,
-`DELETE /documents/{filename}`, `GET /health`. Spesifikasi lengkap +
-alur integrasi ada di **`API_CONTRACT.md`** — lempar ke Backend Engineer.
+Port `8001` hanya merupakan port yang diekspos ke host.
 
-- `DATABASE_URL` diset → chunk + embedding disimpan di pgvector (`<=>` cosine
-  search), TF-IDF offline tetap ada via store JSON.
-- `DATABASE_URL` kosong → fallback ke `knowledge_base.json` (perilaku lama).
+## Endpoint
 
-## Embedding + vector search (opsional)
+| Method | Path | Kegunaan |
+| --- | --- | --- |
+| GET | `/health` | Status service dan store aktif |
+| POST | `/ask` | Retrieval dan grounded answer |
+| POST | `/ingest` | Ingestion direktori dokumen (kontrak sementara) |
+| GET | `/documents` | Daftar dokumen yang telah diindeks |
+| DELETE | `/documents/{filename}` | Menghapus dokumen dan chunk terkait |
+
+Spesifikasi lengkap terdapat di `API_CONTRACT.md`. Endpoint `/ingest` masih
+menerima `input_dir` dan belum terhubung dengan file `bytea` milik Backend.
+
+## LLM dan embedding
+
+LLM dan embedding menggunakan gateway OpenAI-compatible SumoPod. API key hanya
+dibaca dari environment:
 
 ```powershell
 $env:SUMOPOD_API_KEY="sk-xxxx"
-python ai_engine.py ingest sample_docs --embed                    # simpan embeddings
-python ai_engine.py ask "Berapa maksimal biaya hotel Manager?" --retriever vector
 ```
 
-`--retriever auto` memakai vector bila embeddings tersimpan DAN
-`SUMOPOD_API_KEY` tersedia; tanpa itu otomatis fallback ke TF-IDF (tetap bisa
-dipakai offline). Catatan: no-answer paling ketat dengan TF-IDF; vector search
-bersifat semantik sehingga threshold-nya lebih tinggi (0.45).
+Jangan menyimpan atau commit API key ke repository.
 
-## Filtering metadata (slide 6: top-k + filtering metadata)
+Contoh:
 
-`ask` bisa dipersempit ke dokumen/bagian tertentu lewat filter metadata —
-berguna saat knowledge base sudah berisi banyak file:
+```powershell
+python ai_engine.py ingest sample_docs --embed
+python ai_engine.py ask "Berapa biaya hotel Manager?" --retriever vector
+python ai_engine.py ask "Berapa biaya hotel Manager?" --llm --model gpt-5-nano
+```
+
+`--retriever auto` memilih vector jika embedding dan API key tersedia; jika
+tidak, retrieval fallback ke TF-IDF.
+
+Filter metadata dapat digunakan:
 
 ```powershell
 python ai_engine.py ask "Berapa biaya hotel Manager?" --doc sop_perjalanan.txt
 python ai_engine.py ask "biaya hotel" --section "KETENTUAN UMUM"
-python ai_engine.py ask "cuti" --doc sop_b.txt --retriever vector
 ```
 
-- `--doc`    → hanya cari di chunk dokumen dengan nama tersebut (case-insensitive substring)
-- `--section` → hanya cari di chunk dengan section_title tersebut
-
-Bisa dikombinasikan dengan `--retriever`/`--llm`. Kalau filter tidak
-mencocokkan dokumen apa pun, hasilnya no-answer (bukan error). Filter juga
-tersedia di API Python: `kb.ask(query, filters={"filename": ...})`.
-
-## Evaluasi golden question set
+## Pengujian dan evaluasi
 
 ```powershell
-python evaluate.py            # cek retrieval + citation + no-answer (offline)
-python evaluate.py --llm      # + cek isi jawaban LLM
+python -m unittest discover -s tests -v
+python evaluate.py
 ```
 
-Check sesuai slide "Cara menguji AI/RAG": retrieval (chunk sumber masuk top-k),
-answer (fakta yang diharapkan ada), citation (file + halaman benar), dan
-no-answer (menolak saat bukti tidak cukup). Exit code 0 = semua PASS, cocok
-untuk release gate.
+Evaluasi memeriksa retrieval, fakta jawaban, citation, dan no-answer. Exit code
+0 berarti seluruh kasus evaluasi lolos.
+
+Melalui image Docker:
+
+```powershell
+docker compose run --rm --entrypoint python ai-api -m unittest discover -s tests -v
+docker compose run --rm --entrypoint python ai-api evaluate.py
+```

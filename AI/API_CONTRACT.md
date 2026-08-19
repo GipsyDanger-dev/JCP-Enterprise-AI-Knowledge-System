@@ -1,53 +1,115 @@
-# API Contract — Backend (NestJS) ↔ AI Service (Python)
+# API Contract — Backend dan AI Service
 
-Version: 0.1 — status: draft untuk technical kickoff (slide 13 & 18 briefing).
+Version: `0.1`
 
-AI Service adalah **HTTP service terpisah** yang dipanggil NestJS. Frontend
-(Next.js) **tidak pernah** memanggil AI Service langsung — semua request
-lewat Backend.
+Status: draft; kontrak query tersedia, kontrak ingestion end-to-end belum final.
 
-- Base URL: `http://ai-api:8000` (docker network) / `http://localhost:8000` (local)
-- Format: JSON, UTF-8
-- OpenAPI docs otomatis: `GET /docs` (FastAPI Swagger)
-- Auth antar-service: belum ada (internal network). Jangan expose ke publik
-  tanpa auth di sisi Backend.
+AI Service adalah service HTTP internal yang dipanggil oleh Backend NestJS.
+Frontend React/Vite tidak boleh memanggil AI Service secara langsung.
 
----
+## Alamat service
 
-## 1. `POST /ask` — pertanyaan → jawaban + citation
+| Konteks | Base URL |
+| --- | --- |
+| Backend di Docker Compose | `http://ai-api:8000` |
+| Akses dari host ke container | `http://localhost:8001` |
+| AI dijalankan langsung tanpa Docker | `http://localhost:8000` |
+
+- Format request/response: JSON UTF-8.
+- Swagger FastAPI: `GET /docs` pada base URL yang sesuai.
+- Auth antar-service belum tersedia.
+- Jangan mengekspos AI Service langsung ke publik.
+- `AI_SERVICE_URL` Backend di Docker harus bernilai `http://ai-api:8000`.
+
+## Status integrasi
+
+Endpoint di bawah sudah ada pada FastAPI, tetapi integrasi PostgreSQL bersama
+Backend masih memiliki kendala:
+
+1. AI dan Prisma membuat tabel bernama `documents` dengan schema berbeda.
+2. AI membuat `document_id` dari nama file, bukan memakai
+   `DocumentVersion.id` Backend.
+3. Backend menyimpan file sebagai `bytea`, sementara `/ingest` hanya menerima
+   path direktori pada filesystem AI.
+4. PostgreSQL `list_documents()` menghasilkan `num_chunks`, tetapi response
+   model `/documents` mengharuskan `chunks`.
+5. Parameter query vector search perlu diperbaiki dan diuji pada PostgreSQL
+   asli, termasuk metadata filter.
+
+Karena itu, endpoint JSON store dapat dipakai untuk pengembangan mandiri, tetapi
+alur upload–ingest end-to-end belum boleh dianggap selesai.
+
+## 1. Health
+
+### `GET /health`
+
+Response `200`:
+
+```json
+{
+  "status": "ok",
+  "store": "json",
+  "chat_model": "gpt-5-nano",
+  "embedding_model": "text-embedding-3-small"
+}
+```
+
+`store` bernilai `pgvector` ketika `DATABASE_URL` tersedia dan `json` ketika
+variabel tersebut tidak tersedia.
+
+## 2. Ask
+
+### `POST /ask`
 
 Request:
+
 ```json
 {
   "query": "Berapa maksimal biaya hotel level Manager?",
   "top_k": 5,
-  "filters": { "filename": "sop_perjalanan.pdf", "section_title": "KETENTUAN UMUM" },
+  "filters": {
+    "filename": "sop_perjalanan.pdf",
+    "section_title": "KETENTUAN UMUM"
+  },
   "use_llm": true,
   "model": "gpt-5-nano",
   "retriever": "auto"
 }
 ```
 
-Response `200`:
+| Field | Wajib | Default | Keterangan |
+| --- | --- | --- | --- |
+| `query` | Ya | — | Pertanyaan yang tidak boleh kosong |
+| `top_k` | Tidak | `5` | Jumlah hasil retrieval maksimum |
+| `filters` | Tidak | `null` | Filter `filename` dan `section_title` |
+| `use_llm` | Tidak | `false` | Mengaktifkan penyusunan jawaban oleh LLM |
+| `model` | Tidak | model default | Model chat yang digunakan |
+| `retriever` | Tidak | `auto` | `auto`, `tfidf`, atau `vector` pada JSON store |
+
+Response grounded `200`:
+
 ```json
 {
   "answer": "Maksimal biaya hotel level Manager adalah Rp900.000 per malam.",
   "citations": [
     {
-      "document_id": "b9d7a539-...",
+      "document_id": "document-id",
       "filename": "sop_perjalanan.pdf",
       "version": 1,
       "page_number": 1,
-      "section_title": "SOP Perjalanan Dinas 2026",
-      "chunk_id": "b9d7a539-...-1"
+      "section_title": "KETENTUAN UMUM",
+      "chunk_id": "chunk-id"
     }
   ],
   "grounded": true,
-  "retrieval": [ { "chunk_id": "b9d7a539-...-1", "score": 0.71 } ]
+  "retrieval": [
+    { "chunk_id": "chunk-id", "score": 0.71 }
+  ]
 }
 ```
 
-Response no-answer `200` (bukan error!):
+Response no-answer `200`:
+
 ```json
 {
   "answer": "Informasi tidak ditemukan pada dokumen yang tersedia.",
@@ -57,208 +119,186 @@ Response no-answer `200` (bukan error!):
 }
 ```
 
-Error `400`: `{"detail": "query must not be empty"}`
+Query kosong menghasilkan:
 
-**Aturan penting:**
-- `citations` SELALU berasal dari metadata chunk yang benar-benar
-  diretrieval. AI tidak pernah mengarang citation.
-- `grounded: false` berarti Backend/UI harus menampilkan state NO ANSWER
-  (bukan error), sesuai slide 10.
-- `filters` opsional; key yang didukung: `filename`, `section_title`
-  (case-insensitive substring).
-- `retriever` hanya berlaku untuk JSON store (`auto`/`tfidf`/`vector`);
-  saat `DATABASE_URL` diset (pgvector) retrieval selalu vector.
+```json
+{ "detail": "query must not be empty" }
+```
 
-## 2. `POST /ingest` — indeks dokumen
+dengan HTTP `400`.
+
+Aturan:
+
+- Citation selalu berasal dari metadata chunk hasil retrieval.
+- `grounded: false` adalah hasil no-answer, bukan kegagalan HTTP.
+- LLM tidak boleh membuat citation.
+- `retriever` hanya berpengaruh pada JSON store; pgvector selalu memakai vector.
+
+## 3. Ingest saat ini
+
+### `POST /ingest`
+
+Kontrak ini bersifat sementara dan hanya menerima direktori yang dapat dibaca
+oleh filesystem AI Service.
 
 Request:
+
 ```json
-{ "input_dir": "sample_docs", "embed": true, "model": "text-embedding-3-small" }
+{
+  "input_dir": "sample_docs",
+  "embed": true,
+  "model": "text-embedding-3-small"
+}
 ```
-> `input_dir` relatif terhadap working directory container AI Service.
-> Untuk alur upload (Frontend → Backend → storage), Backend menulis file ke
-> direktori bersama lalu memanggil endpoint ini — atau kontrak diperluas
-> dengan multipart upload (keputusan bersama di kickoff).
 
 Response `200`:
+
 ```json
 {
   "documents": [
-    { "filename": "sop_perjalanan.txt", "document_id": "b9d7a539-...",
-      "version": 1, "num_chunks": 1, "status": "indexed" }
+    {
+      "filename": "sop_perjalanan.txt",
+      "document_id": "document-id",
+      "version": 1,
+      "num_chunks": 1,
+      "status": "indexed"
+    }
   ],
-  "store": "pgvector"
+  "store": "json"
 }
 ```
-`status` = `indexed` (baru/berubah) atau `unchanged` (idempotent, content hash sama).
 
-Error `400`: `{"detail": "input_dir not found: ..."}`
+Pada PostgreSQL, `status` dapat bernilai `indexed` atau `unchanged`. JSON store
+saat ini tidak selalu menyertakan `status` pada item response.
 
-## 3. `GET /documents` — daftar dokumen terindeks
+Direktori yang tidak ditemukan menghasilkan HTTP `400`:
 
-Response `200`:
+```json
+{ "detail": "input_dir not found: sample_docs" }
+```
+
+Keterbatasan:
+
+- Path dipahami dari sisi AI Service/container, bukan dari Backend atau browser.
+- Endpoint belum menerima file multipart atau binary dari PostgreSQL.
+- Endpoint belum menerima `documentVersionId` Backend.
+- Kontrak ini belum sesuai untuk alur upload production MVP.
+
+## 4. Daftar dokumen AI
+
+### `GET /documents`
+
+Target response:
+
 ```json
 [
-  { "filename": "sop_perjalanan.txt", "document_id": "b9d7a539-...", "version": 1, "chunks": 1 }
+  {
+    "filename": "sop_perjalanan.txt",
+    "document_id": "document-id",
+    "version": 1,
+    "chunks": 1
+  }
 ]
 ```
 
-## 4. `DELETE /documents/{filename}` — hapus dokumen + chunk + embedding
+Mode JSON menghasilkan bentuk tersebut. Mode PostgreSQL saat ini memiliki
+ketidaksesuaian `num_chunks` versus `chunks` yang harus diperbaiki sebelum
+endpoint dianggap stabil.
+
+## 5. Delete dokumen AI
+
+### `DELETE /documents/{filename}`
 
 Response `200`:
+
 ```json
 { "ok": true, "filename": "sop_perjalanan.txt" }
 ```
-Error `404`: `{"detail": "document not found: ..."}`
 
-## 5. `GET /health`
+Jika file tidak ditemukan:
 
-Response `200`:
 ```json
-{
-  "status": "ok",
-  "store": "pgvector",
-  "chat_model": "gpt-5-nano",
-  "embedding_model": "text-embedding-3-small"
-}
+{ "detail": "document not found: sop_perjalanan.txt" }
 ```
 
----
+dengan HTTP `404`.
 
-## Alur integrasi yang disarankan (backend)
+Pada store standalone, delete menghapus document, chunk, dan embedding terkait.
 
-**Upload dokumen:**
-1. Frontend `POST /documents` (multipart) → Backend simpan file + buat
-   `processing_jobs` row `queued`
-2. Backend tulis file ke lokasi yang bisa dibaca AI Service → `POST /ingest`
-3. `POST /ingest` balikin `{filename, document_id, version, num_chunks}`
-4. Backend update job → `ready`, Frontend polling `GET /documents/:id/status`
+## Metadata citation
 
-**Chat:**
-1. Frontend `POST /chat/query {question}` → Backend simpan conversation
-2. Backend `POST /ask {query, filters, use_llm}`
-3. Balikin ke Frontend: `{answer, citations, grounded}` → UI render jawaban +
-   kartu citation (klik → viewer dokumen, slide 9/10)
-
-## Kontrak metadata chunk (dipakai Backend sebagai referensi schema)
+Metadata minimum yang harus dipertahankan dari ingestion sampai response:
 
 ```json
 {
-  "document_id": "uuid",
+  "document_id": "string",
   "filename": "string",
-  "version": "int",
-  "page_number": "int",
+  "version": 1,
+  "page_number": 1,
   "section_title": "string",
   "chunk_id": "string",
   "text": "string"
 }
 ```
-Ini kontrak minimum slide 7. Perubahan apa pun pada schema/response harus
-lewat PR + disepakati sebelum merge (slide 13).
 
----
+Untuk integrasi final, `document_id` perlu diganti atau dilengkapi dengan
+`document_version_id` UUID yang berasal dari Backend/Prisma.
 
-## Contoh integrasi NestJS (buat Backend Engineer)
+## Kontrak ingestion yang dituju
 
-### 0. Yang perlu disiapkan Backend Engineer
+Backend menyimpan binary file pada PostgreSQL `bytea`. Alur target yang perlu
+disepakati dan diimplementasikan:
 
-1. Pastikan AI Service jalan (dari root repo):
-   `docker compose up -d postgres ai-api`
-2. Set env di backend:
-   - `AI_SERVICE_URL=http://ai-api:8000` (dalam docker network, nama service =
-     hostname) atau `http://localhost:8000` (kalau AI jalan lokal)
-3. (Opsional) Eksplorasi endpoint interaktif: `http://localhost:8000/docs`
-   (Swagger, auto-generated). `SUMOPOD_API_KEY` & `DATABASE_URL` diurus AI
-   Service — Backend tidak perlu tahu isinya.
-
-### 1. Service wrapper (taruh di `src/ai/ai.service.ts`)
-
-```typescript
-import { Injectable } from '@nestjs/common';
-
-export interface Citation {
-  document_id: string;
-  filename: string;
-  version: number;
-  page_number: number;
-  section_title: string;
-  chunk_id: string;
-}
-
-export interface AskResult {
-  answer: string;
-  citations: Citation[];
-  grounded: boolean;
-  retrieval?: { chunk_id: string; score: number }[];
-}
-
-@Injectable()
-export class AiService {
-  // Di docker: http://ai-api:8000 — lokal: http://localhost:8000
-  private readonly baseUrl = process.env.AI_SERVICE_URL ?? 'http://localhost:8000';
-
-  async ask(
-    query: string,
-    options?: { useLlm?: boolean; filters?: Record<string, string> },
-  ): Promise<AskResult> {
-    const res = await fetch(`${this.baseUrl}/ask`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query,
-        top_k: 5,
-        filters: options?.filters,
-        use_llm: options?.useLlm ?? true,
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(`AI service error ${res.status}: ${await res.text()}`);
-    }
-    return (await res.json()) as AskResult;
-  }
-
-  async ingest(inputDir: string) {
-    const res = await fetch(`${this.baseUrl}/ingest`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ input_dir: inputDir, embed: true }),
-    });
-    if (!res.ok) {
-      throw new Error(`AI ingest error ${res.status}: ${await res.text()}`);
-    }
-    return res.json();
-  }
-}
+```text
+Frontend upload PDF/DOCX
+→ Backend membuat Document, DocumentVersion, dan ProcessingJob
+→ Backend mengirim file dan documentVersionId ke AI
+→ AI parse, chunk, embed, dan menyimpan chunk
+→ AI mengembalikan jumlah chunk
+→ Backend memperbarui job dan status Document
 ```
 
-Register di module (jangan lupa `@Module({ providers: [AiService], exports: [AiService] })`).
+Request target sebaiknya membawa:
 
-### 2. Contoh pemakaian di chat flow
-
-```typescript
-// src/chat/chat.service.ts (potongan)
-const result = await this.aiService.ask(question);
-
-// grounded=false -> ini NO-ANSWER, bukan error:
-// kirim state ke frontend supaya UI menampilkan "informasi tidak ditemukan"
-return {
-  answer: result.answer,
-  citations: result.citations,
-  grounded: result.grounded,
-};
+```text
+documentVersionId
+filename
+mimeType
+file
 ```
 
-### 3. Catatan alur upload
+Pilihan sederhana untuk MVP adalah multipart dari Backend ke AI. Keputusan ini
+belum diterapkan dan merupakan perubahan kontrak berikutnya.
 
-Endpoint `/ingest` sekarang menerima `input_dir` (path di sisi AI Service).
-Untuk alur upload asli (Frontend kirim file → Backend simpan), ada 2 opsi yang
-harus disepakati di kickoff:
+Aturan target:
 
-- **Opsi A (paling sederhana):** Backend menulis file upload ke direktori
-  bersama yang bisa dibaca AI Service (misal volume docker), lalu panggil
-  `POST /ingest` dengan path-nya.
-- **Opsi B:** AI Service menambah endpoint `POST /documents` (multipart)
-  supaya file dikirim langsung. Ini perubahan kontrak → perlu PR + review.
+- `documentVersionId` berasal dari Backend; AI tidak membuat ID dokumen sendiri.
+- Re-ingest ID dan checksum yang sama tidak menduplikasi chunk.
+- Re-ingest versi yang sama mengganti chunk secara transaksional.
+- Delete versi/dokumen membersihkan chunk dan embedding terkait.
+- Citation menyimpan referensi ke `DocumentVersion.id` yang benar.
 
-Apapun opsi yang dipilih, alur tetap: upload → `POST /ingest` → dapat
-`document_id` → update status job `ready` → frontend polling.
+## Alur query yang dituju
+
+```text
+Frontend POST /chat/query ke Backend
+→ Backend menyimpan pesan user
+→ Backend POST /ask ke AI
+→ AI mengembalikan answer, grounded, retrieval, dan citations
+→ Backend memvalidasi documentVersionId dan menyimpan citation
+→ Backend mengembalikan response UI
+```
+
+Backend harus mempertahankan `grounded: false` sebagai state no-answer dan tidak
+mengubahnya menjadi error atau jawaban karangan.
+
+## Checklist sebelum kontrak dinyatakan stabil
+
+1. Hilangkan konflik tabel `documents`.
+2. Jadikan `document_versions.id` sebagai referensi chunk.
+3. Perbaiki parameter SQL vector search dan test dengan PostgreSQL asli.
+4. Samakan field `chunks` pada response semua store.
+5. Tetapkan endpoint ingestion file dan ukuran maksimal request.
+6. Tambahkan timeout serta penanganan error pada Backend AI client.
+7. Uji idempotency, delete cascade, no-answer, dan citation end-to-end.
+8. Perbarui version dokumen ini setelah kontrak disepakati tim.
