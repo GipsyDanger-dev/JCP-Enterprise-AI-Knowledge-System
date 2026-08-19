@@ -1,0 +1,208 @@
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { DocumentStatus, ProcessingJobStatus, UserRole } from '@prisma/client';
+import { createHash, randomUUID } from 'node:crypto';
+import { extname } from 'node:path';
+import { AuthenticatedUser } from '../auth/auth.types';
+import { PrismaService } from '../database/prisma.service';
+import { DOCUMENT_STORAGE, DocumentStorage } from './document-storage.interface';
+import { UploadedDocumentFile, validateDocumentFile } from './document-file.validator';
+import { CreateDocumentDto } from './dto/create-document.dto';
+
+@Injectable()
+export class DocumentsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage,
+  ) {}
+
+  async create(input: CreateDocumentDto, uploadedFile: UploadedDocumentFile, actor: AuthenticatedUser) {
+    const file = validateDocumentFile(uploadedFile);
+    const checksum = createHash('sha256').update(file.buffer).digest('hex');
+    const duplicate = await this.prisma.documentVersion.findFirst({
+      where: {
+        checksum,
+        document: { deletedAt: null },
+      },
+      select: { documentId: true },
+    });
+    if (duplicate) throw new ConflictException('This document file has already been uploaded');
+
+    const documentId = randomUUID();
+    const documentVersionId = randomUUID();
+    const processingJobId = randomUUID();
+    const title = input.title?.trim() || file.originalname.slice(0, -extname(file.originalname).length);
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.document.create({
+        data: {
+          id: documentId,
+          title,
+          status: DocumentStatus.QUEUED,
+          uploadedById: actor.sub,
+        },
+      });
+      await transaction.documentVersion.create({
+        data: {
+          id: documentVersionId,
+          documentId,
+          versionNumber: 1,
+          originalFilename: file.originalname,
+          mimeType: file.mimetype,
+          fileSize: file.size,
+          checksum,
+        },
+      });
+      await this.storage.save(transaction, {
+        documentVersionId,
+        content: file.buffer,
+      });
+      await transaction.processingJob.create({
+        data: {
+          id: processingJobId,
+          documentVersionId,
+          idempotencyKey: `document-ingestion:${documentVersionId}`,
+          status: ProcessingJobStatus.QUEUED,
+        },
+      });
+    });
+
+    return {
+      id: documentId,
+      title,
+      status: DocumentStatus.QUEUED,
+      version: {
+        id: documentVersionId,
+        versionNumber: 1,
+        originalFilename: file.originalname,
+        mimeType: file.mimetype,
+        fileSize: file.size,
+        checksum,
+      },
+      processingJob: {
+        id: processingJobId,
+        status: ProcessingJobStatus.QUEUED,
+      },
+    };
+  }
+
+  async findAll(actor: AuthenticatedUser) {
+    const documents = await this.prisma.document.findMany({
+      where: {
+        deletedAt: null,
+        ...(actor.role === UserRole.USER ? { status: DocumentStatus.READY } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        uploadedBy: {
+          select: { id: true, displayName: true },
+        },
+        versions: {
+          orderBy: { versionNumber: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            versionNumber: true,
+            originalFilename: true,
+            mimeType: true,
+            fileSize: true,
+            checksum: true,
+          },
+        },
+      },
+    });
+
+    return documents.map(({ versions, ...document }) => ({
+      ...document,
+      latestVersion: versions[0] ?? null,
+    }));
+  }
+
+  async getStatus(id: string) {
+    const document = await this.prisma.document.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        updatedAt: true,
+        versions: {
+          orderBy: { versionNumber: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            versionNumber: true,
+            processingJobs: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: {
+                id: true,
+                status: true,
+                attemptCount: true,
+                errorMessage: true,
+                startedAt: true,
+                completedAt: true,
+                updatedAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!document) throw new NotFoundException('Document not found');
+
+    const latestVersion = document.versions[0];
+    return {
+      id: document.id,
+      title: document.title,
+      status: document.status,
+      updatedAt: document.updatedAt,
+      version: latestVersion
+        ? {
+            id: latestVersion.id,
+            versionNumber: latestVersion.versionNumber,
+            processingJob: latestVersion.processingJobs[0] ?? null,
+          }
+        : null,
+    };
+  }
+
+  async remove(id: string) {
+    const document = await this.prisma.document.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!document) throw new NotFoundException('Document not found');
+
+    const deletedAt = new Date();
+    await this.prisma.$transaction(async (transaction) => {
+      await this.storage.deleteByDocumentId(transaction, id);
+      await transaction.processingJob.updateMany({
+        where: {
+          documentVersion: { documentId: id },
+          status: { in: [ProcessingJobStatus.QUEUED, ProcessingJobStatus.PROCESSING] },
+        },
+        data: {
+          status: ProcessingJobStatus.FAILED,
+          errorMessage: 'Document deleted before processing completed',
+          completedAt: deletedAt,
+        },
+      });
+      await transaction.document.update({
+        where: { id },
+        data: { status: DocumentStatus.DELETED, deletedAt },
+      });
+    });
+
+    return { id, status: DocumentStatus.DELETED, deletedAt };
+  }
+}

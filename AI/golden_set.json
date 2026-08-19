@@ -1,0 +1,37 @@
+{
+  "description": "Golden question set untuk SOP Perjalanan Dinas 2026 (sample_docs). Expected source mengikuti metadata chunk yang benar-benar di-retrieval.",
+  "top_k": 3,
+  "documents": [
+    {
+      "filename": "sop_perjalanan.txt",
+      "path": "sample_docs/sop_perjalanan.txt"
+    }
+  ],
+  "cases": [
+    {
+      "id": "hotel-manager-cost",
+      "question": "Berapa maksimal biaya hotel level Manager?",
+      "expected": {
+        "answer_contains": ["900.000"],
+        "source": {"filename": "sop_perjalanan.txt", "page": 1},
+        "no_answer": false
+      }
+    },
+    {
+      "id": "hotel-reimbursement-requirement",
+      "question": "Apa syarat penggantian biaya hotel?",
+      "expected": {
+        "answer_contains": ["bukti pembayaran"],
+        "source": {"filename": "sop_perjalanan.txt", "page": 1},
+        "no_answer": false
+      }
+    },
+    {
+      "id": "leave-procedure-not-in-doc",
+      "question": "Bagaimana prosedur pengajuan cuti tahunan?",
+      "expected": {
+        "no_answer": true
+      }
+    }
+  ]
+}
