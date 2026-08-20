@@ -1,4 +1,9 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuditAction, AuditActorType, Prisma, UserRole } from '@prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { AuthenticatedUser } from '../auth/auth.types';
@@ -26,6 +31,7 @@ export class UsersService {
 
   findAll() {
     return this.prisma.user.findMany({
+      where: { isActive: true },
       orderBy: { createdAt: 'asc' },
       select: SAFE_USER_SELECT,
     });
@@ -64,5 +70,44 @@ export class UsersService {
       }
       throw error;
     }
+  }
+
+  async deactivate(id: string, actor: AuthenticatedUser): Promise<void> {
+    if (id === actor.sub) {
+      throw new ForbiddenException('You cannot deactivate your own account');
+    }
+
+    await this.prisma.$transaction(
+      async (transaction) => {
+        const user = await transaction.user.findFirst({
+          where: { id, isActive: true },
+          select: { id: true, email: true, role: true },
+        });
+        if (!user) throw new NotFoundException('Active user not found');
+
+        if (user.role === UserRole.ADMIN) {
+          const activeAdminCount = await transaction.user.count({
+            where: { role: UserRole.ADMIN, isActive: true },
+          });
+          if (activeAdminCount <= 1) {
+            throw new ConflictException('The last active admin cannot be deactivated');
+          }
+        }
+
+        await transaction.user.update({
+          where: { id: user.id },
+          data: { isActive: false },
+        });
+        await this.auditLogs.record(transaction, {
+          actorType: AuditActorType.USER,
+          actorUserId: actor.sub,
+          action: AuditAction.USER_DEACTIVATED,
+          targetType: 'USER',
+          targetId: user.id,
+          metadata: { email: user.email, role: user.role },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 }

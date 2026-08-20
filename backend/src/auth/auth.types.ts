@@ -6,7 +6,9 @@ export interface JwtPayload {
   role: UserRole;
 }
 
-export interface AuthenticatedUser extends JwtPayload {}
+export interface AuthenticatedUser extends JwtPayload {
+  displayName: string;
+}
 
 export interface AuthenticatedRequest {
   headers: {

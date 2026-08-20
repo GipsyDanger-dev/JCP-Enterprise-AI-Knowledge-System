@@ -34,7 +34,7 @@ export class AuthController {
   @Roles(UserRole.ADMIN, UserRole.USER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get the authenticated user from the access token' })
-  @ApiOkResponse({ description: 'Authenticated token payload' })
+  @ApiOkResponse({ description: 'Authenticated token payload with display name' })
   @ApiUnauthorizedResponse({ description: 'Missing, invalid, or expired token' })
   me(@CurrentUser() user: AuthenticatedUser) {
     return user;

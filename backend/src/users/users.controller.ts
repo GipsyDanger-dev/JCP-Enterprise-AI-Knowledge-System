@@ -1,10 +1,23 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -30,8 +43,8 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List users without password hashes' })
-  @ApiOkResponse({ description: 'All users ordered by creation time' })
+  @ApiOperation({ summary: 'List active users without password hashes' })
+  @ApiOkResponse({ description: 'Active users ordered by creation time' })
   findAll() {
     return this.usersService.findAll();
   }
@@ -43,5 +56,18 @@ export class UsersController {
   @ApiConflictResponse({ description: 'The email address is already registered' })
   create(@Body() input: CreateUserDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.usersService.create(input, actor);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Deactivate a user while preserving historical records' })
+  @ApiNoContentResponse({ description: 'User deactivated' })
+  @ApiNotFoundResponse({ description: 'Active user not found' })
+  @ApiConflictResponse({ description: 'The last active admin cannot be deactivated' })
+  deactivate(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.usersService.deactivate(id, actor);
   }
 }
