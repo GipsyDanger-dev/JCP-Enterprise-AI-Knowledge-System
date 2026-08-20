@@ -34,6 +34,11 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
       setError('Only PDF and DOCX files are supported.')
       return
     }
+    if (selected.size === 0) {
+      setFile(null)
+      setError('The selected file is empty.')
+      return
+    }
     if (selected.size > MAX_FILE_SIZE) {
       setFile(null)
       setError('File size must not exceed 10 MB.')
@@ -103,6 +108,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
             id="upload-title"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
+            maxLength={200}
             placeholder={file ? file.name.replace(/\.[^.]+$/, '') : 'Enter a document title'}
             disabled={uploading}
           />

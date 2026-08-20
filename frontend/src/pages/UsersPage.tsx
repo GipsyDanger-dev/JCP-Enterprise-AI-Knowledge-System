@@ -4,14 +4,14 @@ import { Check, ChevronDown, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { errorMessage } from '@/api/client'
 import { createUser, deleteUser, listUsers } from '@/api/users'
-import { userInitials, userRoleLabel } from '@/api/mockUsers'
 import type { ApiUser, ApiRole } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
+import { userAccessLabel, userInitials, userRoleLabel } from '@/utils/user'
 
 type FilterRole = 'all' | ApiRole
 
 export function UsersPage() {
-  const { token } = useAuth()
+  const { token, user: currentUser } = useAuth()
   const [users, setUsers] = useState<ApiUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -44,10 +44,15 @@ export function UsersPage() {
   const filtered = filter === 'all' ? users : users.filter((u) => u.role === filter)
   const adminCount = users.filter((u) => u.role === 'ADMIN').length
   const employeeCount = users.filter((u) => u.role === 'USER').length
+  const passwordInvalid = formPassword.length > 0 && (formPassword.length < 12 || formPassword.length > 128)
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
     if (!formName.trim() || !formEmail.trim()) return
+    if (formPassword.length < 12 || formPassword.length > 128) {
+      setFormError('Password wajib terdiri dari 12 sampai 128 karakter.')
+      return
+    }
     setIsSubmitting(true)
     setFormError(null)
     try {
@@ -55,7 +60,7 @@ export function UsersPage() {
         displayName: formName.trim(),
         email: formEmail.trim(),
         role: formRole,
-        password: formPassword || undefined,
+        password: formPassword,
       }, token ?? undefined)
       setUsers((prev) => [newUser, ...prev])
       setShowForm(false)
@@ -71,7 +76,7 @@ export function UsersPage() {
   }
 
   const handleDelete = async (user: ApiUser) => {
-    if (!confirm(`Hapus ${user.displayName}?`)) return
+    if (!confirm(`Deactivate ${user.displayName}?`)) return
     try {
       await deleteUser(user.id, token ?? undefined)
       setUsers((prev) => prev.filter((u) => u.id !== user.id))
@@ -85,10 +90,10 @@ export function UsersPage() {
       <PageHeading
         eyebrow="Access management"
         title="People & access"
-        detail="Manage who can access collections and AI answers."
+        detail="Manage authenticated users and their assigned roles."
         action={
           <button className="primary-button" onClick={() => setShowForm(true)}>
-            <Plus size={17} /> Invite person
+            <Plus size={17} /> Add user
           </button>
         }
       />
@@ -139,13 +144,13 @@ export function UsersPage() {
                     </div>
                   </td>
                   <td><span className={`role-badge ${user.role === 'ADMIN' ? 'admin' : 'employee'}`}>{userRoleLabel(user.role)}</span></td>
-                  <td>{user.role === 'ADMIN' ? 'Full access' : 'Knowledge library'}</td>
+                  <td>{userAccessLabel(user.role)}</td>
                   <td><span className="active-user"><Check size={13} /> Active</span></td>
-                  <td>
-                    <button className="icon-button" title={`Hapus ${user.displayName}`} onClick={() => handleDelete(user)}>
+                  <td>{user.id !== currentUser?.id && (
+                    <button className="icon-button" title={`Deactivate ${user.displayName}`} onClick={() => handleDelete(user)}>
                       <Trash2 size={15} />
                     </button>
-                  </td>
+                  )}</td>
                 </tr>
               ))}
             </tbody>
@@ -158,7 +163,7 @@ export function UsersPage() {
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Invite person</h2>
+              <h2>Add user</h2>
               <button className="icon-button" onClick={() => setShowForm(false)}><X size={18} /></button>
             </div>
             <form onSubmit={handleCreate}>
@@ -166,12 +171,12 @@ export function UsersPage() {
 
               <div className="auth-field">
                 <label htmlFor="user-name">Nama</label>
-                <input id="user-name" type="text" value={formName} onChange={(e) => setFormName(e.target.value)} required placeholder="Nama lengkap" />
+                <input id="user-name" type="text" value={formName} onChange={(e) => setFormName(e.target.value)} minLength={2} maxLength={100} required placeholder="Nama lengkap" />
               </div>
 
               <div className="auth-field">
                 <label htmlFor="user-email">Email</label>
-                <input id="user-email" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} required placeholder="nama@perusahaan.com" />
+                <input id="user-email" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} maxLength={254} required placeholder="nama@perusahaan.com" />
               </div>
 
               <div className="auth-field">
@@ -186,14 +191,26 @@ export function UsersPage() {
               </div>
 
               <div className="auth-field">
-                <label htmlFor="user-password">Password (opsional)</label>
-                <input id="user-password" type="password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder="Kosongkan untuk password default" />
+                <label htmlFor="user-password">Password</label>
+                <input
+                  id="user-password"
+                  type="password"
+                  value={formPassword}
+                  onChange={(e) => setFormPassword(e.target.value)}
+                  minLength={12}
+                  maxLength={128}
+                  required
+                  autoComplete="new-password"
+                  aria-invalid={passwordInvalid}
+                  placeholder="Minimal 12 karakter"
+                />
+                <small>Password wajib terdiri dari 12 sampai 128 karakter.</small>
               </div>
 
               <div className="modal-actions">
                 <button type="button" className="secondary-button" onClick={() => setShowForm(false)}>Batal</button>
-                <button type="submit" className="primary-button" disabled={isSubmitting || !formName.trim() || !formEmail.trim()}>
-                  {isSubmitting ? <><Loader2 size={15} className="spin" /> Menambahkan…</> : <><Plus size={15} /> Tambah</>}
+                <button type="submit" className="primary-button" disabled={isSubmitting || !formName.trim() || !formEmail.trim() || formPassword.length < 12 || formPassword.length > 128}>
+                  {isSubmitting ? <><Loader2 size={15} className="spin" /> Creating...</> : <><Plus size={15} /> Create user</>}
                 </button>
               </div>
             </form>

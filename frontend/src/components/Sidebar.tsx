@@ -1,12 +1,15 @@
-import { Activity, CircleHelp, Clock, LogOut, Settings, X } from 'lucide-react'
+import { CircleHelp, Clock, LogOut, Settings, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { LogoMark } from '@/components/Logo'
+import { userPresentation } from '@/utils/user'
 
 export function Sidebar({ menuOpen, onClose }: { menuOpen: boolean; onClose: () => void }) {
-  const { person, navigation } = useWorkspace()
+  const { navigation } = useWorkspace()
   const { user, logout } = useAuth()
+  if (!user) return null
+  const person = userPresentation(user)
   return (
     <aside className={menuOpen ? 'sidebar open' : 'sidebar'}>
       <div className="brand-lockup"><LogoMark size={28} /><strong>Enterprise AI</strong></div>
@@ -14,8 +17,8 @@ export function Sidebar({ menuOpen, onClose }: { menuOpen: boolean; onClose: () 
       <div className="sidebar-user-info">
         <span className="avatar">{person.initials}</span>
         <div>
-          <strong>{user?.displayName ?? person.name}</strong>
-          <small className="workspace-label">Jogja Creative</small>
+          <strong>{person.name}</strong>
+          <small className="workspace-label">{person.label}</small>
         </div>
       </div>
       <nav aria-label="Primary navigation">
@@ -27,7 +30,6 @@ export function Sidebar({ menuOpen, onClose }: { menuOpen: boolean; onClose: () 
           </NavLink>
         ))}
         <p style={{ marginTop: 16 }}>History</p>
-        <NavLink to="/activity" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} onClick={onClose}><Activity size={18} /><span>Activity log</span></NavLink>
         <NavLink to="/history" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} onClick={onClose}><Clock size={18} /><span>Chat history</span></NavLink>
       </nav>
       <div className="sidebar-lower">

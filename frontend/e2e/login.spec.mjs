@@ -1,122 +1,79 @@
-/**
- * E2E smoke test — alur login (mock auth).
- * Jalankan dengan dev server aktif: npm run dev (port 5173)
- *   CHROME_PATH=... npm run test:e2e
- * Base URL bisa diatur via env E2E_BASE_URL (default http://127.0.0.1:5173).
- */
-import puppeteer from 'puppeteer-core'
+import {
+  BASE_URL,
+  createReporter,
+  credentialPair,
+  login,
+  logout,
+  openBrowser,
+  resetSession,
+  skipCheck,
+  skipSuite,
+  waitForApiResponse,
+} from './support.mjs'
 
-const CHROME = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-const BASE = process.env.E2E_BASE_URL || 'http://127.0.0.1:5173'
-
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new' })
-const page = await browser.newPage()
-await page.setViewport({ width: 1280, height: 800 })
-
-const fill = async (selector, value) => {
-  await page.$eval(selector, (el, v) => {
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
-    setter.call(el, v)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-  }, value)
+const admin = credentialPair('E2E_ADMIN')
+if (!admin.value) {
+  skipSuite('login E2E', admin.missing)
+  process.exit(0)
 }
 
-const bodyText = () => page.$eval('body', (b) => b.textContent)
-const results = []
-const check = (name, ok, extra = '') => results.push(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`)
+const user = credentialPair('E2E_USER')
+const report = createReporter('login E2E')
+let browser
 
 try {
-  // 1. Belum login → /login
-  await page.goto(BASE + '/', { waitUntil: 'networkidle0' })
-  await new Promise((r) => setTimeout(r, 600))
-  check('belum login redirect ke /login', page.url().endsWith('/login'), page.url())
-  const hasDemo = await page.$('.auth-demo')
-  check('mode mock aktif (kotak demo tampil)', hasDemo !== null)
+  const session = await openBrowser()
+  browser = session.browser
+  const { page } = session
 
-  // 2. Password salah → error
-  await fill('#login-email', 'admin@jcp.co.id')
-  await fill('#login-password', 'salah')
-  await page.click('.auth-submit')
-  await page.waitForSelector('.auth-error', { timeout: 5000 })
-  const errText = await page.$eval('.auth-error', (el) => el.textContent)
-  check('password salah tampil error', /salah/i.test(errText), errText.trim())
+  await resetSession(page)
+  await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(() => location.pathname === '/login', { timeout: 10_000 })
+  report.check('unauthenticated visitor is redirected to /login', new URL(page.url()).pathname === '/login')
 
-  // 3. Login admin benar → dashboard admin
-  await fill('#login-password', 'admin123')
-  await page.click('.auth-submit')
-  await new Promise((r) => setTimeout(r, 1500))
-  const afterAdmin = await page.url()
-  const adminText = await bodyText()
-  check('login admin masuk dashboard', afterAdmin.endsWith('/'), afterAdmin)
-  check('dashboard admin (Good morning Adam)', adminText.includes('Good morning, Adam.'), adminText.includes('Good morning, Adam.') ? '' : 'tidak ketemu teks admin')
-  check('tombol logout ada di sidebar', (await page.$('.sidebar-lower .nav-item[title="Log out"]')) !== null)
+  await login(page, admin.value)
+  report.check('seeded admin can sign in', new URL(page.url()).pathname === '/')
+  const adminNavigation = await page.$eval('nav[aria-label="Primary navigation"]', (nav) => nav.textContent || '')
+  report.check('admin navigation includes People & access', adminNavigation.includes('People & access'))
 
-  // 3b. Upload dokumen → queued → processing → ready (mock pipeline)
-  await page.goto(BASE + '/documents', { waitUntil: 'networkidle0' })
-  await new Promise((r) => setTimeout(r, 800))
-  const fileInput = await page.$('input[type="file"]')
-  if (fileInput) {
-    await fileInput.uploadFile('e2e/fixtures/sample-policy.pdf')
-    // tombol berubah jadi "Mengunggah…" lalu selesai
-    await new Promise((r) => setTimeout(r, 2000))
-    check('dokumen muncul setelah upload', (await bodyText()).includes('sample-policy.pdf'))
+  const meResponsePromise = waitForApiResponse(page, 'GET', '/auth/me')
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  const meResponse = await meResponsePromise
+  await page.waitForSelector('nav[aria-label="Primary navigation"]', { timeout: 10_000 })
+  report.check('admin session is restored through GET /auth/me', meResponse.ok())
 
-    // tunggu status berubah jadi Ready (polling frontend 2s + mock ~5s)
-    let status = null
-    for (let i = 0; i < 10; i++) {
-      await new Promise((r) => setTimeout(r, 1500))
-      status = await page.evaluate(() => {
-        const row = [...document.querySelectorAll('tbody tr')].find((r) => r.textContent.includes('sample-policy.pdf'))
-        return row ? row.querySelector('.status-badge')?.textContent.trim() : null
-      })
-      if (status === 'Ready') break
-    }
-    check('status dokumen jadi Ready', status === 'Ready', `status terakhir: ${status}`)
+  await page.evaluate(() => localStorage.setItem('ea.token', 'e2e-invalid-token'))
+  const unauthorizedResponsePromise = waitForApiResponse(page, 'GET', '/auth/me')
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  const unauthorizedResponse = await unauthorizedResponsePromise
+  await page.waitForFunction(() => location.pathname === '/login', { timeout: 10_000 })
+  report.check('GET /auth/me rejects a corrupted token', unauthorizedResponse.status() === 401)
+  report.check('a runtime 401 redirects to /login', new URL(page.url()).pathname === '/login')
+  const navigationType = await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)
+  report.check('the 401 redirect stays inside the SPA', navigationType === 'reload')
+  const storedToken = await page.evaluate(() => localStorage.getItem('ea.token'))
+  report.check('a runtime 401 clears the stored token', storedToken === null)
 
-    // hapus dokumen
-    page.on('dialog', (d) => d.accept())
-    const del = await page.evaluate(() => {
-      const row = [...document.querySelectorAll('tbody tr')].find((r) => r.textContent.includes('sample-policy.pdf'))
-      row?.querySelector('.icon-button.danger')?.click()
-    })
-    await new Promise((r) => setTimeout(r, 1000))
-    check('dokumen terhapus', !(await bodyText()).includes('sample-policy.pdf'))
+  await login(page, admin.value)
+  await logout(page)
+  report.check('logout returns to /login', new URL(page.url()).pathname === '/login')
+
+  if (user.value) {
+    await login(page, user.value)
+    const userNavigation = await page.$eval('nav[aria-label="Primary navigation"]', (nav) => nav.textContent || '')
+    report.check('USER navigation omits People & access', !userNavigation.includes('People & access'))
+
+    await page.goto(`${BASE_URL}/users`, { waitUntil: 'domcontentloaded' })
+    await page.waitForFunction(() => location.pathname !== '/users', { timeout: 10_000 })
+    report.check('USER cannot open /users', new URL(page.url()).pathname !== '/users')
+    await logout(page)
   } else {
-    check('input file tersedia', false)
+    skipCheck('USER role routing', `set ${user.missing.join(' and ')}`)
   }
-
-  // 4. Logout → /login
-  if (await page.$('.sidebar-lower .nav-item[title="Log out"]')) {
-    await page.click('.sidebar-lower .nav-item[title="Log out"]')
-    await new Promise((r) => setTimeout(r, 800))
-  }
-  check('logout kembali ke /login', page.url().endsWith('/login'), page.url())
-
-  // 5. Login employee → dashboard employee
-  await fill('#login-email', 'nadia@jcp.co.id')
-  await fill('#login-password', 'employee123')
-  await page.click('.auth-submit')
-  await new Promise((r) => setTimeout(r, 1500))
-  const empText = await bodyText()
-  check('login employee masuk dashboard', page.url().endsWith('/'), page.url())
-  check('dashboard employee (Good morning Nadia)', empText.includes('Good morning, Nadia.'), empText.includes('Good morning, Nadia.') ? '' : 'tidak ketemu teks employee')
-
-  // 6. Employee akses /users → redirect '/'
-  await page.goto(BASE + '/users', { waitUntil: 'networkidle0' })
-  await new Promise((r) => setTimeout(r, 600))
-  check('employee akses /users ditolak (redirect /)', page.url().endsWith('/'), page.url())
-
-  // 7. Reload → sesi dipulihkan
-  await page.goto(BASE + '/', { waitUntil: 'networkidle0' })
-  await new Promise((r) => setTimeout(r, 1000))
-  const reloadText = await bodyText()
-  check('sesi pulih setelah reload (tetap login)', reloadText.includes('Good morning, Nadia.'), reloadText.includes('Good morning, Nadia.') ? '' : 'tidak ketemu teks setelah reload')
-} catch (err) {
-  check('SKRIP ERROR', false, err.message)
+} catch (error) {
+  report.fail('suite execution', error)
+} finally {
+  await browser?.close()
 }
 
-console.log(results.join('\n'))
-const failed = results.filter((r) => r.startsWith('❌')).length
-console.log(`\n${failed === 0 ? '✅ SEMUA LULUS' : `❌ ${failed} GAGAL`}`)
-await browser.close()
-process.exit(failed === 0 ? 0 : 1)
+process.exitCode = report.finish() > 0 ? 1 : 0

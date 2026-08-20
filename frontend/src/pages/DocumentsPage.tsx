@@ -1,171 +1,99 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowUpRight, ChevronDown, Download, FileText, FolderOpen, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { FileText, Loader2, RefreshCw, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { UploadModal } from '@/components/UploadModal'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import type { DocumentItem } from '@/types/domain'
 
-const COLLECTIONS = ['All', 'Operations', 'IT & Security', 'Finance', 'People']
-
 export function DocumentsPage() {
-  const { documents, role, uploadError, removeDocument, registerUploadedDocument } = useWorkspace()
+  const {
+    documents,
+    documentsLoading,
+    documentsError,
+    reloadDocuments,
+    role,
+    uploadError,
+    removeDocument,
+    registerUploadedDocument,
+  } = useWorkspace()
   const canManage = role === 'admin'
   const [searchParams, setSearchParams] = useSearchParams()
-  const initialCollection = searchParams.get('collection') ?? 'All'
-  const initialQuery = searchParams.get('q') ?? ''
-  const [query, setQuery] = useState(initialQuery)
-  const [collection, setCollection] = useState(initialCollection)
-  const [showCollections, setShowCollections] = useState(false)
+  const query = searchParams.get('q') ?? ''
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null)
   const [showUpload, setShowUpload] = useState(false)
 
   const filtered = useMemo(() => {
-    return documents.filter((doc) => {
-      const matchesQuery = doc.name.toLowerCase().includes(query.toLowerCase())
-      const matchesCollection = collection === 'All' || doc.collection === collection
-      return matchesQuery && matchesCollection
-    })
-  }, [documents, query, collection])
-
-  const handleCollectionChange = (c: string) => {
-    setCollection(c)
-    setShowCollections(false)
-    if (c === 'All') {
-      searchParams.delete('collection')
-    } else {
-      searchParams.set('collection', c)
-    }
-    setSearchParams(searchParams)
-  }
+    const normalizedQuery = query.trim().toLowerCase()
+    if (!normalizedQuery) return documents
+    return documents.filter((document) => document.name.toLowerCase().includes(normalizedQuery))
+  }, [documents, query])
 
   const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Hapus dokumen "${name}"?`)) {
-      await removeDocument(id)
-      if (selectedDoc?.id === id) setSelectedDoc(null)
-    }
+    if (!window.confirm(`Delete document "${name}"?`)) return
+    const deleted = await removeDocument(id)
+    if (deleted && selectedDoc?.id === id) setSelectedDoc(null)
   }
 
-  const action = canManage ? (
-    <button className="primary-button" onClick={() => setShowUpload(true)}>
-      <Upload size={17} /> Upload document
-    </button>
-  ) : undefined
+  const handleQueryChange = (value: string) => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (value) nextParams.set('q', value)
+    else nextParams.delete('q')
+    setSearchParams(nextParams, { replace: true })
+  }
 
   return (
     <div className="standard-page">
-      <PageHeading eyebrow="Knowledge base" title={canManage ? 'Documents' : 'Knowledge library'} detail={canManage ? `${documents.length} sources connected to this workspace.` : `${documents.length} trusted sources available to you.`} action={action} />
+      <PageHeading
+        eyebrow="Knowledge base"
+        title={canManage ? 'Documents' : 'Knowledge library'}
+        detail={documentsLoading ? 'Loading document metadata...' : `${documents.length} document${documents.length === 1 ? '' : 's'} available.`}
+        action={canManage ? <button className="primary-button" onClick={() => setShowUpload(true)}><Upload size={17} /> Upload document</button> : undefined}
+      />
       {uploadError && <div className="inline-alert" role="alert"><ShieldAlert size={15} /> {uploadError}</div>}
       <div className="table-toolbar">
-        <div className="filter-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search documents" /></div>
-        <div className="collection-dropdown-wrap">
-          <button className="secondary-button" onClick={() => setShowCollections(!showCollections)}>
-            <FolderOpen size={16} /> {collection} <ChevronDown size={14} />
-          </button>
-          {showCollections && (
-            <div className="collection-dropdown">
-              {COLLECTIONS.map((c) => (
-                <button key={c} className={collection === c ? 'active' : ''} onClick={() => handleCollectionChange(c)}>
-                  {c === 'All' ? 'All collections' : c}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="data-table">
-        <table>
-          <thead><tr><th>Document</th><th>Collection</th><th>Updated</th><th>Status</th><th>Chunks</th><th aria-label="Actions" /></tr></thead>
-          <tbody>{filtered.length === 0 ? (
-            <tr><td colSpan={6} className="empty-row">Tidak ada dokumen ditemukan.</td></tr>
-          ) : filtered.map((document) => (
-            <tr key={document.id} className="clickable-row" onClick={() => setSelectedDoc(document)}>
-              <td><div className="document-name"><span><FileText size={18} /></span><strong>{document.name}</strong></div></td>
-              <td>{document.collection}</td>
-              <td>{document.updatedAt}</td>
-              <td><StatusBadge status={document.status} /></td>
-              <td>{document.chunks ?? '—'}</td>
-              <td>{canManage
-                ? <button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button>
-                : <button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button>}
-              </td>
-            </tr>
-          ))}</tbody>
-        </table>
+        <div className="filter-search"><Search size={16} /><input value={query} onChange={(event) => handleQueryChange(event.target.value)} placeholder="Search documents" /></div>
       </div>
 
-      {/* Document detail modal */}
+      {documentsLoading ? (
+        <div className="users-loading"><Loader2 size={20} className="spin" /> Loading documents...</div>
+      ) : documentsError ? (
+        <div className="inline-alert" role="alert"><ShieldAlert size={15} /> {documentsError}<button className="link-button" onClick={() => void reloadDocuments()}><RefreshCw size={14} /> Retry</button></div>
+      ) : (
+        <div className="data-table">
+          <table>
+            <thead><tr><th>Document</th><th>Updated</th><th>Status</th><th aria-label="Actions" /></tr></thead>
+            <tbody>{filtered.length === 0 ? (
+              <tr><td colSpan={4} className="empty-row">{documents.length === 0 ? 'No documents are available.' : 'No documents match your search.'}</td></tr>
+            ) : filtered.map((document) => (
+              <tr key={document.id} className="clickable-row" onClick={() => setSelectedDoc(document)}>
+                <td><div className="document-name"><span><FileText size={18} /></span><strong>{document.name}</strong></div></td>
+                <td>{document.updatedAt || 'Unavailable'}</td>
+                <td><StatusBadge status={document.status} /></td>
+                <td>{canManage && <button className="icon-button danger" title={`Delete ${document.name}`} onClick={(event) => { event.stopPropagation(); void handleDelete(document.id, document.name) }}><Trash2 size={16} /></button>}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+
       {selectedDoc && (
         <div className="modal-overlay" onClick={() => setSelectedDoc(null)}>
-          <div className="modal-card doc-detail-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card doc-detail-modal" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <div className="doc-detail-header">
-                <span className="doc-detail-icon"><FileText size={24} /></span>
-                <div>
-                  <h2>{selectedDoc.name}</h2>
-                  <small>{selectedDoc.collection}</small>
-                </div>
-              </div>
+              <div className="doc-detail-header"><span className="doc-detail-icon"><FileText size={24} /></span><div><h2>{selectedDoc.name}</h2></div></div>
               <button className="icon-button" onClick={() => setSelectedDoc(null)}><X size={18} /></button>
             </div>
-
             <div className="doc-detail-grid">
-              <div className="doc-detail-field">
-                <label>Status</label>
-                <StatusBadge status={selectedDoc.status} />
-              </div>
-              <div className="doc-detail-field">
-                <label>Collection</label>
-                <span>{selectedDoc.collection}</span>
-              </div>
-              <div className="doc-detail-field">
-                <label>Updated</label>
-                <span>{selectedDoc.updatedAt}</span>
-              </div>
-              <div className="doc-detail-field">
-                <label>Indexed chunks</label>
-                <span>{selectedDoc.chunks ?? '—'}</span>
-              </div>
+              <div className="doc-detail-field"><label>Status</label><StatusBadge status={selectedDoc.status} /></div>
+              <div className="doc-detail-field"><label>Updated</label><span>{selectedDoc.updatedAt || 'Unavailable'}</span></div>
             </div>
-
-            <div className="doc-detail-info">
-              <p>Document ini sudah ter-index dan tersedia untuk AI search. {selectedDoc.status === 'Ready' ? 'Status: siap digunakan.' : selectedDoc.status === 'Processing' ? 'Sedang diproses oleh pipeline indexing.' : selectedDoc.status === 'Queued' ? 'Menunggu giliran diproses.' : 'Gagal diproses.'}</p>
-            </div>
-
-            {selectedDoc.status === 'Ready' && (
-              <div className="doc-preview-content">
-                <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 8, display: 'block' }}>Document preview</label>
-                <div className="doc-preview-chunks">
-                  <div className="doc-preview-chunk">
-                    <label>Section 1 · Page 1</label>
-                    <p>This document contains standard operating procedures for business travel. All employees must follow the guidelines outlined below when requesting travel approvals.</p>
-                  </div>
-                  <div className="doc-preview-chunk">
-                    <label>Section 2 · Page 3</label>
-                    <p>Hotel allowances are determined by employee grade level. Managers are entitled to up to Rp 1,500,000 per night, while staff members receive up to Rp 800,000 per night.</p>
-                  </div>
-                  <div className="doc-preview-chunk">
-                    <label>Section 3 · Page 5</label>
-                    <p>Transportation costs are reimbursed based on actual expenses with a maximum limit per destination. Receipts must be submitted within 7 business days.</p>
-                  </div>
-                </div>
+            {canManage && (
+              <div className="doc-detail-actions">
+                <button className="danger-button" onClick={() => void handleDelete(selectedDoc.id, selectedDoc.name)}><Trash2 size={15} /> Delete document</button>
               </div>
             )}
-
-            <div className="doc-detail-actions">
-              {selectedDoc.status === 'Ready' && (
-                <button className="secondary-button" onClick={() => window.alert('Download dimulai. Dalam produksi, file akan diunduh dari backend.')}
-                >
-                  <Download size={15} /> Download document
-                </button>
-              )}
-              {canManage && (
-                <button className="danger-button" onClick={() => { handleDelete(selectedDoc.id, selectedDoc.name) }}>
-                  <Trash2 size={15} /> Hapus dokumen
-                </button>
-              )}
-            </div>
           </div>
         </div>
       )}

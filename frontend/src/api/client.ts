@@ -8,6 +8,21 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
+type UnauthorizedHandler = (requestToken: string | null) => void
+
+let unauthorizedHandler: UnauthorizedHandler | null = null
+
+/**
+ * Hubungkan respons 401 ke pemilik sesi tanpa membuat API client bergantung
+ * pada React. Cleanup hanya melepas handler yang didaftarkannya sendiri.
+ */
+export function registerUnauthorizedHandler(handler: UnauthorizedHandler): () => void {
+  unauthorizedHandler = handler
+  return () => {
+    if (unauthorizedHandler === handler) unauthorizedHandler = null
+  }
+}
+
 export class ApiError extends Error {
   readonly status: number
   readonly code?: string
@@ -39,7 +54,7 @@ type ErrorBody = {
 /** Pesan error yang ramah pengguna (401/403/network) */
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 401) return 'Email atau password salah.'
+    if (error.status === 401) return 'Sesi Anda telah berakhir. Silakan masuk kembali.'
     if (error.status === 403) return 'Akun Anda tidak memiliki akses.'
     return error.message
   }
@@ -62,6 +77,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const response = await fetch(`${API_BASE_URL}${path}`, { ...rest, headers, body: payload })
 
   if (!response.ok) {
+    if (response.status === 401) {
+      const authorization = headers.get('Authorization')
+      const requestToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null
+      unauthorizedHandler?.(requestToken)
+    }
+
     let errorBody: ErrorBody | null = null
     try {
       errorBody = (await response.json()) as ErrorBody

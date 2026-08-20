@@ -34,13 +34,14 @@ export interface MeResponse {
   sub: string
   email: string
   role: ApiRole
+  displayName: string
 }
 
 export interface CreateUserRequest {
   displayName: string
   email: string
   role: ApiRole
-  password?: string
+  password: string
 }
 
 /* ============ Documents ============ */
@@ -108,7 +109,7 @@ export interface DeleteDocumentResponse {
   deletedAt: string
 }
 
-/* ============ Chat (target contract; Backend masih skeleton) ============ */
+/* ============ Chat ============ */
 export interface Citation {
   documentId: string
   documentVersionId: string
@@ -117,7 +118,7 @@ export interface Citation {
   pageNumber: number | null
   sectionTitle: string | null
   chunkId: string
-  excerpt?: string
+  excerpt?: string | null
 }
 
 export interface ChatQueryRequest {
@@ -135,7 +136,15 @@ export interface ChatQueryResponse {
 export interface ConversationSummary {
   id: string
   title: string
+  createdAt: string
   updatedAt: string
+  messageCount: number
+  latestMessage: {
+    id: string
+    role: 'USER' | 'ASSISTANT'
+    content: string
+    createdAt: string
+  } | null
 }
 
 export interface ChatMessage {
@@ -149,5 +158,7 @@ export interface ChatMessage {
 export interface ConversationDetail {
   id: string
   title: string
+  createdAt: string
+  updatedAt: string
   messages: ChatMessage[]
 }

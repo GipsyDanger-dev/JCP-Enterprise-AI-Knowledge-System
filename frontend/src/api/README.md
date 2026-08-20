@@ -1,29 +1,32 @@
-# Kontrak API Frontend–Backend
+# Kontrak API Frontend-Backend
 
-Folder ini berisi API client, tipe TypeScript, mapper, dan implementasi mock.
-Backend NestJS menjadi sumber kontrak utama. Tipe auth, UUID, role, status
-dokumen, mock, dan mapper Frontend sudah diselaraskan dengan response Backend.
+Folder ini berisi API client, tipe TypeScript, dan mapper untuk Backend NestJS.
+Frontend selalu mengirim request ke Backend nyata; tidak ada mode API alternatif.
 
-## Aturan Backend aktual
+## Konfigurasi
 
-- Base URL lokal: `http://localhost:8000` tanpa prefix global `/api`.
-- Auth menggunakan `Authorization: Bearer <accessToken>`.
-- ID menggunakan UUID bertipe `string`.
-- Role Backend adalah `ADMIN | USER`.
-- Status dokumen menggunakan uppercase:
-  `UPLOADED | QUEUED | PROCESSING | READY | FAILED | DELETED`.
-- Endpoint admin dilindungi Backend dengan JWT guard dan role guard.
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
 
-## Endpoint yang sudah tersedia
+Backend tidak memasang global prefix `/api`. Path `/api/docs` hanya digunakan
+untuk Swagger. Seluruh endpoint terproteksi memakai header berikut:
 
-### Auth
+```http
+Authorization: Bearer <accessToken>
+```
 
-| Method | Path | Keterangan |
-| --- | --- | --- |
-| POST | `/auth/login` | Menerima `{ email, password }`, mengembalikan `accessToken` dan profil user |
-| GET | `/auth/me` | Mengembalikan payload user terautentikasi secara langsung |
+ID adalah UUID string, role adalah `ADMIN | USER`, dan error mengikuti format
+standar NestJS `{ statusCode, message, error }`.
 
-Response login aktual:
+## Auth
+
+| Method | Path | Akses | Keterangan |
+| --- | --- | --- | --- |
+| POST | `/auth/login` | Publik | Login akun aktif dan menerima JWT serta profil aman |
+| GET | `/auth/me` | `ADMIN`, `USER` | Mengambil profil dari access token |
+
+Response login:
 
 ```json
 {
@@ -38,26 +41,29 @@ Response login aktual:
 }
 ```
 
-### Documents
+`GET /auth/me` mengembalikan `{ sub, email, role, displayName }`.
 
-| Method | Path | Akses |
-| --- | --- | --- |
-| POST | `/documents` | `ADMIN`, multipart `file`, optional `title` |
-| GET | `/documents` | `ADMIN` dan `USER`; user hanya melihat status `READY` |
-| GET | `/documents/:id/status` | `ADMIN` |
-| DELETE | `/documents/:id` | `ADMIN` |
+## Documents
 
-Upload mengembalikan HTTP `201` dengan document, version, dan processing job.
-Delete mengembalikan HTTP `200` dengan `{ id, status: "DELETED", deletedAt }`,
-bukan response kosong `204`.
+| Method | Path | Akses | Keterangan |
+| --- | --- | --- | --- |
+| POST | `/documents` | `ADMIN` | Upload PDF/DOCX multipart pada field `file`, dengan `title` opsional |
+| GET | `/documents` | `ADMIN`, `USER` | Admin melihat dokumen aktif; user hanya dokumen `READY` |
+| GET | `/documents/:id/status` | `ADMIN` | Membaca status dokumen dan processing job terbaru |
+| DELETE | `/documents/:id` | `ADMIN` | Soft-delete metadata dan menghapus binary tersimpan |
 
-Contoh bentuk item dari `GET /documents`:
+Status dokumen menggunakan
+`UPLOADED | QUEUED | PROCESSING | READY | FAILED | DELETED`. Upload dibatasi
+10 MB oleh Backend. Delete mengembalikan HTTP 200 dengan ID, status `DELETED`,
+dan waktu penghapusan.
+
+Contoh item dari `GET /documents`:
 
 ```json
 {
   "id": "document-uuid",
   "title": "SOP Perjalanan",
-  "status": "QUEUED",
+  "status": "READY",
   "createdAt": "2026-08-19T00:00:00.000Z",
   "updatedAt": "2026-08-19T00:00:00.000Z",
   "uploadedBy": {
@@ -75,77 +81,62 @@ Contoh bentuk item dari `GET /documents`:
 }
 ```
 
-Endpoint users, chat, dan conversations yang dipanggil Frontend belum tersedia
-karena modul Backend terkait masih skeleton.
+## Users
 
-## Penyesuaian yang sudah dilakukan
+Semua endpoint users khusus `ADMIN`.
 
-| Kontrak lama | Kontrak sekarang |
-| --- | --- |
-| `token` | `accessToken` |
-| `user.name` | `user.displayName` |
-| ID `number` | UUID `string` |
-| `ADMIN | EMPLOYEE` | `ADMIN | USER` |
-| status lowercase | status uppercase |
-| `{ error: { code, message } }` | error standar NestJS `{ statusCode, message, error }` |
-| delete `204` tanpa body | delete `200` dengan body |
-
-File yang telah disesuaikan:
-
-```text
-types.ts
-auth.ts
-documents.ts
-chat.ts
-users.ts
-mappers.ts
-```
-
-Mock sekarang mengikuti UUID string, `accessToken`, `displayName`, role `USER`,
-status uppercase, dan format error NestJS.
-
-## Pekerjaan integrasi yang tersisa
-
-1. `/auth/me` hanya mengembalikan payload JWT tanpa `displayName`, sehingga
-   pemulihan sesi sementara memakai email sebagai nama tampilan.
-2. Backend users, chat, dan conversations masih skeleton.
-3. Backend documents belum mengembalikan jumlah chunk.
-4. Selector E2E login lama perlu diselaraskan dengan markup UI saat ini.
-
-## Mock mode
-
-```env
-VITE_API_BASE_URL=http://localhost:8000
-VITE_USE_MOCK_AUTH=true
-```
-
-| Role UI | Email | Password |
+| Method | Path | Keterangan |
 | --- | --- | --- |
-| Admin | `admin@jcp.co.id` | `admin123` |
-| Employee | `nadia@jcp.co.id` | `employee123` |
+| GET | `/users` | Menampilkan akun aktif tanpa password hash |
+| POST | `/users` | Membuat akun `ADMIN` atau `USER`; password wajib 12-128 karakter |
+| DELETE | `/users/:id` | Menonaktifkan akun dan mengembalikan HTTP 204 |
 
-Mock documents mensimulasikan `queued → processing → ready`. Mock chat hanya
-memberikan citation dari metadata mock yang sudah ditentukan dan mengembalikan
-no-answer untuk pertanyaan yang tidak cocok.
+Backend menolak deaktivasi admin aktif terakhir. Frontend harus memperlakukan
+delete sebagai deaktivasi, bukan penghapusan riwayat pengguna.
 
-## No-answer dan citation
+## Chat dan conversations
 
-Citation tidak boleh dibuat oleh LLM. Citation harus berasal dari metadata chunk
-yang benar-benar diretrieval:
+Endpoint berikut tersedia untuk `ADMIN` dan `USER`.
+
+| Method | Path | Keterangan |
+| --- | --- | --- |
+| POST | `/chat/query` | Menjalankan query AI dan menyimpan percakapan |
+| POST | `/conversations` | Membuat conversation kosong |
+| GET | `/conversations` | Menampilkan conversation milik user aktif |
+| GET | `/conversations/:id` | Menampilkan pesan dan citation milik user aktif |
+| POST | `/conversations/:id/messages` | Menambah pesan USER tanpa menjalankan AI |
+
+Request query:
+
+```json
+{
+  "question": "Berapa jatah cuti tahunan?",
+  "conversationId": "uuid-opsional"
+}
+```
+
+Jawaban grounded mengembalikan `answer` dan minimal satu citation. Jika bukti
+tidak cukup, Backend mengembalikan HTTP 200 dengan `answer: null`, pesan
+no-answer, dan `citations: []`. State no-answer bukan kegagalan HTTP.
+
+Metadata citation berasal dari hasil retrieval dan tidak dibuat oleh LLM:
 
 ```text
-document_version_id
+documentId
+documentVersionId
 filename
 version
-page_number
-section_title
-chunk_id
+pageNumber
+sectionTitle
+chunkId
+excerpt
 ```
 
-Jika bukti tidak cukup, UI harus menampilkan:
+## Keamanan client
 
-```text
-Informasi tidak ditemukan pada dokumen yang tersedia.
-```
-
-State no-answer bukan kegagalan HTTP.
+- JWT disimpan oleh auth context dan dikirim hanya sebagai Bearer token.
+- `WORKER_TOKEN`, `JWT_SECRET`, `SEED_*`, dan key AI tidak boleh masuk ke
+  environment Frontend.
+- Hanya variable berawalan `VITE_` yang boleh dianggap tersedia di browser.
+- UI role guard membantu navigasi, tetapi otorisasi tetap wajib ditegakkan oleh
+  JWT guard dan role guard Backend.

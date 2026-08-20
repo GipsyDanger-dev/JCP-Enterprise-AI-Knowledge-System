@@ -1,53 +1,111 @@
-import { ArrowUpRight, MessageSquareText, Sparkles } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { AlertTriangle, Loader2, MessageSquareText, RefreshCw, Sparkles, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { errorMessage } from '@/api/client'
+import { getConversation, listConversations } from '@/api/chat'
+import { formatTimestamp } from '@/api/mappers'
+import type { ConversationDetail, ConversationSummary } from '@/api/types'
 import { PageHeading } from '@/components/PageHeading'
-
-interface Conversation {
-  id: number
-  title: string
-  preview: string
-  sources: number
-  time: string
-}
-
-const CONVERSATIONS: Conversation[] = [
-  { id: 1, title: 'Hotel allowance for managers', preview: 'Based on SOP Perjalanan Dinas 2026, the hotel allowance for managers is...', sources: 2, time: '18 minutes ago' },
-  { id: 2, title: 'Procurement approval flow', preview: 'The procurement approval flow requires 3 levels of approval...', sources: 1, time: '2 hours ago' },
-  { id: 3, title: 'Annual leave carry over policy', preview: 'According to the Employee Handbook, annual leave can be carried over...', sources: 3, time: 'Yesterday' },
-  { id: 4, title: 'IT security policy for contractors', preview: 'Contractors are required to follow the Information Security Policy...', sources: 2, time: '2 days ago' },
-  { id: 5, title: 'Reimbursement process', preview: 'The reimbursement process requires submitting a claim form with receipts...', sources: 1, time: '3 days ago' },
-]
+import { SourceCard } from '@/components/SourceCard'
+import { useAuth } from '@/hooks/useAuth'
+import { useWorkspace } from '@/hooks/useWorkspace'
 
 export function HistoryPage() {
   const navigate = useNavigate()
+  const { token } = useAuth()
+  const { startNewConversation } = useWorkspace()
+  const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selected, setSelected] = useState<ConversationDetail | null>(null)
+  const [loadingConversationId, setLoadingConversationId] = useState<string | null>(null)
+  const [detailError, setDetailError] = useState<string | null>(null)
+
+  const loadConversations = useCallback(async () => {
+    if (!token) {
+      setConversations([])
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      setConversations(await listConversations(token))
+    } catch (err) {
+      setConversations([])
+      setError(errorMessage(err))
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
+  useEffect(() => {
+    void loadConversations()
+  }, [loadConversations])
+
+  const openConversation = async (id: string) => {
+    if (!token) return
+    setLoadingConversationId(id)
+    setDetailError(null)
+    try {
+      setSelected(await getConversation(id, token))
+    } catch (err) {
+      setDetailError(errorMessage(err))
+    } finally {
+      setLoadingConversationId(null)
+    }
+  }
 
   return (
     <div className="standard-page">
       <PageHeading
         eyebrow="AI assistant"
         title="Conversation history"
-        detail="Your past questions and answers from Enterprise AI."
-        action={
-          <button className="primary-button" onClick={() => navigate('/chat')}>
-            <MessageSquareText size={17} /> New question
-          </button>
-        }
+        detail="Your conversations stored by Enterprise AI."
+        action={<button className="primary-button" onClick={() => { startNewConversation(); navigate('/chat') }}><MessageSquareText size={17} /> New question</button>}
       />
 
-      <div className="conversation-list">
-        {CONVERSATIONS.map((conv) => (
-          <button key={conv.id} className="conversation-card" onClick={() => navigate('/chat')}>
-            <span className="conversation-icon"><Sparkles size={16} /></span>
-            <div>
-              <strong>{conv.title}</strong>
-              <small>{conv.time}</small>
-              <p>{conv.preview}</p>
-              <small>{conv.sources} source{conv.sources !== 1 ? 's' : ''} cited</small>
+      {loading ? (
+        <div className="users-loading"><Loader2 size={20} className="spin" /> Loading conversations...</div>
+      ) : error ? (
+        <div className="inline-alert" role="alert"><AlertTriangle size={15} /> {error}<button className="link-button" onClick={() => void loadConversations()}><RefreshCw size={14} /> Retry</button></div>
+      ) : conversations.length === 0 ? (
+        <div className="chat-empty"><span><Sparkles size={27} /></span><h2>No conversations yet</h2><p>Your completed conversations will appear here.</p></div>
+      ) : (
+        <div className="conversation-list">
+          {conversations.map((conversation) => (
+            <button key={conversation.id} className="conversation-card" onClick={() => void openConversation(conversation.id)} disabled={loadingConversationId !== null}>
+              <span className="conversation-icon">{loadingConversationId === conversation.id ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}</span>
+              <div><strong>{conversation.title}</strong><small>{formatTimestamp(conversation.updatedAt)}</small></div>
+            </button>
+          ))}
+        </div>
+      )}
+      {detailError && <div className="inline-alert" role="alert"><AlertTriangle size={15} /> {detailError}</div>}
+
+      {selected && (
+        <div className="modal-overlay" onClick={() => setSelected(null)}>
+          <div className="modal-card doc-detail-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header"><h2>{selected.title}</h2><button className="icon-button" onClick={() => setSelected(null)}><X size={18} /></button></div>
+            <div className="conversation">
+              {selected.messages.map((message) => (
+                <div key={message.id} className={message.role === 'user' ? 'user-message' : 'assistant-message'}>
+                  {message.role === 'assistant' && <div className="answer-label"><Sparkles size={15} /> Enterprise AI</div>}
+                  <p>{message.content}</p>
+                  {message.citations.map((citation) => (
+                    <SourceCard
+                      key={`${message.id}-${citation.chunkId}`}
+                      title={citation.filename}
+                      detail={[citation.sectionTitle, citation.pageNumber ? `Page ${citation.pageNumber}` : null].filter(Boolean).join(' - ')}
+                      excerpt={citation.excerpt}
+                    />
+                  ))}
+                </div>
+              ))}
             </div>
-            <ArrowUpRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0, marginTop: 4 }} />
-          </button>
-        ))}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

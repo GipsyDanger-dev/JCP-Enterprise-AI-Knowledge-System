@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
-import { Check, Globe, Loader2, Moon, Palette, Save, ShieldCheck, Sun, User, Users } from 'lucide-react'
+import { Check, Globe, Moon, Palette, ShieldCheck, Sun, User, Users } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { userRoleLabel } from '@/api/mockUsers'
+import { userRoleLabel } from '@/utils/user'
 
 const THEME_KEY = 'jcp-theme'
 const LANG_KEY = 'jcp-lang'
@@ -25,15 +24,8 @@ function getStoredLanguage(): Language {
 export function SettingsPage() {
   const { user } = useAuth()
   const { role } = useWorkspace()
-  const [displayName, setDisplayName] = useState(user?.displayName ?? '')
-  const [saved, setSaved] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [theme, setTheme] = useState<Theme>(getStoredTheme)
   const [language, setLanguage] = useState<Language>(getStoredLanguage)
-
-  useEffect(() => {
-    setDisplayName(user?.displayName ?? '')
-  }, [user?.displayName])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -44,15 +36,6 @@ export function SettingsPage() {
     localStorage.setItem(LANG_KEY, language)
   }, [language])
 
-  const handleSave = async (event: FormEvent) => {
-    event.preventDefault()
-    setSaving(true)
-    await new Promise((resolve) => setTimeout(resolve, 600))
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
-
   const isIndonesian = language === 'id'
 
   return (
@@ -60,7 +43,7 @@ export function SettingsPage() {
       <PageHeading
         eyebrow={isIndonesian ? 'Konfigurasi' : 'Configuration'}
         title={isIndonesian ? 'Pengaturan' : 'Settings'}
-        detail={isIndonesian ? 'Kelola profil dan preferensi workspace Anda.' : 'Manage your profile and workspace preferences.'}
+        detail={isIndonesian ? 'Lihat akun dan kelola preferensi antarmuka Anda.' : 'View your account and manage interface preferences.'}
       />
 
       <div className="settings-grid">
@@ -72,15 +55,15 @@ export function SettingsPage() {
               <small>{isIndonesian ? 'Informasi pribadi Anda' : 'Your personal information'}</small>
             </div>
           </div>
-          <form className="settings-form" onSubmit={handleSave}>
+          <div className="settings-form">
             <div className="settings-field">
               <label htmlFor="settings-name">{isIndonesian ? 'Nama tampilan' : 'Display name'}</label>
               <input
                 id="settings-name"
                 type="text"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                placeholder={isIndonesian ? 'Nama Anda' : 'Your name'}
+                value={user?.displayName ?? ''}
+                disabled
+                className="disabled-input"
               />
             </div>
             <div className="settings-field">
@@ -103,7 +86,7 @@ export function SettingsPage() {
               <div className="settings-role-display">
                 <span className={`role-badge ${role}`}>
                   {role === 'admin' ? <ShieldCheck size={13} /> : <Users size={13} />}
-                  {userRoleLabel(user?.role ?? 'USER')}
+                  {user ? userRoleLabel(user.role) : ''}
                 </span>
                 <small>
                   {isIndonesian
@@ -111,47 +94,6 @@ export function SettingsPage() {
                     : 'Assigned by workspace administrator'}
                 </small>
               </div>
-            </div>
-            <div className="settings-actions">
-              <button type="submit" className="primary-button" disabled={saving || !displayName.trim()}>
-                {saving
-                  ? <><Loader2 size={15} className="spin" /> {isIndonesian ? 'Menyimpan…' : 'Saving…'}</>
-                  : saved
-                    ? <><Check size={15} /> {isIndonesian ? 'Tersimpan!' : 'Saved!'}</>
-                    : <><Save size={15} /> {isIndonesian ? 'Simpan perubahan' : 'Save changes'}</>}
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-icon"><ShieldCheck size={18} /></span>
-            <div>
-              <h3>Workspace</h3>
-              <small>{isIndonesian ? 'Informasi dan akses workspace' : 'Workspace information and access'}</small>
-            </div>
-          </div>
-          <div className="settings-info-grid">
-            <div className="settings-info-item">
-              <label>{isIndonesian ? 'Nama workspace' : 'Workspace name'}</label>
-              <span>Jogja Creative</span>
-            </div>
-            <div className="settings-info-item">
-              <label>{isIndonesian ? 'ID workspace' : 'Workspace ID'}</label>
-              <span>JC-001</span>
-            </div>
-            <div className="settings-info-item">
-              <label>{isIndonesian ? 'Tingkat akses Anda' : 'Your access level'}</label>
-              <span>
-                {role === 'admin'
-                  ? (isIndonesian ? 'Akses penuh (Admin)' : 'Full access (Admin)')
-                  : (isIndonesian ? 'Perpustakaan pengetahuan (Pengguna)' : 'Knowledge library (User)')}
-              </span>
-            </div>
-            <div className="settings-info-item">
-              <label>{isIndonesian ? 'Koleksi yang dapat diakses' : 'Collections accessible'}</label>
-              <span>{role === 'admin' ? (isIndonesian ? 'Semua koleksi' : 'All collections') : '3 collections'}</span>
             </div>
           </div>
         </section>

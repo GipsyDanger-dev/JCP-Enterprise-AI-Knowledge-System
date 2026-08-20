@@ -1,14 +1,15 @@
 import { createContext } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
+import type { FormEvent } from 'react'
 import type { ApiDocument } from '@/api/types'
-import type { Citation, DocumentItem, NavigationItem, Person, Role } from '@/types/domain'
+import type { Citation, DocumentItem, NavigationItem, Role } from '@/types/domain'
 
 export interface WorkspaceContextValue {
-  role: Role
-  changeRole: (role: Role) => void
-  person: Person
+  role: Role | null
   navigation: NavigationItem[]
   documents: DocumentItem[]
+  documentsLoading: boolean
+  documentsError: string | null
+  reloadDocuments: () => Promise<void>
   question: string
   setQuestion: (value: string) => void
   answer: string
@@ -17,12 +18,10 @@ export interface WorkspaceContextValue {
   chatError: string | null
   onAsk: (event: FormEvent) => void
   askQuestion: (value: string) => void
-  triggerUpload: () => void
-  onUpload: (event: ChangeEvent<HTMLInputElement>) => void
-  isUploading: boolean
+  startNewConversation: () => void
   uploadError: string | null
   registerUploadedDocument: (document: ApiDocument) => void
-  removeDocument: (id: string) => Promise<void>
+  removeDocument: (id: string) => Promise<boolean>
 }
 
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)

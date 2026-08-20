@@ -29,15 +29,13 @@ export function toDomainDocument(document: ApiDocument): DocumentItem {
   return {
     id: document.id,
     name: version?.originalFilename ?? document.title,
-    collection: 'Knowledge Base',
-    updatedAt: document.updatedAt ? formatRelativeTime(document.updatedAt) : 'Baru saja',
+    updatedAt: document.updatedAt ? formatTimestamp(document.updatedAt) : '',
     status: toDomainDocumentStatus(document.status),
-    chunks: null,
   }
 }
 
-/** Konversi ISO datetime → label singkat, mis. "18 Aug, 10:42" */
-function formatRelativeTime(iso: string): string {
+/** Konversi ISO datetime -> label singkat, mis. "18 Aug, 10:42". */
+export function formatTimestamp(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
   const day = date.getDate()

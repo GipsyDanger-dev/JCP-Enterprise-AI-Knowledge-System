@@ -1,16 +1,13 @@
-# Enterprise AI Knowledge System — Frontend
+# Enterprise AI Knowledge System - Frontend
 
-Web UI internal untuk pengelolaan dokumen dan AI assistant berbasis citation.
-Frontend menggunakan React, Vite, dan TypeScript (bukan Next.js).
+Web internal untuk dokumen perusahaan dan AI assistant berbasis citation.
+Frontend menggunakan React, Vite, dan TypeScript serta selalu memakai API
+Backend nyata.
 
-## Status
+## Menjalankan Frontend
 
-Halaman login, documents, chat, dan users sudah tersedia. Untuk development,
-seluruh alur dapat didemonstrasikan dengan mock API. Kontrak auth dan documents
-sudah disesuaikan dengan Backend; users dan chat masih menunggu implementasi
-modul Backend terkait.
-
-## Menjalankan UI dengan mock
+Pastikan Backend dan database sudah berjalan, migration sudah diterapkan, dan
+akun lokal sudah dibuat melalui seed Backend. Kemudian:
 
 ```powershell
 cd frontend
@@ -19,74 +16,81 @@ Copy-Item .env.example .env
 npm run dev
 ```
 
-Buka http://localhost:5173.
-
-| Role UI | Email | Password |
-| --- | --- | --- |
-| Admin | `admin@jcp.co.id` | `admin123` |
-| Employee | `nadia@jcp.co.id` | `employee123` |
-
-Pastikan environment berisi:
+Buka http://localhost:5173. Konfigurasi default mengarah ke Backend lokal:
 
 ```env
 VITE_API_BASE_URL=http://localhost:8000
-VITE_USE_MOCK_AUTH=true
 ```
 
-Untuk integrasi Backend asli, gunakan `VITE_USE_MOCK_AUTH=false`. Auth dan
-documents sudah memakai kontrak Backend aktual.
-
-## Mode development
-
-| Kebutuhan | `VITE_USE_MOCK_AUTH` | Backend diperlukan |
-| --- | --- | --- |
-| Demo UI sementara | `true` | Tidak |
-| Integrasi API | `false` | Ya, port 8000 |
-
-Gunakan file `.env` di folder `frontend` agar base URL selalu eksplisit. Fallback
-API client juga sudah mengarah ke `http://localhost:8000`.
+Backend tidak memakai global prefix `/api`; `/api/docs` hanya path Swagger.
 
 ## Scripts
 
 | Command | Kegunaan |
 | --- | --- |
 | `npm run dev` | Menjalankan Vite pada port 5173 |
-| `npm run build` | TypeScript check dan production build |
+| `npm run build` | Memeriksa TypeScript dan membuat production build |
 | `npm run lint` | Menjalankan oxlint |
-| `npm run preview` | Preview production build |
-| `npm run test:e2e` | Menjalankan E2E login, chat, dan users |
+| `npm run preview` | Menjalankan preview production build |
+| `npm run test:e2e` | Menjalankan smoke test login, chat, dan users terhadap API nyata |
 
-E2E menggunakan `puppeteer-core` dan membutuhkan Chrome. Suite saat ini berisi
-38 skenario mock: 14 login, 11 chat, dan 13 users.
+## E2E dengan akun seed
+
+Suite E2E tidak memiliki email atau password bawaan. Isi kredensial lokal pada
+`frontend/.env` dengan akun yang benar-benar dibuat oleh `prisma:seed`:
+
+```env
+E2E_ADMIN_EMAIL=
+E2E_ADMIN_PASSWORD=
+E2E_USER_EMAIL=
+E2E_USER_PASSWORD=
+```
+
+Pasangan admin wajib untuk menjalankan suite. Jika belum diisi, setiap script
+keluar dengan status sukses dan pesan `SKIP` yang jelas. Pasangan user opsional;
+tanpanya hanya pemeriksaan pembatasan route role USER yang dilewati.
+
+Nilai `E2E_ADMIN_*` biasanya sama dengan `SEED_ADMIN_*`, sedangkan
+`E2E_USER_*` sama dengan `SEED_USER_*`. Jangan menaruh credential nyata di
+repository. Variabel E2E tidak memakai prefix `VITE_`, sehingga tidak tersedia
+di bundle browser.
+
+Untuk menguji satu query ke AI nyata, isi pertanyaan yang sesuai dengan dokumen
+`READY` pada environment pengujian:
+
+```env
+E2E_CHAT_QUESTION=
+E2E_CHAT_FOLLOWUP=
+```
+
+Jika pertanyaan kosong, suite chat tetap memeriksa login dan halaman chat tetapi
+tidak membuat conversation. `E2E_CHAT_QUESTION` harus berupa pertanyaan yang
+memiliki jawaban dan citation dari dokumen `READY`. Bila
+`E2E_CHAT_FOLLOWUP` diisi, suite juga memverifikasi request kedua mengirim dan
+menerima `conversationId` yang sama. Test users hanya membaca dan memfilter
+data; test tidak membuat atau menonaktifkan akun. URL UI dan lokasi Chrome
+dapat diubah dengan `E2E_BASE_URL` dan `CHROME_PATH`.
 
 ## Struktur
 
 ```text
 src/
-├── api/          # API client, tipe, mapper, dan mock
-├── components/   # Komponen UI reusable
-├── context/      # Auth dan workspace state
-├── hooks/        # Custom hooks
-├── pages/        # Login, documents, chat, users, dan halaman lain
-├── types/        # Tipe domain UI
-├── App.tsx       # Routing
-└── main.tsx      # Entry point
+|-- api/          # API client, tipe, dan mapper
+|-- components/   # Komponen UI reusable
+|-- context/      # Auth dan workspace state
+|-- hooks/        # Custom hooks
+|-- pages/        # Login, documents, chat, users, dan halaman pendukung
+|-- types/        # Tipe domain UI
+|-- App.tsx       # Routing
+`-- main.tsx      # Entry point
 ```
 
-## Environment
+Kontrak endpoint dan aturan role tersedia di `src/api/README.md`.
 
-| Variable | Nilai contoh | Kegunaan |
-| --- | --- | --- |
-| `VITE_API_BASE_URL` | `http://localhost:8000` | Base URL NestJS tanpa trailing slash |
-| `VITE_USE_MOCK_AUTH` | `true` | Menggunakan mock API saat demo lokal |
+## Ketergantungan runtime
 
-Dokumentasi kontrak dan status integrasi tersedia di `src/api/README.md`.
-
-## Batasan integrasi saat ini
-
-- `/auth/me` belum mengembalikan `displayName` untuk pemulihan sesi.
-- Response documents belum menyediakan jumlah chunk untuk kartu UI.
-- Endpoint users, chat, dan conversations belum tersedia di Backend.
-- Selector E2E login masih tertinggal dari markup UI saat ini.
-
-Gunakan mock mode untuk mendemonstrasikan fitur Backend yang masih skeleton.
+- Auth, documents, users, chat, dan conversations memerlukan Backend di port
+  `8000` atau URL yang ditentukan melalui `VITE_API_BASE_URL`.
+- Query chat memerlukan `AI_SERVICE_URL` Backend yang valid dan AI service yang
+  sehat.
+- Jawaban grounded memerlukan dokumen `READY` yang sudah diproses dan diindeks.

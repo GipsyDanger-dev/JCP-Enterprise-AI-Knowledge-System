@@ -4,7 +4,6 @@ import { DashboardLayout } from '@/components/DashboardLayout'
 import { RequireAuth, RequireRole } from '@/components/RequireAuth'
 import { AuthProvider } from '@/context/AuthProvider'
 import { WorkspaceProvider } from '@/context/WorkspaceProvider'
-import { ActivityPage } from '@/pages/ActivityPage'
 import { ChatPage } from '@/pages/ChatPage'
 import { DocumentsPage } from '@/pages/DocumentsPage'
 import { HelpPage } from '@/pages/HelpPage'
@@ -39,7 +38,6 @@ export default function App() {
               <Route path="users" element={<RequireRole role="ADMIN"><UsersPage /></RequireRole>} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="help" element={<HelpPage />} />
-              <Route path="activity" element={<ActivityPage />} />
               <Route path="history" element={<HistoryPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

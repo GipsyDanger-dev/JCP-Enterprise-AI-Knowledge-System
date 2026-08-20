@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Eye, EyeOff, LoaderCircle, Lock, Mail, ShieldAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { errorMessage } from '@/api/client'
+import { ApiError, errorMessage } from '@/api/client'
 import { useAuth } from '@/hooks/useAuth'
 import { LogoMark } from '@/components/Logo'
 
@@ -40,7 +40,7 @@ export function LoginPage() {
       await login(email.trim(), password)
       navigate('/', { replace: true })
     } catch (err) {
-      setError(errorMessage(err))
+      setError(err instanceof ApiError && err.status === 401 ? 'Email atau password salah.' : errorMessage(err))
     } finally {
       setSubmitting(false)
     }
