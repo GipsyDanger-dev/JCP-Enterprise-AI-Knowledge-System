@@ -14,7 +14,7 @@ export function Sidebar({ menuOpen, onClose }: { menuOpen: boolean; onClose: () 
       <div className="sidebar-user-info">
         <span className="avatar">{person.initials}</span>
         <div>
-          <strong>{user?.name ?? person.name}</strong>
+          <strong>{user?.displayName ?? person.name}</strong>
           <small className="workspace-label">Jogja Creative</small>
         </div>
       </div>

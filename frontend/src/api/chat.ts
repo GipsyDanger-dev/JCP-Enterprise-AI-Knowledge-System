@@ -13,7 +13,7 @@ export function listConversations(token?: string): Promise<ConversationSummary[]
   return request<ConversationSummary[]>('/conversations', { headers: authHeaders(token) })
 }
 
-export function getConversation(id: number, token?: string): Promise<ConversationDetail> {
+export function getConversation(id: string, token?: string): Promise<ConversationDetail> {
   if (USE_MOCK) return Promise.resolve({ id, title: '', messages: [] })
   return request<ConversationDetail>(`/conversations/${id}`, { headers: authHeaders(token) })
 }

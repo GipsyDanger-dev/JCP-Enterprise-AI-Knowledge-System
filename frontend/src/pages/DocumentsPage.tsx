@@ -38,7 +38,7 @@ export function DocumentsPage() {
     setSearchParams(searchParams)
   }
 
-  const handleDelete = async (id: number, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Hapus dokumen "${name}"?`)) {
       await removeDocument(id)
       if (selectedDoc?.id === id) setSelectedDoc(null)

@@ -1,8 +1,8 @@
 # Kontrak API Frontend–Backend
 
 Folder ini berisi API client, tipe TypeScript, mapper, dan implementasi mock.
-Backend NestJS menjadi sumber kontrak utama. Kontrak Frontend saat ini masih
-perlu dimigrasikan sebelum mock mode dapat dimatikan untuk integrasi nyata.
+Backend NestJS menjadi sumber kontrak utama. Tipe auth, UUID, role, status
+dokumen, mock, dan mapper Frontend sudah diselaraskan dengan response Backend.
 
 ## Aturan Backend aktual
 
@@ -78,9 +78,9 @@ Contoh bentuk item dari `GET /documents`:
 Endpoint users, chat, dan conversations yang dipanggil Frontend belum tersedia
 karena modul Backend terkait masih skeleton.
 
-## Perbedaan yang harus diperbaiki
+## Penyesuaian yang sudah dilakukan
 
-| Frontend sekarang | Backend aktual |
+| Kontrak lama | Kontrak sekarang |
 | --- | --- |
 | `token` | `accessToken` |
 | `user.name` | `user.displayName` |
@@ -90,7 +90,7 @@ karena modul Backend terkait masih skeleton.
 | `{ error: { code, message } }` | error standar NestJS `{ statusCode, message, error }` |
 | delete `204` tanpa body | delete `200` dengan body |
 
-File yang terdampak:
+File yang telah disesuaikan:
 
 ```text
 types.ts
@@ -101,20 +101,16 @@ users.ts
 mappers.ts
 ```
 
-Jangan menganggap response mock sebagai kontrak Backend. Saat integrasi,
-sesuaikan Frontend terhadap response NestJS kecuali perubahan Backend sudah
-dibahas dan disepakati tim.
+Mock sekarang mengikuti UUID string, `accessToken`, `displayName`, role `USER`,
+status uppercase, dan format error NestJS.
 
-## Urutan penyesuaian Frontend
+## Pekerjaan integrasi yang tersisa
 
-1. Ubah fallback `VITE_API_BASE_URL` di `client.ts` ke `http://localhost:8000`.
-2. Sesuaikan parser error agar menerima format error standar NestJS.
-3. Ubah tipe auth dan penyimpanan token ke `accessToken`.
-4. Ubah ID API menjadi UUID `string`.
-5. Petakan role Backend `USER` ke label UI employee.
-6. Sesuaikan tipe dan mapper documents dengan response Backend aktual.
-7. Pertahankan mock chat/users sampai endpoint Backend-nya tersedia.
-8. Jalankan build dan E2E mock, lalu uji integrasi dengan mock dimatikan.
+1. `/auth/me` hanya mengembalikan payload JWT tanpa `displayName`, sehingga
+   pemulihan sesi sementara memakai email sebagai nama tampilan.
+2. Backend users, chat, dan conversations masih skeleton.
+3. Backend documents belum mengembalikan jumlah chunk.
+4. Selector E2E login lama perlu diselaraskan dengan markup UI saat ini.
 
 ## Mock mode
 

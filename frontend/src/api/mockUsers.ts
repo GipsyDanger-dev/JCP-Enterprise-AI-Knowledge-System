@@ -7,9 +7,9 @@ import type { ApiUser, ApiRole, CreateUserRequest } from './types'
 let seq = 4
 
 const store: ApiUser[] = [
-  { id: 1, name: 'Adam', email: 'adam@jcp.co.id', role: 'ADMIN' },
-  { id: 2, name: 'Nadia S.', email: 'nadia@jcp.co.id', role: 'EMPLOYEE' },
-  { id: 3, name: 'Raka D.', email: 'raka@jcp.co.id', role: 'EMPLOYEE' },
+  { id: '00000000-0000-4000-8000-000000000001', displayName: 'Adam', email: 'adam@jcp.co.id', role: 'ADMIN' },
+  { id: '00000000-0000-4000-8000-000000000002', displayName: 'Nadia S.', email: 'nadia@jcp.co.id', role: 'USER' },
+  { id: '00000000-0000-4000-8000-000000000003', displayName: 'Raka D.', email: 'raka@jcp.co.id', role: 'USER' },
 ]
 
 function delay(ms: number): Promise<void> {
@@ -28,8 +28,8 @@ export async function mockCreateUser(data: CreateUserRequest): Promise<ApiUser> 
     throw { status: 409, code: 'EMAIL_EXISTS', message: 'Email sudah terdaftar' }
   }
   const user: ApiUser = {
-    id: seq++,
-    name: data.name,
+    id: `00000000-0000-4000-8000-${String(seq++).padStart(12, '0')}`,
+    displayName: data.displayName,
     email: data.email,
     role: data.role,
   }
@@ -37,7 +37,7 @@ export async function mockCreateUser(data: CreateUserRequest): Promise<ApiUser> 
   return user
 }
 
-export async function mockDeleteUser(_id: number): Promise<void> {
+export async function mockDeleteUser(_id: string): Promise<void> {
   await delay(300)
   const idx = store.findIndex((u) => u.id === _id)
   if (idx !== -1) store.splice(idx, 1)

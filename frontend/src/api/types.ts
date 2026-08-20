@@ -1,25 +1,21 @@
-/**
- * Kontrak API — Enterprise AI Knowledge System
- * Kesepakatan Frontend ↔ Backend (lihat README.md di folder ini).
- * Role memakai format UPPERCASE: ADMIN | EMPLOYEE.
- */
+/** Kontrak API mengikuti response aktual Backend NestJS/Prisma. */
 
 /* ============ Error ============ */
 export interface ApiErrorBody {
-  error?: {
-    code?: string
-    message?: string
-  }
+  statusCode?: number
+  message?: string | string[]
+  error?: string
 }
 
-/* ============ Auth ============ */
-export type ApiRole = 'ADMIN' | 'EMPLOYEE'
+/* ============ Auth & Users ============ */
+export type ApiRole = 'ADMIN' | 'USER'
 
 export interface ApiUser {
-  id: number
-  name: string
+  id: string
+  displayName: string
   email: string
   role: ApiRole
+  isActive?: boolean
 }
 
 export interface LoginRequest {
@@ -28,91 +24,130 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  token: string
+  accessToken: string
+  tokenType: 'Bearer'
   user: ApiUser
 }
 
+/** Response aktual GET /auth/me adalah payload JWT secara langsung. */
 export interface MeResponse {
-  user: ApiUser
+  sub: string
+  email: string
+  role: ApiRole
 }
 
-/* ============ Users ============ */
 export interface CreateUserRequest {
-  name: string
+  displayName: string
   email: string
   role: ApiRole
   password?: string
 }
 
 /* ============ Documents ============ */
-export type ApiDocumentStatus = 'queued' | 'processing' | 'ready' | 'failed'
+export type ApiDocumentStatus =
+  | 'UPLOADED'
+  | 'QUEUED'
+  | 'PROCESSING'
+  | 'READY'
+  | 'FAILED'
+  | 'DELETED'
+
+export type ApiProcessingJobStatus = 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+
+export interface ApiDocumentVersion {
+  id: string
+  versionNumber: number
+  originalFilename: string
+  mimeType?: string
+  fileSize?: number
+  checksum?: string | null
+}
+
+export interface ApiProcessingJob {
+  id: string
+  status: ApiProcessingJobStatus
+  attemptCount?: number
+  errorMessage?: string | null
+  startedAt?: string | null
+  completedAt?: string | null
+  updatedAt?: string
+}
 
 export interface ApiDocument {
-  id: number
-  name: string
-  collection: string
-  /** ISO datetime, mis. 2026-08-18T10:42:00Z */
-  updatedAt: string
+  id: string
+  title: string
   status: ApiDocumentStatus
-  /** Jumlah chunk; null selama belum selesai diproses */
-  chunks: number | null
-  /** Pesan error saat status = failed */
-  error?: string | null
+  createdAt?: string
+  updatedAt?: string
+  uploadedBy?: {
+    id: string
+    displayName: string
+  }
+  /** Tersedia pada GET /documents. */
+  latestVersion?: ApiDocumentVersion | null
+  /** Tersedia pada POST /documents. */
+  version?: ApiDocumentVersion
+  processingJob?: Pick<ApiProcessingJob, 'id' | 'status'>
 }
 
 export interface DocumentStatusResponse {
-  id: number
+  id: string
+  title: string
   status: ApiDocumentStatus
-  error?: string | null
-  /** Jumlah chunk; terisi saat status = ready */
-  chunks?: number | null
+  updatedAt: string
+  version: {
+    id: string
+    versionNumber: number
+    processingJob: ApiProcessingJob | null
+  } | null
 }
 
-/* ============ Chat ============ */
+export interface DeleteDocumentResponse {
+  id: string
+  status: 'DELETED'
+  deletedAt: string
+}
+
+/* ============ Chat (target contract; Backend masih skeleton) ============ */
 export interface Citation {
-  documentId: number
+  documentId: string
+  documentVersionId: string
   filename: string
-  version?: string
+  version?: number
   pageNumber: number | null
   sectionTitle: string | null
-  chunkId: number
-  /** Kutipan langsung dari dokumen sumber */
+  chunkId: string
   excerpt?: string
 }
 
 export interface ChatQueryRequest {
   question: string
-  /** Opsional: lanjutkan percakapan yang sudah ada */
-  conversationId?: number
+  conversationId?: string
 }
 
 export interface ChatQueryResponse {
-  conversationId: number
-  /** null = no-answer ("informasi tidak ditemukan pada dokumen yang tersedia") */
+  conversationId: string
   answer: string | null
-  /** Pesan penjelasan saat answer = null */
   message?: string
   citations: Citation[]
 }
 
 export interface ConversationSummary {
-  id: number
+  id: string
   title: string
-  /** ISO datetime */
   updatedAt: string
 }
 
 export interface ChatMessage {
-  id: number
+  id: string
   role: 'user' | 'assistant'
   content: string
   citations: Citation[]
-  /** ISO datetime */
   createdAt: string
 }
 
 export interface ConversationDetail {
-  id: number
+  id: string
   title: string
   messages: ChatMessage[]
 }

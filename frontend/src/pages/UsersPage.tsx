@@ -21,7 +21,7 @@ export function UsersPage() {
   const [showForm, setShowForm] = useState(false)
   const [formName, setFormName] = useState('')
   const [formEmail, setFormEmail] = useState('')
-  const [formRole, setFormRole] = useState<ApiRole>('EMPLOYEE')
+  const [formRole, setFormRole] = useState<ApiRole>('USER')
   const [formPassword, setFormPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -43,7 +43,7 @@ export function UsersPage() {
 
   const filtered = filter === 'all' ? users : users.filter((u) => u.role === filter)
   const adminCount = users.filter((u) => u.role === 'ADMIN').length
-  const employeeCount = users.filter((u) => u.role === 'EMPLOYEE').length
+  const employeeCount = users.filter((u) => u.role === 'USER').length
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
@@ -52,7 +52,7 @@ export function UsersPage() {
     setFormError(null)
     try {
       const newUser = await createUser({
-        name: formName.trim(),
+        displayName: formName.trim(),
         email: formEmail.trim(),
         role: formRole,
         password: formPassword || undefined,
@@ -61,7 +61,7 @@ export function UsersPage() {
       setShowForm(false)
       setFormName('')
       setFormEmail('')
-      setFormRole('EMPLOYEE')
+      setFormRole('USER')
       setFormPassword('')
     } catch (err) {
       setFormError(errorMessage(err))
@@ -71,7 +71,7 @@ export function UsersPage() {
   }
 
   const handleDelete = async (user: ApiUser) => {
-    if (!confirm(`Hapus ${user.name}?`)) return
+    if (!confirm(`Hapus ${user.displayName}?`)) return
     try {
       await deleteUser(user.id, token ?? undefined)
       setUsers((prev) => prev.filter((u) => u.id !== user.id))
@@ -101,7 +101,7 @@ export function UsersPage() {
         <button className={`filter-chip ${filter === 'ADMIN' ? 'active' : ''}`} onClick={() => setFilter('ADMIN')}>
           Admin ({adminCount})
         </button>
-        <button className={`filter-chip ${filter === 'EMPLOYEE' ? 'active' : ''}`} onClick={() => setFilter('EMPLOYEE')}>
+        <button className={`filter-chip ${filter === 'USER' ? 'active' : ''}`} onClick={() => setFilter('USER')}>
           Employee ({employeeCount})
         </button>
       </div>
@@ -131,18 +131,18 @@ export function UsersPage() {
                 <tr key={user.id}>
                   <td>
                     <div className="person-cell">
-                      <span className="avatar">{userInitials(user.name)}</span>
+                      <span className="avatar">{userInitials(user.displayName)}</span>
                       <span>
-                        <strong>{user.name}</strong>
+                        <strong>{user.displayName}</strong>
                         <small>{user.email}</small>
                       </span>
                     </div>
                   </td>
-                  <td><span className={`role-badge ${user.role.toLowerCase()}`}>{userRoleLabel(user.role)}</span></td>
+                  <td><span className={`role-badge ${user.role === 'ADMIN' ? 'admin' : 'employee'}`}>{userRoleLabel(user.role)}</span></td>
                   <td>{user.role === 'ADMIN' ? 'Full access' : 'Knowledge library'}</td>
                   <td><span className="active-user"><Check size={13} /> Active</span></td>
                   <td>
-                    <button className="icon-button" title={`Hapus ${user.name}`} onClick={() => handleDelete(user)}>
+                    <button className="icon-button" title={`Hapus ${user.displayName}`} onClick={() => handleDelete(user)}>
                       <Trash2 size={15} />
                     </button>
                   </td>
@@ -178,7 +178,7 @@ export function UsersPage() {
                 <label htmlFor="user-role">Role</label>
                 <div className="select-wrapper">
                   <select id="user-role" value={formRole} onChange={(e) => setFormRole(e.target.value as ApiRole)}>
-                    <option value="EMPLOYEE">Employee</option>
+                    <option value="USER">Employee</option>
                     <option value="ADMIN">Admin</option>
                   </select>
                   <ChevronDown size={15} className="select-icon" />

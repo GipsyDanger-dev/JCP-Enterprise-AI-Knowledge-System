@@ -20,7 +20,7 @@ export interface WorkspaceContextValue {
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void
   isUploading: boolean
   uploadError: string | null
-  removeDocument: (id: number) => Promise<void>
+  removeDocument: (id: string) => Promise<void>
 }
 
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)

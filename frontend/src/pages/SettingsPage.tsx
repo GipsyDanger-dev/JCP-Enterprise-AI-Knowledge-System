@@ -9,7 +9,7 @@ import { userRoleLabel } from '@/api/mockUsers'
 export function SettingsPage() {
   const { user } = useAuth()
   const { role } = useWorkspace()
-  const [displayName, setDisplayName] = useState(user?.name ?? '')
+  const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -68,7 +68,7 @@ export function SettingsPage() {
               <div className="settings-role-display">
                 <span className={`role-badge ${role}`}>
                   {role === 'admin' ? <ShieldCheck size={13} /> : <Users size={13} />}
-                  {userRoleLabel(user?.role ?? 'EMPLOYEE')}
+                  {userRoleLabel(user?.role ?? 'USER')}
                 </span>
                 <small>Assigned by workspace administrator</small>
               </div>

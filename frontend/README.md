@@ -6,9 +6,9 @@ Frontend menggunakan React, Vite, dan TypeScript (bukan Next.js).
 ## Status
 
 Halaman login, documents, chat, dan users sudah tersedia. Untuk development,
-seluruh alur dapat didemonstrasikan dengan mock API. Integrasi Backend asli
-belum selesai karena kontrak field Frontend masih perlu disesuaikan dengan
-kontrak NestJS.
+seluruh alur dapat didemonstrasikan dengan mock API. Kontrak auth dan documents
+sudah disesuaikan dengan Backend; users dan chat masih menunggu implementasi
+modul Backend terkait.
 
 ## Menjalankan UI dengan mock
 
@@ -33,9 +33,8 @@ VITE_API_BASE_URL=http://localhost:8000
 VITE_USE_MOCK_AUTH=true
 ```
 
-Untuk integrasi Backend asli, gunakan `VITE_USE_MOCK_AUTH=false`. Kontrak tipe
-Frontend belum sepenuhnya sama dengan Backend sehingga integrasi masih perlu
-dikerjakan.
+Untuk integrasi Backend asli, gunakan `VITE_USE_MOCK_AUTH=false`. Auth dan
+documents sudah memakai kontrak Backend aktual.
 
 ## Mode development
 
@@ -44,9 +43,8 @@ dikerjakan.
 | Demo UI sementara | `true` | Tidak |
 | Integrasi API | `false` | Ya, port 8000 |
 
-Gunakan file `.env` di folder `frontend` agar base URL selalu eksplisit. Source
-API client saat ini masih memiliki fallback URL lama jika variable tersebut
-tidak tersedia; fallback itu perlu diperbaiki pada tahap integrasi source code.
+Gunakan file `.env` di folder `frontend` agar base URL selalu eksplisit. Fallback
+API client juga sudah mengarah ke `http://localhost:8000`.
 
 ## Scripts
 
@@ -86,12 +84,9 @@ Dokumentasi kontrak dan status integrasi tersedia di `src/api/README.md`.
 
 ## Batasan integrasi saat ini
 
-- Login Frontend membaca `token`, sedangkan Backend mengirim `accessToken`.
-- Frontend menggunakan ID angka, sedangkan Backend menggunakan UUID string.
-- Role UI `EMPLOYEE` belum dipetakan ke role Backend `USER`.
-- Status dan bentuk response dokumen belum sama.
-- Format error Frontend belum menangani format error standar NestJS.
+- `/auth/me` belum mengembalikan `displayName` untuk pemulihan sesi.
+- Response documents belum menyediakan jumlah chunk untuk kartu UI.
 - Endpoint users, chat, dan conversations belum tersedia di Backend.
+- Selector E2E login masih tertinggal dari markup UI saat ini.
 
-Karena batasan tersebut, gunakan mock mode untuk demo sampai tahap penyesuaian
-API Frontend selesai.
+Gunakan mock mode untuk mendemonstrasikan fitur Backend yang masih skeleton.

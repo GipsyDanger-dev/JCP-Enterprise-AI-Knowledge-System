@@ -11,10 +11,10 @@ export type { Citation } from '@/api/types'
 
 export type View = 'overview' | 'documents' | 'chat' | 'users'
 export type Role = 'admin' | 'employee'
-export type DocumentStatus = 'Ready' | 'Processing' | 'Queued' | 'Failed'
+export type DocumentStatus = 'Uploaded' | 'Ready' | 'Processing' | 'Queued' | 'Failed' | 'Deleted'
 
 export interface DocumentItem {
-  id: number
+  id: string
   name: string
   collection: string
   updatedAt: string
@@ -37,10 +37,10 @@ export interface Person {
 }
 
 export const initialDocuments: DocumentItem[] = [
-  { id: 1, name: 'SOP Perjalanan Dinas 2026.pdf', collection: 'Operations', updatedAt: '18 Aug, 10:42', status: 'Ready', chunks: 42 },
-  { id: 2, name: 'Kebijakan Keamanan Informasi.docx', collection: 'IT & Security', updatedAt: '18 Aug, 09:16', status: 'Ready', chunks: 28 },
-  { id: 3, name: 'Panduan Procurement.pdf', collection: 'Finance', updatedAt: '17 Aug, 16:30', status: 'Processing', chunks: null },
-  { id: 4, name: 'Employee Handbook 2026.pdf', collection: 'People', updatedAt: '16 Aug, 13:05', status: 'Ready', chunks: 61 },
+  { id: 'mock-document-1', name: 'SOP Perjalanan Dinas 2026.pdf', collection: 'Operations', updatedAt: '18 Aug, 10:42', status: 'Ready', chunks: 42 },
+  { id: 'mock-document-2', name: 'Kebijakan Keamanan Informasi.docx', collection: 'IT & Security', updatedAt: '18 Aug, 09:16', status: 'Ready', chunks: 28 },
+  { id: 'mock-document-3', name: 'Panduan Procurement.pdf', collection: 'Finance', updatedAt: '17 Aug, 16:30', status: 'Processing', chunks: null },
+  { id: 'mock-document-4', name: 'Employee Handbook 2026.pdf', collection: 'People', updatedAt: '16 Aug, 13:05', status: 'Ready', chunks: 61 },
 ]
 
 export const adminNavigation: NavigationItem[] = [

@@ -61,7 +61,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         getDocumentStatus(doc.id, token)
           .then((status) => {
             setDocuments((current) => current.map((item) => item.id === status.id
-              ? { ...item, status: toDomainDocumentStatus(status.status), chunks: status.chunks ?? item.chunks }
+              ? { ...item, status: toDomainDocumentStatus(status.status) }
               : item))
           })
           .catch(() => { /* biarkan polling berikutnya mencoba lagi */ })
@@ -91,7 +91,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const removeDocument = async (id: number) => {
+  const removeDocument = async (id: string) => {
     if (!token) return
     try {
       await deleteDocument(id, token)
