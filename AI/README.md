@@ -14,6 +14,7 @@ generation/     prompt, grounded answer, citation, dan guardrail
 knowledge_base.py
                 JSON store, versioning, idempotency, dan delete
 http_api.py     FastAPI untuk integrasi Backend
+worker.py       Worker polling antrean Backend dan ingestion ke pgvector
 evaluate.py     evaluasi golden question
 ```
 
@@ -31,19 +32,22 @@ Sudah diperbaiki:
 4. Response daftar dokumen memakai field `chunks` secara konsisten.
 5. Urutan parameter SQL vector search sudah diperbaiki dan dikunci unit test.
 6. Citation PostgreSQL membawa `document_version_id` dari chunk hasil retrieval.
+7. Retrieval hanya membaca dokumen aktif berstatus `READY` dan versi terbaru.
+8. Chunk dan embedding diganti dalam satu transaksi setelah seluruh vector berhasil dibuat.
 
 Yang masih perlu diselesaikan:
 
-1. `/ingest` masih menerima `input_dir`; Backend belum mengirim binary `bytea`
-   atau multipart ke AI.
-2. Migration dan vector query belum diuji terhadap instance PostgreSQL nyata di
-   environment ini.
+1. Migration, worker, dan vector query belum diuji end-to-end terhadap instance
+   PostgreSQL serta provider embedding nyata di environment ini.
+2. Job yang tertinggal pada status `PROCESSING` setelah worker berhenti masih
+   membutuhkan kebijakan lease/reaper di Backend.
 
 ## Aturan utama
 
 - Citation selalu disalin dari metadata chunk yang benar-benar diretrieval.
 - LLM tidak boleh membuat citation sendiri.
-- Re-ingest file yang tidak berubah harus menjadi no-op.
+- Re-ingest file yang tidak berubah menjadi no-op hanya jika semua chunk sudah
+  memiliki embedding; data parsial dibangun ulang secara atomik.
 - File yang berubah menaikkan version dan mengganti chunk lama.
 - Delete membersihkan dokumen, chunk, dan embedding terkait.
 - Jika bukti tidak cukup, response harus `grounded: false` dengan jawaban:
@@ -97,7 +101,7 @@ service menggunakan `knowledge_base.json`.
 | Kondisi | Store | Status penggunaan |
 | --- | --- | --- |
 | `DATABASE_URL` kosong | JSON | Dapat dipakai untuk pengembangan standalone |
-| `DATABASE_URL` terisi | PostgreSQL/pgvector | Schema siap; alur pengiriman file belum terhubung |
+| `DATABASE_URL` terisi | PostgreSQL/pgvector | Worker terhubung; runtime provider nyata belum divalidasi |
 
 ## Menjalankan melalui Docker
 
@@ -105,7 +109,7 @@ Dari root repository:
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up -d postgres ai-api
+docker compose up -d postgres backend ai-api ai-worker
 ```
 
 Alamat dari host:
@@ -123,6 +127,28 @@ http://ai-api:8000
 
 Port `8001` hanya merupakan port yang diekspos ke host.
 
+## AI processing worker
+
+`worker.py` mengklaim job paling lama dari Backend menggunakan
+`X-Worker-Token`, mengunduh binary dokumen, lalu memanggil `PgVectorStore` dan
+`ingest_to_pg` menggunakan `version.id` dari claim. Satu job hanya membuat satu
+temporary file dengan `originalFilename` yang sama persis; nama dengan path
+separator, NUL, `.` atau `..` ditolak dan file selalu dibersihkan setelah job.
+
+Environment wajib:
+
+| Variable | Kegunaan |
+| --- | --- |
+| `BACKEND_URL` | Base URL internal Backend, misalnya `http://backend:8000` |
+| `WORKER_TOKEN` | Token internal yang sama dengan konfigurasi Backend |
+| `DATABASE_URL` | DSN PostgreSQL bersama tanpa parameter khusus Prisma |
+| `SUMOPOD_API_KEY` | Credential provider embedding, hanya melalui environment |
+| `WORKER_POLL_SECONDS` | Jeda antrean kosong, dibatasi 1–60 detik (default 5) |
+
+Claim `404` diperlakukan sebagai antrean kosong. HTTP error lain dianggap
+kegagalan. Error ingestion dilaporkan sebagai `FAILED` dengan pesan terbatas dan
+credential yang dikenal disensor; result PATCH dicoba ulang secara terbatas.
+
 ## Endpoint
 
 | Method | Path | Kegunaan |
@@ -135,7 +161,8 @@ Port `8001` hanya merupakan port yang diekspos ke host.
 
 Spesifikasi lengkap terdapat di `API_CONTRACT.md`. Pada PostgreSQL, endpoint
 `/ingest` wajib menerima `document_version_id` milik Backend dan tepat satu file
-dalam `input_dir`. Endpoint belum terhubung langsung dengan file `bytea` Backend.
+dalam `input_dir`. Alur normal tidak memakai endpoint ini: `ai-worker` mengambil
+binary `bytea` melalui kontrak internal Backend dan memanggil ingestion langsung.
 
 ## LLM dan embedding
 
@@ -143,7 +170,7 @@ LLM dan embedding menggunakan gateway OpenAI-compatible SumoPod. API key hanya
 dibaca dari environment:
 
 ```powershell
-$env:SUMOPOD_API_KEY="sk-xxxx"
+$env:SUMOPOD_API_KEY="replace-with-new-key"
 ```
 
 Jangan menyimpan atau commit API key ke repository.
@@ -169,12 +196,14 @@ python ai_engine.py ask "biaya hotel" --section "KETENTUAN UMUM"
 ## Pengujian dan evaluasi
 
 ```powershell
+python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
 python evaluate.py
 ```
 
 Evaluasi memeriksa retrieval, fakta jawaban, citation, dan no-answer. Exit code
-0 berarti seluruh kasus evaluasi lolos.
+0 berarti seluruh kasus evaluasi lolos. `httpx` tercantum sebagai dependency
+wajib agar test HTTP tidak dilewati diam-diam pada image yang baru dibangun.
 
 Melalui image Docker:
 

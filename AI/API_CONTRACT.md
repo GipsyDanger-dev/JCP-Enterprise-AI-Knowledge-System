@@ -1,8 +1,8 @@
 # API Contract — Backend dan AI Service
 
-Version: `0.2`
+Version: `0.3`
 
-Status: draft; schema chunk terintegrasi, transport file end-to-end belum final.
+Status: terimplementasi di level kode; validasi runtime end-to-end masih diperlukan.
 
 AI Service adalah service HTTP internal yang dipanggil oleh Backend NestJS.
 Frontend React/Vite tidak boleh memanggil AI Service secara langsung.
@@ -32,11 +32,15 @@ Schema chunk sudah diperbaiki:
 - Metadata dokumen dibaca melalui join ke schema Backend.
 - Vector search dan metadata filter memakai parameter SQL yang sesuai urutan.
 - Citation PostgreSQL membawa `document_version_id` hasil retrieval.
+- Retrieval hanya memakai dokumen aktif berstatus `READY` dan versi terbaru.
+- Worker mengambil binary `bytea` melalui endpoint internal Backend, lalu melakukan
+  parse, embedding, dan replace chunk secara atomik.
+- Backend `POST /chat/query` memanggil `/ask` dan menyimpan percakapan serta
+  citation yang sudah divalidasi.
 
-Kendala tersisa adalah transport file: Backend menyimpan file sebagai `bytea`,
-sedangkan `/ingest` masih membaca satu file dari direktori AI. Alur
-upload–ingest end-to-end belum boleh dianggap selesai sebelum multipart atau
-mekanisme transport lain diimplementasikan dan diuji pada PostgreSQL nyata.
+Yang belum terbukti adalah runtime nyata PostgreSQL/pgvector dan provider AI.
+Worker juga belum memiliki lease/reaper untuk mengembalikan job `PROCESSING`
+yang tertinggal bila proses berhenti setelah claim.
 
 ## 1. Health
 
@@ -93,6 +97,7 @@ Response grounded `200`:
   "citations": [
     {
       "document_id": "document-id",
+      "document_version_id": "document-version-uuid",
       "filename": "sop_perjalanan.pdf",
       "version": 1,
       "page_number": 1,
@@ -102,7 +107,11 @@ Response grounded `200`:
   ],
   "grounded": true,
   "retrieval": [
-    { "chunk_id": "chunk-id", "score": 0.71 }
+    {
+      "chunk_id": "chunk-id",
+      "score": 0.71,
+      "text": "Maksimal biaya hotel level Manager adalah Rp900.000 per malam."
+    }
   ]
 }
 ```
@@ -131,9 +140,11 @@ Aturan:
 - Citation selalu berasal dari metadata chunk hasil retrieval.
 - `grounded: false` adalah hasil no-answer, bukan kegagalan HTTP.
 - LLM tidak boleh membuat citation.
+- `retrieval[].text` berasal dari chunk yang sama dan digunakan Backend sebagai
+  excerpt citation; nilainya bukan hasil karangan LLM.
 - `retriever` hanya berpengaruh pada JSON store; pgvector selalu memakai vector.
 
-## 3. Ingest saat ini
+## 3. Manual ingest endpoint
 
 ### `POST /ingest`
 
@@ -165,14 +176,16 @@ Response `200`:
       "status": "indexed"
     }
   ],
-  "store": "json"
+  "store": "pgvector"
 }
 ```
 
 Pada PostgreSQL, `document_version_id` wajib berupa UUID dan direktori harus
 memuat tepat satu file yang nama serta checksum-nya sesuai metadata Backend.
-`status` dapat bernilai `indexed` atau `unchanged`. JSON store tidak memerlukan
-`document_version_id` dan saat ini tidak selalu menyertakan `status`.
+`status` dapat bernilai `indexed` atau `unchanged`. `unchanged` hanya dikembalikan
+jika versi memiliki minimal satu chunk dan seluruh chunk sudah memiliki embedding.
+JSON store tidak memerlukan `document_version_id` dan tidak selalu menyertakan
+`status`.
 
 Direktori yang tidak ditemukan menghasilkan HTTP `400`:
 
@@ -183,9 +196,8 @@ Direktori yang tidak ditemukan menghasilkan HTTP `400`:
 Keterbatasan:
 
 - Path dipahami dari sisi AI Service/container, bukan dari Backend atau browser.
-- Endpoint belum menerima file multipart atau binary dari PostgreSQL.
-- Endpoint PostgreSQL sudah menerima `document_version_id` Backend.
-- Kontrak ini belum sesuai untuk alur upload production MVP.
+- Endpoint ini tidak menerima multipart atau binary secara langsung.
+- Alur aplikasi normal menggunakan `ai-worker`, bukan endpoint manual ini.
 
 ## 4. Daftar dokumen AI
 
@@ -246,48 +258,45 @@ Metadata minimum yang harus dipertahankan dari ingestion sampai response:
 Pada PostgreSQL, metadata citation dilengkapi dengan `document_version_id` UUID
 yang berasal dari Backend/Prisma.
 
-## Kontrak ingestion yang dituju
+## Kontrak worker ingestion
 
-Backend menyimpan binary file pada PostgreSQL `bytea`. Alur target yang perlu
-disepakati dan diimplementasikan:
+Backend menyimpan binary file pada PostgreSQL `bytea`. `ai-worker` memakai
+kontrak internal berikut dengan header `X-Worker-Token`:
+
+- `POST /internal/processing-jobs/claim`
+- `GET /internal/processing-jobs/{jobId}/file`
+- `PATCH /internal/processing-jobs/{jobId}/result`
+
+Alur yang terimplementasi:
 
 ```text
 Frontend upload PDF/DOCX
 → Backend membuat Document, DocumentVersion, dan ProcessingJob
-→ Backend mengirim file dan documentVersionId ke AI
-→ AI parse, chunk, embed, dan menyimpan chunk
-→ AI mengembalikan jumlah chunk
-→ Backend memperbarui job dan status Document
+→ Worker claim job dan mengunduh binary dari Backend
+→ Worker parse dan membuat seluruh embedding sebelum mutasi database
+→ Worker mengganti chunk dan embedding versi tersebut dalam satu transaksi
+→ Worker melaporkan COMPLETED atau FAILED ke Backend
+→ Backend memperbarui job dan status Document secara transaksional
 ```
 
-Request target sebaiknya membawa:
-
-```text
-documentVersionId
-filename
-mimeType
-file
-```
-
-Pilihan sederhana untuk MVP adalah multipart dari Backend ke AI. Keputusan ini
-belum diterapkan dan merupakan perubahan kontrak berikutnya.
-
-Aturan target:
+Aturan:
 
 - `documentVersionId` berasal dari Backend; AI tidak membuat ID dokumen sendiri.
-- Re-ingest ID dan checksum yang sama tidak menduplikasi chunk.
-- Re-ingest versi yang sama mengganti chunk secara transaksional.
+- Filename harus berupa basename aman dan checksum harus cocok dengan metadata.
+- Re-ingest hanya menjadi no-op bila semua chunk memiliki embedding.
+- Retry atas data parsial membangun ulang satu versi secara transaksional.
 - Delete versi/dokumen membersihkan chunk dan embedding terkait.
 - Citation menyimpan referensi ke `DocumentVersion.id` yang benar.
 
-## Alur query yang dituju
+## Alur query terintegrasi
 
 ```text
 Frontend POST /chat/query ke Backend
-→ Backend menyimpan pesan user
+→ Backend memvalidasi JWT dan kepemilikan conversation
 → Backend POST /ask ke AI
 → AI mengembalikan answer, grounded, retrieval, dan citations
-→ Backend memvalidasi documentVersionId dan menyimpan citation
+→ Backend memvalidasi documentVersionId serta provenance excerpt
+→ Backend menyimpan pesan user, jawaban, dan citation dalam transaksi
 → Backend mengembalikan response UI
 ```
 
@@ -296,9 +305,8 @@ mengubahnya menjadi error atau jawaban karangan.
 
 ## Checklist sebelum kontrak dinyatakan stabil
 
-1. Terapkan migration `chunks` pada PostgreSQL development.
-2. Uji vector search dan metadata filter terhadap pgvector asli.
-3. Tetapkan endpoint ingestion file dan ukuran maksimal request.
-4. Tambahkan timeout serta penanganan error pada Backend AI client.
-5. Uji idempotency, delete cascade, no-answer, dan citation end-to-end.
-6. Perbarui version dokumen setelah kontrak transport file disepakati tim.
+1. Terapkan dan verifikasi seluruh migration pada PostgreSQL target.
+2. Uji upload, worker, vector search, LLM, no-answer, dan citation dengan provider nyata.
+3. Tambahkan lease/reaper untuk pemulihan job `PROCESSING` setelah worker crash.
+4. Jalankan browser E2E untuk akun `ADMIN` dan `USER` terhadap stack asli.
+5. Verifikasi secret, port, reverse proxy, backup, dan health check di VPS.

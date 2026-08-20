@@ -95,7 +95,8 @@ class PgVectorStore:
     def get_document_version(self, document_version_id: str) -> dict[str, Any] | None:
         sql = """
             SELECT d.id, dv.id, dv.original_filename, dv.version_number,
-                   dv.checksum, COUNT(c.chunk_id)::int
+                   dv.checksum, COUNT(c.chunk_id)::int,
+                   COUNT(c.embedding)::int
             FROM document_versions AS dv
             JOIN documents AS d ON d.id = dv.document_id
             LEFT JOIN chunks AS c ON c.document_version_id = dv.id
@@ -113,30 +114,40 @@ class PgVectorStore:
             "version": row[3],
             "content_hash": row[4],
             "num_chunks": row[5],
+            "num_embedded_chunks": row[6],
         }
 
     def replace_document_version(
         self,
         document_version_id: str,
         chunks: list[dict[str, Any]],
+        vectors: list[list[float]] | None = None,
     ) -> None:
-        """Replace one version's chunks atomically; the version must exist."""
+        """Replace a version's chunks and optional embeddings atomically."""
+        if vectors is not None and len(vectors) != len(chunks):
+            raise ValueError("embedding count must match chunk count")
+
         with psycopg.connect(self.dsn) as conn:
+            if vectors is not None:
+                register_vector(conn)
             with conn.transaction():
                 conn.execute(
                     "DELETE FROM chunks WHERE document_version_id = %s",
                     (document_version_id,),
                 )
-                for chunk in chunks:
+                for index, chunk in enumerate(chunks):
+                    vector = vectors[index] if vectors is not None else None
                     conn.execute(
                         "INSERT INTO chunks (chunk_id, document_version_id, page_number, "
-                        "section_title, text) VALUES (%s, %s, %s, %s, %s)",
+                        "section_title, text, embedding) "
+                        "VALUES (%s, %s, %s, %s, %s, %s)",
                         (
                             chunk["chunk_id"],
                             document_version_id,
                             chunk.get("page_number"),
                             chunk.get("section_title", ""),
                             chunk["text"],
+                            vector,
                         ),
                     )
 
@@ -164,6 +175,8 @@ class PgVectorStore:
     # ---------- embeddings ----------
 
     def store_embeddings(self, vectors: list[list[float]], chunk_ids: list[str]) -> None:
+        if len(vectors) != len(chunk_ids):
+            raise ValueError("embedding count must match chunk count")
         with psycopg.connect(self.dsn) as conn:
             register_vector(conn)
             with conn.transaction():
@@ -182,7 +195,16 @@ class PgVectorStore:
         filters: dict[str, Any] | None = None,
     ) -> list[tuple[float, dict[str, Any]]]:
         """Cosine search joined to authoritative backend document metadata."""
-        conditions = ["c.embedding IS NOT NULL", "d.deleted_at IS NULL"]
+        conditions = [
+            "c.embedding IS NOT NULL",
+            "d.deleted_at IS NULL",
+            "d.status = 'READY'",
+            "NOT EXISTS ("
+            "SELECT 1 FROM document_versions AS newer "
+            "WHERE newer.document_id = dv.document_id "
+            "AND newer.version_number > dv.version_number"
+            ")",
+        ]
         filter_params: list[Any] = []
         if filters:
             filename = filters.get("filename")
@@ -257,7 +279,11 @@ class PgVectorStore:
             "citations": citations,
             "grounded": True,
             "retrieval": [
-                {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
+                {
+                    "chunk_id": chunk["chunk_id"],
+                    "score": round(score, 4),
+                    "text": chunk["text"],
+                }
                 for score, chunk in matches
             ],
         }
@@ -304,13 +330,15 @@ def ingest_to_pg(
     if expected_hash and digest != expected_hash:
         raise ValueError("file checksum does not match document version")
 
-    if metadata["num_chunks"] > 0:
+    num_chunks = int(metadata.get("num_chunks") or 0)
+    num_embedded_chunks = int(metadata.get("num_embedded_chunks") or 0)
+    if num_chunks > 0 and num_embedded_chunks == num_chunks:
         return [{
             "filename": metadata["filename"],
             "document_id": metadata["document_id"],
             "document_version_id": metadata["document_version_id"],
             "version": metadata["version"],
-            "num_chunks": metadata["num_chunks"],
+            "num_chunks": num_chunks,
             "status": "unchanged",
         }]
 
@@ -327,14 +355,19 @@ def ingest_to_pg(
         chunk["document_id"] = metadata["document_id"]
         chunk["document_version_id"] = metadata["document_version_id"]
 
-    store.replace_document_version(document_version_id, chunks)
+    vectors: list[list[float]] | None = None
     if embed and chunks:
         vectors = embed_texts(
             [chunk["text"] for chunk in chunks],
             model=store.model,
             api_key=api_key,
         )
-        store.store_embeddings(vectors, [chunk["chunk_id"] for chunk in chunks])
+        if len(vectors) != len(chunks):
+            raise ValueError("embedding provider returned an unexpected vector count")
+
+    # Embeddings are generated before any database mutation. A retry replaces
+    # partial legacy data with one complete transaction.
+    store.replace_document_version(document_version_id, chunks, vectors=vectors)
 
     return [{
         "filename": metadata["filename"],

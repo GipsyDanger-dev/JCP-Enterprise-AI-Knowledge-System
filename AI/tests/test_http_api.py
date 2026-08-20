@@ -1,14 +1,10 @@
 import unittest
 
-try:
-    from fastapi.testclient import TestClient
-    import http_api
-    HAS_DEPS = True
-except ImportError:  # pragma: no cover - optional dependencies
-    HAS_DEPS = False
+from fastapi.testclient import TestClient
+
+import http_api
 
 
-@unittest.skipUnless(HAS_DEPS, "fastapi/httpx not installed (pip install -r requirements.txt)")
 class HttpApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
