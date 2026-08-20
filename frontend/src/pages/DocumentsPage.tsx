@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowUpRight, ChevronDown, Download, FileText, FolderOpen, LoaderCircle, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { ArrowUpRight, ChevronDown, Download, FileText, FolderOpen, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
+import { UploadModal } from '@/components/UploadModal'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import type { DocumentItem } from '@/types/domain'
 
 const COLLECTIONS = ['All', 'Operations', 'IT & Security', 'Finance', 'People']
 
 export function DocumentsPage() {
-  const { documents, triggerUpload, role, isUploading, uploadError, removeDocument } = useWorkspace()
+  const { documents, role, uploadError, removeDocument, registerUploadedDocument } = useWorkspace()
   const canManage = role === 'admin'
   const [searchParams, setSearchParams] = useSearchParams()
   const initialCollection = searchParams.get('collection') ?? 'All'
@@ -18,6 +19,7 @@ export function DocumentsPage() {
   const [collection, setCollection] = useState(initialCollection)
   const [showCollections, setShowCollections] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null)
+  const [showUpload, setShowUpload] = useState(false)
 
   const filtered = useMemo(() => {
     return documents.filter((doc) => {
@@ -46,9 +48,8 @@ export function DocumentsPage() {
   }
 
   const action = canManage ? (
-    <button className="primary-button" onClick={triggerUpload} disabled={isUploading}>
-      {isUploading ? <LoaderCircle size={17} className="spin" /> : <Upload size={17} />}
-      {isUploading ? 'Mengunggah…' : 'Upload document'}
+    <button className="primary-button" onClick={() => setShowUpload(true)}>
+      <Upload size={17} /> Upload document
     </button>
   ) : undefined
 
@@ -168,6 +169,8 @@ export function DocumentsPage() {
           </div>
         </div>
       )}
+
+      <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
     </div>
   )
 }

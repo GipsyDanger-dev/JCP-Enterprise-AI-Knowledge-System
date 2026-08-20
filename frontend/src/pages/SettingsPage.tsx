@@ -1,10 +1,26 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Check, Loader2, Save, ShieldCheck, User, Users } from 'lucide-react'
+import { Check, Globe, Loader2, Moon, Palette, Save, ShieldCheck, Sun, User, Users } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { userRoleLabel } from '@/api/mockUsers'
+
+const THEME_KEY = 'jcp-theme'
+const LANG_KEY = 'jcp-lang'
+
+type Theme = 'light' | 'dark'
+type Language = 'en' | 'id'
+
+function getStoredTheme(): Theme {
+  const storedTheme = localStorage.getItem(THEME_KEY)
+  return storedTheme === 'dark' ? 'dark' : 'light'
+}
+
+function getStoredLanguage(): Language {
+  const storedLanguage = localStorage.getItem(LANG_KEY)
+  return storedLanguage === 'id' ? 'id' : 'en'
+}
 
 export function SettingsPage() {
   const { user } = useAuth()
@@ -12,48 +28,63 @@ export function SettingsPage() {
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [theme, setTheme] = useState<Theme>(getStoredTheme)
+  const [language, setLanguage] = useState<Language>(getStoredLanguage)
 
-  const handleSave = async (e: FormEvent) => {
-    e.preventDefault()
+  useEffect(() => {
+    setDisplayName(user?.displayName ?? '')
+  }, [user?.displayName])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem(THEME_KEY, theme)
+  }, [theme])
+
+  useEffect(() => {
+    localStorage.setItem(LANG_KEY, language)
+  }, [language])
+
+  const handleSave = async (event: FormEvent) => {
+    event.preventDefault()
     setSaving(true)
-    // Mock delay
-    await new Promise((r) => setTimeout(r, 600))
+    await new Promise((resolve) => setTimeout(resolve, 600))
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
+  const isIndonesian = language === 'id'
+
   return (
     <div className="standard-page">
       <PageHeading
-        eyebrow="Configuration"
-        title="Settings"
-        detail="Manage your profile and workspace preferences."
+        eyebrow={isIndonesian ? 'Konfigurasi' : 'Configuration'}
+        title={isIndonesian ? 'Pengaturan' : 'Settings'}
+        detail={isIndonesian ? 'Kelola profil dan preferensi workspace Anda.' : 'Manage your profile and workspace preferences.'}
       />
 
       <div className="settings-grid">
-        {/* Profile section */}
         <section className="settings-section">
           <div className="settings-section-header">
             <span className="settings-icon"><User size={18} /></span>
             <div>
-              <h3>Profile</h3>
-              <small>Your personal information</small>
+              <h3>{isIndonesian ? 'Profil' : 'Profile'}</h3>
+              <small>{isIndonesian ? 'Informasi pribadi Anda' : 'Your personal information'}</small>
             </div>
           </div>
           <form className="settings-form" onSubmit={handleSave}>
             <div className="settings-field">
-              <label htmlFor="settings-name">Display name</label>
+              <label htmlFor="settings-name">{isIndonesian ? 'Nama tampilan' : 'Display name'}</label>
               <input
                 id="settings-name"
                 type="text"
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your name"
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder={isIndonesian ? 'Nama Anda' : 'Your name'}
               />
             </div>
             <div className="settings-field">
-              <label htmlFor="settings-email">Email address</label>
+              <label htmlFor="settings-email">{isIndonesian ? 'Alamat email' : 'Email address'}</label>
               <input
                 id="settings-email"
                 type="email"
@@ -61,76 +92,158 @@ export function SettingsPage() {
                 disabled
                 className="disabled-input"
               />
-              <small>Email cannot be changed. Contact admin to update.</small>
+              <small>
+                {isIndonesian
+                  ? 'Email tidak dapat diubah. Hubungi admin untuk memperbaruinya.'
+                  : 'Email cannot be changed. Contact admin to update.'}
+              </small>
             </div>
             <div className="settings-field">
-              <label>Role</label>
+              <label>{isIndonesian ? 'Peran' : 'Role'}</label>
               <div className="settings-role-display">
                 <span className={`role-badge ${role}`}>
                   {role === 'admin' ? <ShieldCheck size={13} /> : <Users size={13} />}
                   {userRoleLabel(user?.role ?? 'USER')}
                 </span>
-                <small>Assigned by workspace administrator</small>
+                <small>
+                  {isIndonesian
+                    ? 'Ditetapkan oleh administrator workspace'
+                    : 'Assigned by workspace administrator'}
+                </small>
               </div>
             </div>
             <div className="settings-actions">
               <button type="submit" className="primary-button" disabled={saving || !displayName.trim()}>
-                {saving ? <><Loader2 size={15} className="spin" /> Saving…</> : saved ? <><Check size={15} /> Saved!</> : <><Save size={15} /> Save changes</>}
+                {saving
+                  ? <><Loader2 size={15} className="spin" /> {isIndonesian ? 'Menyimpan…' : 'Saving…'}</>
+                  : saved
+                    ? <><Check size={15} /> {isIndonesian ? 'Tersimpan!' : 'Saved!'}</>
+                    : <><Save size={15} /> {isIndonesian ? 'Simpan perubahan' : 'Save changes'}</>}
               </button>
             </div>
           </form>
         </section>
 
-        {/* Workspace section */}
         <section className="settings-section">
           <div className="settings-section-header">
             <span className="settings-icon"><ShieldCheck size={18} /></span>
             <div>
               <h3>Workspace</h3>
-              <small>Workspace information and access</small>
+              <small>{isIndonesian ? 'Informasi dan akses workspace' : 'Workspace information and access'}</small>
             </div>
           </div>
           <div className="settings-info-grid">
             <div className="settings-info-item">
-              <label>Workspace name</label>
+              <label>{isIndonesian ? 'Nama workspace' : 'Workspace name'}</label>
               <span>Jogja Creative</span>
             </div>
             <div className="settings-info-item">
-              <label>Workspace ID</label>
+              <label>{isIndonesian ? 'ID workspace' : 'Workspace ID'}</label>
               <span>JC-001</span>
             </div>
             <div className="settings-info-item">
-              <label>Your access level</label>
-              <span>{role === 'admin' ? 'Full access (Admin)' : 'Knowledge library (Employee)'}</span>
+              <label>{isIndonesian ? 'Tingkat akses Anda' : 'Your access level'}</label>
+              <span>
+                {role === 'admin'
+                  ? (isIndonesian ? 'Akses penuh (Admin)' : 'Full access (Admin)')
+                  : (isIndonesian ? 'Perpustakaan pengetahuan (Pengguna)' : 'Knowledge library (User)')}
+              </span>
             </div>
             <div className="settings-info-item">
-              <label>Collections accessible</label>
-              <span>{role === 'admin' ? 'All collections' : '3 collections'}</span>
+              <label>{isIndonesian ? 'Koleksi yang dapat diakses' : 'Collections accessible'}</label>
+              <span>{role === 'admin' ? (isIndonesian ? 'Semua koleksi' : 'All collections') : '3 collections'}</span>
             </div>
           </div>
         </section>
 
-        {/* Appearance section */}
         <section className="settings-section">
           <div className="settings-section-header">
-            <span className="settings-icon"><User size={18} /></span>
+            <span className="settings-icon"><Palette size={18} /></span>
             <div>
-              <h3>Appearance</h3>
-              <small>Customize your interface</small>
+              <h3>{isIndonesian ? 'Tampilan' : 'Appearance'}</h3>
+              <small>
+                {isIndonesian
+                  ? 'Sesuaikan tampilan antarmuka Anda'
+                  : 'Customize your interface look and feel'}
+              </small>
             </div>
           </div>
-          <div className="settings-info-grid">
-            <div className="settings-info-item">
-              <label>Theme</label>
-              <span>Light (default)</span>
+          <div className="settings-form">
+            <div className="settings-field">
+              <label>{isIndonesian ? 'Tema' : 'Theme'}</label>
+              <div className="settings-theme-grid">
+                <button
+                  className={`theme-card ${theme === 'light' ? 'active' : ''}`}
+                  onClick={() => setTheme('light')}
+                  type="button"
+                  aria-pressed={theme === 'light'}
+                >
+                  <div className="theme-preview theme-light-preview">
+                    <div className="theme-preview-sidebar" />
+                    <div className="theme-preview-content">
+                      <div className="theme-preview-bar" />
+                      <div className="theme-preview-block" />
+                      <div className="theme-preview-block short" />
+                    </div>
+                  </div>
+                  <span className="theme-label">
+                    <Sun size={14} /> {isIndonesian ? 'Terang' : 'Light'}
+                  </span>
+                </button>
+                <button
+                  className={`theme-card ${theme === 'dark' ? 'active' : ''}`}
+                  onClick={() => setTheme('dark')}
+                  type="button"
+                  aria-pressed={theme === 'dark'}
+                >
+                  <div className="theme-preview theme-dark-preview">
+                    <div className="theme-preview-sidebar dark" />
+                    <div className="theme-preview-content dark">
+                      <div className="theme-preview-bar dark" />
+                      <div className="theme-preview-block dark" />
+                      <div className="theme-preview-block short dark" />
+                    </div>
+                  </div>
+                  <span className="theme-label">
+                    <Moon size={14} /> {isIndonesian ? 'Gelap' : 'Dark'}
+                  </span>
+                </button>
+              </div>
             </div>
-            <div className="settings-info-item">
-              <label>Language</label>
-              <span>English / Bahasa Indonesia</span>
-            </div>
-            <div className="settings-info-item">
-              <label>Compact mode</label>
-              <span>Off</span>
+
+            <div className="settings-field">
+              <label>
+                <Globe size={14} style={{ marginRight: 6, verticalAlign: -2 }} />
+                {isIndonesian ? 'Bahasa' : 'Language'}
+              </label>
+              <div className="settings-language-options">
+                <button
+                  className={`language-option ${language === 'en' ? 'active' : ''}`}
+                  onClick={() => setLanguage('en')}
+                  type="button"
+                  aria-pressed={language === 'en'}
+                >
+                  <span className="lang-flag" aria-hidden="true">🇬🇧</span>
+                  <span className="lang-text">
+                    <span className="lang-name">English</span>
+                    <span className="lang-sub">Default language</span>
+                  </span>
+                  {language === 'en' && <Check size={16} className="lang-check" />}
+                </button>
+                <button
+                  className={`language-option ${language === 'id' ? 'active' : ''}`}
+                  onClick={() => setLanguage('id')}
+                  type="button"
+                  aria-pressed={language === 'id'}
+                >
+                  <span className="lang-flag" aria-hidden="true">🇮🇩</span>
+                  <span className="lang-text">
+                    <span className="lang-name">Bahasa Indonesia</span>
+                    <span className="lang-sub">Bahasa nasional</span>
+                  </span>
+                  {language === 'id' && <Check size={16} className="lang-check" />}
+                </button>
+              </div>
             </div>
           </div>
         </section>

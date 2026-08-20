@@ -7,10 +7,11 @@ export function listDocuments(token?: string): Promise<ApiDocument[]> {
   return USE_MOCK ? mockListDocuments() : request<ApiDocument[]>('/documents', { headers: authHeaders(token) })
 }
 
-export function uploadDocument(file: File, token?: string): Promise<ApiDocument> {
-  if (USE_MOCK) return mockUploadDocument(file)
+export function uploadDocument(file: File, token?: string, title?: string): Promise<ApiDocument> {
+  if (USE_MOCK) return mockUploadDocument(file, title)
   const form = new FormData()
   form.append('file', file)
+  if (title?.trim()) form.append('title', title.trim())
   return request<ApiDocument>('/documents', { method: 'POST', body: form, headers: authHeaders(token) })
 }
 

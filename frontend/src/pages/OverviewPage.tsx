@@ -1,6 +1,8 @@
-import { ArrowUpRight, BookOpen, ChevronRight, Database, FileText, Library, LoaderCircle, MessageSquareText, Send, ShieldAlert, ShieldCheck, Sparkles, Upload, Users } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowUpRight, BookOpen, ChevronRight, Database, FileText, Library, MessageSquareText, Send, ShieldAlert, ShieldCheck, Sparkles, Upload, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AgentPanel } from '@/components/AgentPanel'
+import { UploadModal } from '@/components/UploadModal'
 import { Collection } from '@/components/Collection'
 import { DocumentActivity } from '@/components/DocumentActivity'
 import { Metric } from '@/components/Metric'
@@ -18,13 +20,14 @@ export function OverviewPage() {
 
 function AdminOverview() {
   const navigate = useNavigate()
-  const { documents, triggerUpload, isUploading, uploadError } = useWorkspace()
+  const { documents, uploadError, registerUploadedDocument } = useWorkspace()
+  const [showUpload, setShowUpload] = useState(false)
   const readyCount = documents.filter((document) => document.status === 'Ready').length
   const totalChunks = documents.reduce((sum, document) => sum + (document.chunks ?? 0), 0)
   return (
     <div className="overview-layout">
       <section className="overview-main">
-        <PageHeading eyebrow="Tuesday, 18 August" title={<>Good morning, <span>Adam.</span></>} detail="Your company knowledge is up to date and ready to use." action={<><button className="secondary-button" onClick={() => navigate('/chat')}><MessageSquareText size={17} /> Ask AI</button><button className="primary-button" onClick={triggerUpload} disabled={isUploading}>{isUploading ? <LoaderCircle size={17} className="spin" /> : <Upload size={17} />}{isUploading ? 'Mengunggah…' : 'Upload'}</button></>} />
+        <PageHeading eyebrow="Tuesday, 18 August" title={<>Good morning, <span>Adam.</span></>} detail="Your company knowledge is up to date and ready to use." action={<><button className="secondary-button" onClick={() => navigate('/chat')}><MessageSquareText size={17} /> Ask AI</button><button className="primary-button" onClick={() => setShowUpload(true)}><Upload size={17} /> Upload</button></>} />
         {uploadError && <div className="inline-alert" role="alert"><ShieldAlert size={15} /> {uploadError}</div>}
         <div className="metrics-grid">
           <Metric icon={FileText} value={readyCount} label="Ready documents" note="+2 this week" />
@@ -50,6 +53,7 @@ function AdminOverview() {
       </section>
 
       <AgentPanel />
+      <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
     </div>
   )
 }

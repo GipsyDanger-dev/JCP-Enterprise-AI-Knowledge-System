@@ -41,14 +41,14 @@ export async function mockListDocuments(): Promise<ApiDocument[]> {
   return DOCUMENTS.map((doc) => ({ ...doc }))
 }
 
-export async function mockUploadDocument(file: File): Promise<ApiDocument> {
+export async function mockUploadDocument(file: File, title?: string): Promise<ApiDocument> {
   await delay(900)
   const numericId = nextId++
   const id = `20000000-0000-4000-8000-${String(numericId).padStart(12, '0')}`
   const documentVersion = version(numericId, file.name)
   const doc: ApiDocument = {
     id,
-    title: file.name.replace(/\.[^.]+$/, ''),
+    title: title?.trim() || file.name.replace(/\.[^.]+$/, ''),
     updatedAt: iso(new Date()),
     status: 'QUEUED',
     version: documentVersion,

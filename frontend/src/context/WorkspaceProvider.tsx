@@ -5,6 +5,7 @@ import { queryChat } from '@/api/chat'
 import { errorMessage } from '@/api/client'
 import { deleteDocument, getDocumentStatus, listDocuments, uploadDocument } from '@/api/documents'
 import { toDomainDocument, toDomainDocumentStatus, toDomainRole } from '@/api/mappers'
+import type { ApiDocument } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import type { Citation } from '@/types/domain'
 import { initialDocuments, navigationFor, personFor } from '@/types/domain'
@@ -75,6 +76,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (nextRole === 'employee' && location.pathname === '/users') navigate('/')
   }
 
+  const registerUploadedDocument = (document: ApiDocument) => {
+    const nextDocument = toDomainDocument(document)
+    setDocuments((current) => [nextDocument, ...current.filter((item) => item.id !== nextDocument.id)])
+  }
+
   const onUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -83,7 +89,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setUploadError(null)
     try {
       const doc = await uploadDocument(file, token ?? undefined)
-      setDocuments((current) => [toDomainDocument(doc), ...current])
+      registerUploadedDocument(doc)
     } catch (err) {
       setUploadError(errorMessage(err))
     } finally {
@@ -152,6 +158,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       onUpload,
       isUploading,
       uploadError,
+      registerUploadedDocument,
       removeDocument,
     }}>
       <input ref={uploadRef} className="visually-hidden" type="file" accept=".pdf,.docx" onChange={onUpload} />

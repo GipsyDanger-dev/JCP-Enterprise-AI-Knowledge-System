@@ -71,7 +71,7 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
                 <div><strong>{person.name}</strong><small>{person.label}</small></div>
               </div>
               <div className="dropdown-divider" />
-              <button className="dropdown-item" onClick={() => setShowProfile(false)}><User size={15} /> Profile settings</button>
+              <button className="dropdown-item" onClick={() => { setShowProfile(false); navigate('/settings') }}><User size={15} /> Profile settings</button>
               <button className="dropdown-item danger" onClick={logout}><LogOut size={15} /> Log out</button>
             </div>
           )}
