@@ -4,9 +4,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DocumentStatus, ProcessingJobStatus, UserRole } from '@prisma/client';
+import {
+  AuditAction,
+  AuditActorType,
+  DocumentStatus,
+  ProcessingJobStatus,
+  UserRole,
+} from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { DOCUMENT_STORAGE, DocumentStorage } from './document-storage.interface';
@@ -18,6 +25,7 @@ export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage,
+    private readonly auditLogs: AuditLogsService,
   ) {}
 
   async create(input: CreateDocumentDto, uploadedFile: UploadedDocumentFile, actor: AuthenticatedUser) {
@@ -67,6 +75,20 @@ export class DocumentsService {
           documentVersionId,
           idempotencyKey: `document-ingestion:${documentVersionId}`,
           status: ProcessingJobStatus.QUEUED,
+        },
+      });
+      await this.auditLogs.record(transaction, {
+        actorType: AuditActorType.USER,
+        actorUserId: actor.sub,
+        action: AuditAction.DOCUMENT_UPLOADED,
+        targetType: 'DOCUMENT',
+        targetId: documentId,
+        metadata: {
+          documentVersionId,
+          processingJobId,
+          originalFilename: file.originalname,
+          mimeType: file.mimetype,
+          fileSize: file.size,
         },
       });
     });
@@ -176,7 +198,7 @@ export class DocumentsService {
     };
   }
 
-  async remove(id: string) {
+  async remove(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, deletedAt: null },
       select: { id: true },
@@ -200,6 +222,13 @@ export class DocumentsService {
       await transaction.document.update({
         where: { id },
         data: { status: DocumentStatus.DELETED, deletedAt },
+      });
+      await this.auditLogs.record(transaction, {
+        actorType: AuditActorType.USER,
+        actorUserId: actor.sub,
+        action: AuditAction.DOCUMENT_DELETED,
+        targetType: 'DOCUMENT',
+        targetId: id,
       });
     });
 

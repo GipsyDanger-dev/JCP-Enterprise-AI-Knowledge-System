@@ -97,7 +97,10 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'Document deleted and active processing job stopped' })
   @ApiNotFoundResponse({ description: 'Document not found' })
   @ApiForbiddenResponse({ description: 'Only ADMIN can delete documents' })
-  remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.documentsService.remove(id);
+  remove(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.documentsService.remove(id, actor);
   }
 }
