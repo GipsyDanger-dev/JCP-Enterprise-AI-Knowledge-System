@@ -92,6 +92,15 @@ export class DocumentsController {
     return this.documentsService.getStatus(id);
   }
 
+  @Get(':id/chunks')
+  @Roles(UserRole.ADMIN, UserRole.USER)
+  @ApiOperation({ summary: 'Get document chunks for preview' })
+  @ApiOkResponse({ description: 'Document chunks with text content' })
+  @ApiNotFoundResponse({ description: 'Document not found' })
+  getChunks(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
+    return this.documentsService.getChunks(id);
+  }
+
   @Get(':id/download')
   @Roles(UserRole.ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Download the document binary file' })

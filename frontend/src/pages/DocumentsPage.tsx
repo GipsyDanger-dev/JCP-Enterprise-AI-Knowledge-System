@@ -1,15 +1,122 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ArrowUpRight, ChevronDown, Download, FileText, FolderOpen, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { UploadModal } from '@/components/UploadModal'
-import { downloadDocument } from '@/api/documents'
+import { downloadDocument, getDocumentChunks, type DocumentChunk } from '@/api/documents'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import type { DocumentItem } from '@/types/domain'
 
 const COLLECTIONS = ['All', 'Operations', 'IT & Security', 'Finance', 'People']
+
+function DocViewer({ doc, isId, canManage, token, onClose, onDelete, onChunksLoaded, chunks, chunksLoading, setChunksLoading }: {
+  doc: DocumentItem
+  isId: boolean
+  canManage: boolean
+  token: string | null
+  onClose: () => void
+  onDelete: (id: string, name: string) => void
+  onChunksLoaded: (chunks: DocumentChunk[]) => void
+  chunks: DocumentChunk[]
+  chunksLoading: boolean
+  setChunksLoading: (v: boolean) => void
+}) {
+  useEffect(() => {
+    if (doc.status !== 'Ready' || chunks.length > 0) return
+    setChunksLoading(true)
+    getDocumentChunks(doc.id, token ?? undefined)
+      .then((res) => onChunksLoaded(res.chunks))
+      .catch(() => onChunksLoaded([]))
+      .finally(() => setChunksLoading(false))
+  }, [doc.id, doc.status])
+
+  // Group chunks by page
+  const pages = useMemo(() => {
+    const map = new Map<number, DocumentChunk[]>()
+    chunks.forEach((c) => {
+      const p = c.pageNumber ?? 0
+      if (!map.has(p)) map.set(p, [])
+      map.get(p)!.push(c)
+    })
+    return Array.from(map.entries()).sort((a, b) => a[0] - b[0])
+  }, [chunks])
+
+  return (
+    <div className="doc-viewer-overlay" onClick={onClose}>
+      <div className="doc-viewer" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="doc-viewer-header">
+          <div className="doc-viewer-title">
+            <FileText size={20} />
+            <div>
+              <h2>{doc.name}</h2>
+              <span className="doc-viewer-meta">
+                <StatusBadge status={doc.status} />
+                <span>{doc.collection}</span>
+                <span>{doc.updatedAt}</span>
+              </span>
+            </div>
+          </div>
+          <div className="doc-viewer-actions">
+            {doc.status === 'Ready' && (
+              <button className="secondary-button" onClick={() => downloadDocument(doc.id, doc.name, token ?? undefined)}>
+                <Download size={15} /> {isId ? 'Unduh' : 'Download'}
+              </button>
+            )}
+            {canManage && (
+              <button className="danger-button" onClick={() => { onDelete(doc.id, doc.name); onClose() }}>
+                <Trash2 size={15} /> {isId ? 'Hapus' : 'Delete'}
+              </button>
+            )}
+            <button className="icon-button" onClick={onClose}><X size={20} /></button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="doc-viewer-content">
+          {doc.status !== 'Ready' && (
+            <div className="doc-viewer-status">
+              <p>{doc.status === 'Processing' ? (isId ? 'Dokumen sedang diproses...' : 'Document is being processed...')
+                : doc.status === 'Queued' ? (isId ? 'Menunggu diproses...' : 'Waiting to be processed...')
+                : (isId ? 'Dokumen gagal diproses.' : 'Document failed to process.')}</p>
+            </div>
+          )}
+          {doc.status === 'Ready' && chunksLoading && (
+            <div className="doc-viewer-loading">
+              <p>{isId ? 'Memuat pratinjau...' : 'Loading preview...'}</p>
+            </div>
+          )}
+          {doc.status === 'Ready' && !chunksLoading && chunks.length === 0 && (
+            <div className="doc-viewer-empty">
+              <p>{isId ? 'Tidak ada pratinjau tersedia.' : 'No preview available.'}</p>
+            </div>
+          )}
+          {doc.status === 'Ready' && !chunksLoading && pages.length > 0 && (
+            <div className="doc-viewer-pages">
+              {pages.map(([pageNum, pageChunks]) => (
+                <div key={pageNum} className="doc-viewer-page">
+                  <div className="doc-viewer-page-label">
+                    {isId ? `Halaman ${pageNum}` : `Page ${pageNum}`}
+                  </div>
+                  {pageChunks.map((chunk) => (
+                    <div key={chunk.chunkId} className="doc-viewer-chunk">
+                      {chunk.sectionTitle && (
+                        <div className="doc-viewer-chunk-title">{chunk.sectionTitle}</div>
+                      )}
+                      <p>{chunk.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function DocumentsPage() {
   const { token } = useAuth()
@@ -24,6 +131,8 @@ export function DocumentsPage() {
   const [showCollections, setShowCollections] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null)
   const [showUpload, setShowUpload] = useState(false)
+  const [docChunks, setDocChunks] = useState<DocumentChunk[]>([])
+  const [chunksLoading, setChunksLoading] = useState(false)
 
   const filtered = useMemo(() => {
     return documents.filter((doc) => {
@@ -101,82 +210,9 @@ export function DocumentsPage() {
         </table>
       </div>
 
-      {/* Document detail modal */}
+      {/* Document detail — full-screen viewer */}
       {selectedDoc && (
-        <div className="modal-overlay" onClick={() => setSelectedDoc(null)}>
-          <div className="modal-card doc-detail-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="doc-detail-header">
-                <span className="doc-detail-icon"><FileText size={24} /></span>
-                <div>
-                  <h2>{selectedDoc.name}</h2>
-                  <small>{selectedDoc.collection}</small>
-                </div>
-              </div>
-              <button className="icon-button" onClick={() => setSelectedDoc(null)}><X size={18} /></button>
-            </div>
-
-            <div className="modal-body">
-            <div className="doc-detail-grid">
-              <div className="doc-detail-field">
-                <label>{isId ? 'Status' : 'Status'}</label>
-                <StatusBadge status={selectedDoc.status} />
-              </div>
-              <div className="doc-detail-field">
-                <label>{isId ? 'Koleksi' : 'Collection'}</label>
-                <span>{selectedDoc.collection}</span>
-              </div>
-              <div className="doc-detail-field">
-                <label>{isId ? 'Diperbarui' : 'Updated'}</label>
-                <span>{selectedDoc.updatedAt}</span>
-              </div>
-              <div className="doc-detail-field">
-                <label>{isId ? 'Chunk terindeks' : 'Indexed chunks'}</label>
-                <span>{selectedDoc.chunks ?? '—'}</span>
-              </div>
-            </div>
-
-            <div className="doc-detail-info">
-              <p>Document ini sudah ter-index dan tersedia untuk AI search. {selectedDoc.status === 'Ready' ? 'Status: siap digunakan.' : selectedDoc.status === 'Processing' ? 'Sedang diproses oleh pipeline indexing.' : selectedDoc.status === 'Queued' ? 'Menunggu giliran diproses.' : 'Gagal diproses.'}</p>
-            </div>
-
-            {selectedDoc.status === 'Ready' && (
-              <div className="doc-preview-content">
-                <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 8, display: 'block' }}>{isId ? 'Pratinjau dokumen' : 'Document preview'}</label>
-                <div className="doc-preview-chunks">
-                  <div className="doc-preview-chunk">
-                    <label>Section 1 · Page 1</label>
-                    <p>This document contains standard operating procedures for business travel. All employees must follow the guidelines outlined below when requesting travel approvals.</p>
-                  </div>
-                  <div className="doc-preview-chunk">
-                    <label>Section 2 · Page 3</label>
-                    <p>Hotel allowances are determined by employee grade level. Managers are entitled to up to Rp 1,500,000 per night, while staff members receive up to Rp 800,000 per night.</p>
-                  </div>
-                  <div className="doc-preview-chunk">
-                    <label>Section 3 · Page 5</label>
-                    <p>Transportation costs are reimbursed based on actual expenses with a maximum limit per destination. Receipts must be submitted within 7 business days.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            </div>
-
-            <div className="doc-detail-actions">
-              {selectedDoc.status === 'Ready' && (
-                <button className="secondary-button" onClick={() => window.alert('Download dimulai. Dalam produksi, file akan diunduh dari backend.')}
-                >
-                  <Download size={15} /> {isId ? 'Unduh dokumen' : 'Download document'}
-                </button>
-              )}
-              {canManage && (
-                <button className="danger-button" onClick={() => { handleDelete(selectedDoc.id, selectedDoc.name) }}>
-                  <Trash2 size={15} /> Hapus dokumen
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <DocViewer doc={selectedDoc} isId={isId} canManage={canManage} token={token} onClose={() => { setSelectedDoc(null); setDocChunks([]) }} onDelete={handleDelete} onChunksLoaded={setDocChunks} chunks={docChunks} chunksLoading={chunksLoading} setChunksLoading={setChunksLoading} />
       )}
 
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />

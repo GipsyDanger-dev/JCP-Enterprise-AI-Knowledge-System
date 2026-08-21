@@ -24,6 +24,24 @@ export function deleteDocument(id: string, token?: string): Promise<DeleteDocume
   return USE_MOCK ? mockDeleteDocument(id) : request<DeleteDocumentResponse>(`/documents/${id}`, { method: 'DELETE', headers: authHeaders(token) })
 }
 
+export interface DocumentChunk {
+  chunkId: string
+  pageNumber: number | null
+  sectionTitle: string
+  text: string
+}
+
+export interface DocumentChunksResponse {
+  documentId: string
+  title: string
+  status: string
+  chunks: DocumentChunk[]
+}
+
+export function getDocumentChunks(id: string, token?: string): Promise<DocumentChunksResponse> {
+  return request<DocumentChunksResponse>(`/documents/${id}/chunks`, { headers: authHeaders(token) })
+}
+
 export function downloadDocument(id: string, filename: string, token?: string): void {
   if (USE_MOCK) return
   const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/documents/${id}/download`

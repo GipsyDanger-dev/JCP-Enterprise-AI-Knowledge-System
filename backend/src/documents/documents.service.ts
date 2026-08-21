@@ -222,6 +222,41 @@ export class DocumentsService {
     };
   }
 
+  async getChunks(id: string) {
+    const document = await this.prisma.document.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        versions: {
+          orderBy: { versionNumber: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            chunks: {
+              orderBy: { pageNumber: 'asc' },
+              select: {
+                chunkId: true,
+                pageNumber: true,
+                sectionTitle: true,
+                text: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!document) throw new NotFoundException('Document not found');
+    const version = document.versions[0];
+    return {
+      documentId: document.id,
+      title: document.title,
+      status: document.status,
+      chunks: version?.chunks ?? [],
+    };
+  }
+
   async remove(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, deletedAt: null },
