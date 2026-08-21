@@ -22,3 +22,21 @@ export function getDocumentStatus(id: string, token?: string): Promise<DocumentS
 export function deleteDocument(id: string, token?: string): Promise<DeleteDocumentResponse> {
   return USE_MOCK ? mockDeleteDocument(id) : request<DeleteDocumentResponse>(`/documents/${id}`, { method: 'DELETE', headers: authHeaders(token) })
 }
+
+export function downloadDocument(id: string, filename: string, token?: string): void {
+  if (USE_MOCK) return
+  const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/documents/${id}/download`
+  const a = document.createElement('a')
+  a.href = url
+  a.setAttribute('download', filename)
+  // For auth, we open in new tab (browser handles auth via cookie or we use fetch)
+  fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    .then(r => r.blob())
+    .then(blob => {
+      const blobUrl = URL.createObjectURL(blob)
+      a.href = blobUrl
+      a.click()
+      URL.revokeObjectURL(blobUrl)
+    })
+    .catch(() => {/* ignore */})
+}

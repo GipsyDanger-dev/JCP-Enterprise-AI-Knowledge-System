@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  StreamableFile,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -89,6 +90,22 @@ export class DocumentsController {
   @ApiForbiddenResponse({ description: 'Only ADMIN can inspect processing status' })
   getStatus(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.documentsService.getStatus(id);
+  }
+
+  @Get(':id/download')
+  @Roles(UserRole.ADMIN, UserRole.USER)
+  @ApiOperation({ summary: 'Download the document binary file' })
+  @ApiOkResponse({ description: 'Document binary content' })
+  @ApiNotFoundResponse({ description: 'Document not found' })
+  async download(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<StreamableFile> {
+    const file = await this.documentsService.download(id);
+    return new StreamableFile(file.content, {
+      type: file.mimeType,
+      disposition: `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+      length: file.content.byteLength,
+    });
   }
 
   @Delete(':id')

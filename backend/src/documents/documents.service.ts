@@ -198,6 +198,27 @@ export class DocumentsService {
     };
   }
 
+  async download(id: string) {
+    const document = await this.prisma.document.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        versions: {
+          orderBy: { versionNumber: 'desc' },
+          take: 1,
+          select: { id: true, originalFilename: true, mimeType: true },
+        },
+      },
+    });
+    if (!document || document.versions.length === 0) throw new NotFoundException('Document not found');
+    const version = document.versions[0];
+    const content = await this.storage.read(version.id);
+    return {
+      content: Buffer.from(content),
+      filename: version.originalFilename,
+      mimeType: version.mimeType,
+    };
+  }
+
   async remove(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, deletedAt: null },

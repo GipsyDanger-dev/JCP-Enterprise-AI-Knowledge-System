@@ -4,12 +4,15 @@ import { ArrowUpRight, ChevronDown, Download, FileText, FolderOpen, Search, Shie
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { UploadModal } from '@/components/UploadModal'
+import { downloadDocument } from '@/api/documents'
+import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import type { DocumentItem } from '@/types/domain'
 
 const COLLECTIONS = ['All', 'Operations', 'IT & Security', 'Finance', 'People']
 
 export function DocumentsPage() {
+  const { token } = useAuth()
   const { documents, role, uploadError, removeDocument, registerUploadedDocument, language } = useWorkspace()
   const canManage = role === 'admin'
   const isId = language === 'id'
@@ -87,9 +90,11 @@ export function DocumentsPage() {
               <td>{document.updatedAt}</td>
               <td><StatusBadge status={document.status} /></td>
               <td>{document.chunks ?? '—'}</td>
-              <td>{canManage
-                ? <button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button>
-                : <button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button>}
+              <td style={{ display: 'flex', gap: 4 }}>
+                <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>
+                {canManage
+                  ? <button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button>
+                  : <button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button>}
               </td>
             </tr>
           ))}</tbody>

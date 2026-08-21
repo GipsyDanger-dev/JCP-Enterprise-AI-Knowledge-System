@@ -67,6 +67,17 @@ export function SettingsPage() {
             </div>
           </div>
           <div className="settings-form">
+            <div className="settings-profile-photo">
+              {(user as any)?.photoUrl ? (
+                <img src={(user as any).photoUrl} alt="" className="settings-avatar-img" />
+              ) : (
+                <span className="avatar" style={{ width: 64, height: 64, fontSize: 'var(--fs-xl)' }}>{(user?.displayName ?? 'U').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}</span>
+              )}
+              <div className="settings-profile-info">
+                <strong>{user?.displayName}</strong>
+                <small>{user?.email}</small>
+              </div>
+            </div>
             <div className="settings-field">
               <label>{isId ? 'Nama' : 'Name'}</label>
               <input
