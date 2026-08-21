@@ -254,8 +254,8 @@ button { cursor: pointer; }
 .edit-photo-change:hover { text-decoration: underline; }
 .sidebar-user-avatar { display: flex; justify-content: center; margin: 12px 0 16px; }
 .sidebar-user-avatar .avatar { width: 36px; height: 36px; }
-.sidebar-toggle { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); cursor: pointer; transition: background var(--ease-fast), color var(--ease-fast); margin-left: 6px; flex-shrink: 0; }
-.sidebar-toggle:hover { background: var(--bg-hover); color: var(--text-strong); }
+.sidebar-collapse-btn { width: 24px; height: 24px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer; display: grid; place-items: center; margin-left: auto; flex-shrink: 0; transition: background .15s, color .15s; }
+.sidebar-collapse-btn:hover { background: var(--bg-hover); color: var(--text-strong); }
 
 /* Collapsed sidebar */
 .app-shell.sidebar-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
@@ -899,7 +899,7 @@ button { cursor: pointer; }
   .topbar { padding: 0 17px; gap: 8px; }
   .topbar-left { gap: 2px; }
   .menu-button { display: grid; position: static; }
-  .sidebar-toggle { display: none; }
+  .sidebar-collapse-btn { display: none; }
   .search-shell { display: none; }
 
   .top-actions { position: static; }

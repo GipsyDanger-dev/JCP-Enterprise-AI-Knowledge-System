@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bell, ChevronsLeft, ChevronsRight, ChevronDown, LogOut, Menu, Search, User } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, Menu, Search, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
-export function Topbar({ onMenuOpen, onToggleSidebar, collapsed }: { onMenuOpen: () => void; onToggleSidebar: () => void; collapsed: boolean }) {
+export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
   const { person, language } = useWorkspace()
   const { logout } = useAuth()
   const isId = language === 'id'
@@ -35,10 +35,7 @@ export function Topbar({ onMenuOpen, onToggleSidebar, collapsed }: { onMenuOpen:
 
   return (
     <header className="topbar">
-      <div className="topbar-left">
-        <button className="menu-button" title="Open navigation" onClick={onMenuOpen}><Menu size={20} /></button>
-        <button className="sidebar-toggle" title={collapsed ? 'Buka sidebar' : 'Tutup sidebar'} onClick={onToggleSidebar}>{collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}</button>
-      </div>
+      <button className="menu-button" title="Open navigation" onClick={onMenuOpen}><Menu size={20} /></button>
       <form className="search-shell" onSubmit={handleSearch}>
         <Search size={17} />
         <input

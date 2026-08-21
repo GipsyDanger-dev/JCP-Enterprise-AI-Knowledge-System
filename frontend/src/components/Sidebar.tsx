@@ -1,16 +1,20 @@
-import { Activity, CircleHelp, Clock, LogOut, MessageCircle, Settings, X } from 'lucide-react'
+import { Activity, ChevronsLeft, ChevronsRight, CircleHelp, Clock, LogOut, MessageCircle, Settings, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { LogoMark } from '@/components/Logo'
 
-export function Sidebar({ menuOpen, collapsed, onClose }: { menuOpen: boolean; collapsed: boolean; onClose: () => void }) {
+export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: boolean; collapsed: boolean; onToggle: () => void; onClose: () => void }) {
   const { person, navigation, language, unreadMessages } = useWorkspace()
   const { user, logout } = useAuth()
   const isId = language === 'id'
   return (
     <aside className={[menuOpen ? 'sidebar open' : 'sidebar', collapsed ? 'collapsed' : ''].filter(Boolean).join(' ')}>
-      <div className="brand-lockup"><LogoMark size={28} />{!collapsed && <strong>Enterprise AI</strong>}</div>
+      <div className="brand-lockup">
+        <LogoMark size={28} />
+        {!collapsed && <strong>Enterprise AI</strong>}
+        <button className="sidebar-collapse-btn" title={collapsed ? 'Buka sidebar' : 'Tutup sidebar'} onClick={onToggle}>{collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}</button>
+      </div>
       <button className="mobile-close" title={isId ? 'Tutup navigasi' : 'Close navigation'} onClick={onClose}><X size={20} /></button>
       {!collapsed && (
         <div className="sidebar-user-info">

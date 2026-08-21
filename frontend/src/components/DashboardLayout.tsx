@@ -24,9 +24,9 @@ export function DashboardLayout() {
     <main className={[showBanner ? 'app-shell banner-visible' : 'app-shell', collapsed ? 'sidebar-collapsed' : ''].filter(Boolean).join(' ')}>
       {showBanner && <div className="announcement"><span>{isId ? 'Baru' : 'New'}</span> {isId ? 'Tinjauan bukti sekarang tersedia untuk setiap jawaban AI.' : 'Evidence review is now available for every AI answer.'}<button className="banner-close" title={isId ? 'Tutup' : 'Dismiss'} onClick={() => setShowBanner(false)}><X size={14} /></button></div>}
       {menuOpen && <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} />}
-      <Sidebar menuOpen={menuOpen} collapsed={collapsed} onClose={() => setMenuOpen(false)} />
+      <Sidebar menuOpen={menuOpen} collapsed={collapsed} onToggle={toggleSidebar} onClose={() => setMenuOpen(false)} />
       <section className="workspace">
-        <Topbar onMenuOpen={() => setMenuOpen(true)} onToggleSidebar={toggleSidebar} collapsed={collapsed} />
+        <Topbar onMenuOpen={() => setMenuOpen(true)} />
         <div className="page-content"><Outlet /></div>
       </section>
     </main>
