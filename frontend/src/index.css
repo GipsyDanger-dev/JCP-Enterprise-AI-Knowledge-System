@@ -529,7 +529,7 @@ button { cursor: pointer; }
 .chat-empty > p { color: var(--text-dim); font-size: var(--fs-md); }
 .chat-empty > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-top: 20px; }
 .chat-empty button { border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-md); padding: 9px 11px; color: var(--text-secondary); font-size: var(--fs-xs); }
-.conversation { width: min(680px, 100%); display: grid; gap: 14px; }
+.conversation { width: min(680px, 100%); margin: 0 auto; display: grid; gap: 14px; }
 .user-message { justify-self: end; max-width: 75%; padding: 11px 13px; border-radius: var(--radius-xl) var(--radius-xl) 2px var(--radius-xl); background: var(--ink); color: var(--on-dark); font-size: var(--fs-sm); line-height: 1.5; }
 .assistant-message { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--bg-card); padding: 15px; }
 .assistant-message .source-card { max-width: 310px; }
