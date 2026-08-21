@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { FileText, LoaderCircle, Upload, X } from 'lucide-react'
+import { FileText, FolderOpen, LoaderCircle, Upload, X } from 'lucide-react'
 import { uploadDocument } from '@/api/documents'
 import { errorMessage } from '@/api/client'
 import type { ApiDocument } from '@/api/types'
@@ -94,13 +94,8 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           ) : (
             <div className="upload-file-empty">
               <Upload size={24} />
-<<<<<<< HEAD
               <p>{isId ? 'Klik untuk memilih file' : 'Click to select file'}</p>
               <small>{isId ? 'PDF atau DOCX, maks 10MB' : 'PDF or DOCX, max 10 MB'}</small>
-=======
-              <p>Click to select file</p>
-              <small>PDF or DOCX, max 10 MB</small>
->>>>>>> origin/main
             </div>
           )}
         </div>
