@@ -125,10 +125,10 @@
   --text-strong: #f5f5f2;
   --text-card: #dcdcd8;
   --text-body: #c0c0bc;
-  --text-secondary: #a8a8a4;
-  --text-dim: #8a8a86;
-  --text-muted: #7a7a76;
-  --text-faint: #6a6a66;
+  --text-secondary: #b8b8b4;
+  --text-dim: #9a9a96;
+  --text-muted: #8a8a86;
+  --text-faint: #7a7a76;
   --border-strong: #3a3a3e;
   --border: #2e2e32;
   --border-soft: #282830;
@@ -194,6 +194,20 @@
 [data-theme="dark"] .settings-profile-info strong { color: var(--text-card); }
 [data-theme="dark"] .settings-profile-info small { color: var(--text-dim); }
 [data-theme="dark"] .disabled-input { background: var(--bg-subtle); color: var(--text-secondary); border-color: var(--border); }
+[data-theme="dark"] .settings-role-text { background: #2a1c14; color: #ff8a6a; border-color: #4a2c1a; }
+[data-theme="dark"] .settings-role-text::before { background: #ff8a6a; }
+[data-theme="dark"] .language-option { background: var(--bg-card); border-color: var(--border); color: var(--text-card); }
+[data-theme="dark"] .language-option.active { background: #2a1c14; border-color: var(--brand-600); color: var(--text-primary); }
+[data-theme="dark"] .language-option:hover { background: var(--bg-hover); }
+[data-theme="dark"] .lang-name { color: var(--text-card); }
+[data-theme="dark"] .lang-sub { color: var(--text-dim); }
+[data-theme="dark"] .lang-check { color: var(--brand-600); }
+[data-theme="dark"] .settings-switch-info label { color: var(--text-card); }
+[data-theme="dark"] .settings-switch-info small { color: var(--text-dim); }
+[data-theme="dark"] .toggle-switch { background: var(--border-strong); }
+[data-theme="dark"] .toggle-switch.on { background: var(--brand-600); }
+[data-theme="dark"] .toggle-knob { background: white; }
+[data-theme="dark"] .settings-divider { background: var(--border-soft); }
 [data-theme="dark"] .employee-ask { background: var(--bg-card); border-color: var(--border); }
 [data-theme="dark"] .employee-ask form { background: var(--bg-subtle); border-color: var(--border); }
 [data-theme="dark"] .employee-ask form input { color: var(--text-card); }
