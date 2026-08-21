@@ -235,6 +235,56 @@
 [data-theme="dark"] a { color: var(--brand-600); }
 [data-theme="dark"] .primary-button { box-shadow: var(--shadow-primary); }
 [data-theme="dark"] .primary-button:hover { box-shadow: 0 4px 16px rgba(255, 112, 67, .3); }
+/* Documents page */
+[data-theme="dark"] .document-name { color: var(--text-card); }
+[data-theme="dark"] .data-table tbody tr:hover { background: var(--bg-hover); }
+[data-theme="dark"] .status-badge.ready { color: var(--success); background: var(--success-bg); }
+[data-theme="dark"] .status-badge.processing, [data-theme="dark"] .status-badge.queued { color: var(--warning); background: var(--warning-bg); }
+[data-theme="dark"] .status-badge.failed { color: #ff6b6b; background: #2a1414; }
+/* Users page */
+[data-theme="dark"] .role-badge.admin { background: #2a1c14; color: #ff8a6a; }
+[data-theme="dark"] .role-badge.employee { background: var(--success-bg); color: var(--success); }
+[data-theme="dark"] .filter-chip { background: var(--bg-card); border-color: var(--border); color: var(--text-secondary); }
+[data-theme="dark"] .filter-chip.active { background: #2a1c14; border-color: var(--brand-600); color: #ff8a6a; }
+[data-theme="dark"] .filter-chip:hover { background: var(--bg-hover); }
+/* Chat page */
+[data-theme="dark"] .user-message { background: var(--brand-600); color: white; }
+[data-theme="dark"] .assistant-message { background: var(--bg-card); border-color: var(--border); color: var(--text-body); }
+[data-theme="dark"] .assistant-message p { color: var(--text-body); }
+[data-theme="dark"] .chat-composer { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .chat-composer input { color: var(--text-card); }
+[data-theme="dark"] .chat-empty h2 { color: var(--text-primary); }
+[data-theme="dark"] .chat-empty > p { color: var(--text-dim); }
+[data-theme="dark"] .chat-empty button { background: var(--bg-card); border-color: var(--border); color: var(--text-secondary); }
+/* Messaging */
+[data-theme="dark"] .messaging-bubble.received .messaging-bubble-content { background: var(--bg-card); border-color: var(--border); color: var(--text-body); }
+[data-theme="dark"] .messaging-composer { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .messaging-composer input { color: var(--text-card); }
+[data-theme="dark"] .mc-composer { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .mc-input-row input { color: var(--text-card); }
+/* Source cards & citations */
+[data-theme="dark"] .source-card { background: var(--bg-card); border-color: var(--border); color: var(--text-body); }
+[data-theme="dark"] .source-card strong { color: var(--text-card); }
+[data-theme="dark"] .source-card small { color: var(--text-dim); }
+[data-theme="dark"] .source-card-excerpt { background: var(--bg-subtle); border-color: var(--border-soft); }
+[data-theme="dark"] .source-card-excerpt p { color: var(--text-body); }
+[data-theme="dark"] .verified { background: var(--success-bg); border-color: rgba(61, 168, 122, .15); color: var(--success); }
+/* Upload modal */
+[data-theme="dark"] .upload-file-area { border-color: var(--border); background: var(--bg-subtle); }
+[data-theme="dark"] .upload-file-area:hover { background: var(--bg-hover); }
+[data-theme="dark"] .upload-file-empty svg { color: var(--text-dim); }
+[data-theme="dark"] .upload-collection-chip { background: var(--bg-card); border-color: var(--border); color: var(--text-secondary); }
+[data-theme="dark"] .upload-collection-chip.active { background: #2a1c14; border-color: var(--brand-600); color: #ff8a6a; }
+[data-theme="dark"] .upload-collection-chip:hover { background: var(--bg-hover); }
+/* Collection items */
+[data-theme="dark"] .collection-item { background: var(--bg-card); border-color: var(--border); color: var(--text-card); }
+[data-theme="dark"] .collection-item strong { color: var(--text-card); }
+[data-theme="dark"] .collection-item small { color: var(--text-dim); }
+/* Table & search */
+[data-theme="dark"] .filter-search { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .filter-search input { color: var(--text-card); }
+[data-theme="dark"] .secondary-button { background: var(--bg-card); border-color: var(--border); color: var(--text-card); }
+[data-theme="dark"] .secondary-button:hover { background: var(--bg-hover); }
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
