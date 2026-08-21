@@ -10,6 +10,8 @@ import { DocumentsPage } from '@/pages/DocumentsPage'
 import { HelpPage } from '@/pages/HelpPage'
 import { HistoryPage } from '@/pages/HistoryPage'
 import { LoginPage } from '@/pages/LoginPage'
+import { AdminInboxPage } from '@/pages/AdminInboxPage'
+import { MessagingPage } from '@/pages/MessagingPage'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { UsersPage } from '@/pages/UsersPage'
@@ -37,6 +39,8 @@ export default function App() {
               <Route path="documents" element={<DocumentsPage />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="users" element={<RequireRole role="ADMIN"><UsersPage /></RequireRole>} />
+              <Route path="inbox" element={<RequireRole role="ADMIN"><AdminInboxPage /></RequireRole>} />
+              <Route path="messages" element={<MessagingPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="help" element={<HelpPage />} />
               <Route path="activity" element={<ActivityPage />} />

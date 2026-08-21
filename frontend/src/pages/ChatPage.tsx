@@ -6,12 +6,13 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
 
 export function ChatPage() {
-  const { question, setQuestion, answer, citations, isLoadingAnswer, chatError, onAsk, askQuestion } = useWorkspace()
+  const { question, setQuestion, answer, citations, isLoadingAnswer, chatError, onAsk, askQuestion, language } = useWorkspace()
   const hasConversation = answer || chatError || isLoadingAnswer
+  const isId = language === 'id'
 
   return (
     <div className="chat-page">
-      <PageHeading eyebrow="AI assistant" title="Ask with confidence" detail="Every answer stays linked to its source." />
+      <PageHeading eyebrow={isId ? 'Asisten AI' : 'AI assistant'} title={isId ? 'Tanyakan dengan percaya diri' : 'Ask with confidence'} detail={isId ? 'Setiap jawaban tetap terhubung ke sumbernya.' : 'Every answer stays linked to its source.'} />
       <div className="chat-canvas">
         {hasConversation ? (
           <div className="conversation">
@@ -20,7 +21,7 @@ export function ChatPage() {
             {isLoadingAnswer && (
               <div className="assistant-message loading">
                 <div className="answer-label"><Loader2 size={16} className="spin" /> Enterprise AI</div>
-                <p className="typing-indicator">Searching knowledge base…</p>
+                <p className="typing-indicator">{isId ? 'Mencari basis pengetahuan…' : 'Searching knowledge base…'}</p>
               </div>
             )}
 
@@ -55,9 +56,9 @@ export function ChatPage() {
         ) : (
           <div className="chat-empty">
             <span><Sparkles size={27} /></span>
-            <h2>What would you like to know?</h2>
-            <p>Ask across policies, SOPs, handbooks, and internal documents.</p>
-            <div>{quickQuestions.slice(0, 2).map((item) => (
+            <h2>{isId ? 'Apa yang ingin Anda ketahui?' : 'What would you like to know?'}</h2>
+            <p>{isId ? 'Tanyakan tentang kebijakan, SOP, handbooks, dan dokumen internal.' : 'Ask across policies, SOPs, handbooks, and internal documents.'}</p>
+            <div>{quickQuestions(language).slice(0, 2).map((item) => (
               <button key={item} onClick={() => askQuestion(item)}>{item}</button>
             ))}</div>
           </div>
@@ -67,10 +68,10 @@ export function ChatPage() {
         <input
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="Ask a question about your company knowledge"
+          placeholder={isId ? 'Ajukan pertanyaan tentang pengetahuan perusahaan Anda' : 'Ask a question about your company knowledge'}
           disabled={isLoadingAnswer}
         />
-        <button title="Send question" disabled={isLoadingAnswer || !question.trim()}>
+        <button title={isId ? 'Kirim pertanyaan' : 'Send question'} disabled={isLoadingAnswer || !question.trim()}>
           {isLoadingAnswer ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
         </button>
       </form>

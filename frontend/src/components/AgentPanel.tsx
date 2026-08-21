@@ -5,20 +5,21 @@ import { SourceCard } from './SourceCard'
 import { VerifiedBadge } from './VerifiedBadge'
 
 export function AgentPanel() {
-  const { question, setQuestion, answer, citations, isLoadingAnswer, chatError, onAsk, askQuestion } = useWorkspace()
+  const { question, setQuestion, answer, citations, isLoadingAnswer, chatError, onAsk, askQuestion, language } = useWorkspace()
   const hasConversation = answer || chatError || isLoadingAnswer
+  const isId = language === 'id'
 
   return (
     <aside className="agent-panel">
       <div className="agent-header">
-        <div><span className="agent-icon"><Sparkles size={17} /></span><div><strong>Knowledge Agent</strong><small>Grounded in your workspace</small></div></div>
+        <div><span className="agent-icon"><Sparkles size={17} /></span><div><strong>{isId ? 'Agen Pengetahuan' : 'Knowledge Agent'}</strong><small>{isId ? 'Berbasis ruang kerja Anda' : 'Grounded in your workspace'}</small></div></div>
         <MoreHorizontal size={18} />
       </div>
       <div className="agent-body">
         {!hasConversation ? (
           <>
-            <div className="agent-intro"><span><Bot size={24} /></span><h2>Ask company knowledge</h2><p>Answers include the exact document evidence used.</p></div>
-            <div className="question-list">{quickQuestions.map((item) => (
+            <div className="agent-intro"><span><Bot size={24} /></span><h2>{isId ? 'Tanyakan pengetahuan perusahaan' : 'Ask company knowledge'}</h2><p>{isId ? 'Jawaban menyertakan bukti dokumen yang digunakan.' : 'Answers include the exact document evidence used.'}</p></div>
+            <div className="question-list">{quickQuestions(language).map((item) => (
               <button key={item} onClick={() => askQuestion(item)}>{item}<ChevronRight size={15} /></button>
             ))}</div>
           </>
@@ -27,7 +28,7 @@ export function AgentPanel() {
             {isLoadingAnswer && (
               <>
                 <div className="answer-label"><Loader2 size={16} className="spin" /> Enterprise AI</div>
-                <p className="typing-indicator">Searching knowledge base…</p>
+                <p className="typing-indicator">{isId ? 'Mencari basis pengetahuan…' : 'Searching knowledge base…'}</p>
               </>
             )}
 
@@ -59,11 +60,11 @@ export function AgentPanel() {
         <input
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="Ask anything about your workspace"
-          aria-label="Ask the knowledge agent"
+          placeholder={isId ? 'Tanyakan apa saja tentang ruang kerja Anda' : 'Ask anything about your workspace'}
+          aria-label={isId ? 'Tanyakan ke agen pengetahuan' : 'Ask the knowledge agent'}
           disabled={isLoadingAnswer}
         />
-        <button title="Send question" disabled={isLoadingAnswer || !question.trim()}>
+        <button title={isId ? 'Kirim pertanyaan' : 'Send question'} disabled={isLoadingAnswer || !question.trim()}>
           {isLoadingAnswer ? <Loader2 size={17} className="spin" /> : <Send size={17} />}
         </button>
       </form>

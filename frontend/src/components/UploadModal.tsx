@@ -3,6 +3,7 @@ import { FileText, FolderOpen, LoaderCircle, Upload, X } from 'lucide-react'
 import { uploadDocument } from '@/api/documents'
 import { errorMessage } from '@/api/client'
 import { useAuth } from '@/hooks/useAuth'
+import { useWorkspace } from '@/hooks/useWorkspace'
 
 const COLLECTIONS = ['Operations', 'IT & Security', 'Finance', 'People']
 
@@ -14,6 +15,8 @@ interface UploadModalProps {
 
 export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const { token } = useAuth()
+  const { language } = useWorkspace()
+  const isId = language === 'id'
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [collection, setCollection] = useState(COLLECTIONS[0])
@@ -57,7 +60,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-card upload-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Upload document</h2>
+          <h2>{isId ? 'Unggah dokumen' : 'Upload document'}</h2>
           <button className="icon-button" onClick={handleClose} disabled={uploading}><X size={18} /></button>
         </div>
 
@@ -76,15 +79,15 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           ) : (
             <div className="upload-file-empty">
               <Upload size={24} />
-              <p>Click to select file</p>
-              <small>PDF or DOCX, max 50MB</small>
+              <p>{isId ? 'Klik untuk memilih file' : 'Click to select file'}</p>
+              <small>{isId ? 'PDF atau DOCX, maks 50MB' : 'PDF or DOCX, max 50MB'}</small>
             </div>
           )}
         </div>
 
         {/* Collection picker */}
         <div className="upload-field">
-          <label>Collection</label>
+          <label>{isId ? 'Koleksi' : 'Collection'}</label>
           <div className="upload-collection-grid">
             {COLLECTIONS.map((c) => (
               <button
@@ -103,9 +106,9 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
 
         {/* Actions */}
         <div className="modal-actions">
-          <button className="secondary-button" onClick={handleClose} disabled={uploading}>Cancel</button>
+          <button className="secondary-button" onClick={handleClose} disabled={uploading}>{isId ? 'Batal' : 'Cancel'}</button>
           <button className="primary-button" onClick={handleUpload} disabled={!file || uploading}>
-            {uploading ? <><LoaderCircle size={15} className="spin" /> Uploading…</> : <><Upload size={15} /> Upload</>}
+            {uploading ? <><LoaderCircle size={15} className="spin" /> {isId ? 'Mengunggah…' : 'Uploading…'}</> : <><Upload size={15} /> {isId ? 'Unggah' : 'Upload'}</>}
           </button>
         </div>
       </div>

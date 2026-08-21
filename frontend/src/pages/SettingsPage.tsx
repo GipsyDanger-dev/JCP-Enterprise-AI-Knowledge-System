@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
-import { Check, Globe, Loader2, Moon, Palette, Save, Sun, User } from 'lucide-react'
+import { Check, Globe, Moon, Palette, Sun, User } from 'lucide-react'
 import { ShieldCheck } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { userRoleLabel } from '@/api/mockUsers'
+import { isNotificationsEnabled, setNotificationsEnabled, isBrowserNotificationsEnabled, setBrowserNotificationsEnabled, requestNotificationPermission } from '@/utils/notifications'
 
 const THEME_KEY = 'jcp-theme'
-const LANG_KEY = 'jcp-lang'
 
 function getStoredTheme(): 'light' | 'dark' {
   const v = localStorage.getItem(THEME_KEY)
@@ -16,22 +15,13 @@ function getStoredTheme(): 'light' | 'dark' {
   return 'light'
 }
 
-function getStoredLang(): 'en' | 'id' {
-  const v = localStorage.getItem(LANG_KEY)
-  if (v === 'en' || v === 'id') return v
-  return 'en'
-}
-
 export function SettingsPage() {
   const { user } = useAuth()
-  const { role } = useWorkspace()
-  const [displayName, setDisplayName] = useState(user?.name ?? '')
-  const [saved, setSaved] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const { role, language, setLanguage } = useWorkspace()
   const [theme, setTheme] = useState<'light' | 'dark'>(getStoredTheme)
-  const [language, setLanguage] = useState<'en' | 'id'>(getStoredLang)
   const [compact, setCompact] = useState(false)
-  const [notifications, setNotifications] = useState(true)
+  const [notifications, setNotifications] = useState(isNotificationsEnabled)
+  const [browserNotif, setBrowserNotif] = useState(isBrowserNotificationsEnabled)
   const [emailDigest, setEmailDigest] = useState(false)
 
   // Apply theme to <html> and persist
@@ -40,25 +30,21 @@ export function SettingsPage() {
     localStorage.setItem(THEME_KEY, theme)
   }, [theme])
 
-  // Persist language
-  useEffect(() => {
-    localStorage.setItem(LANG_KEY, language)
-  }, [language])
-
   // Apply initial theme on mount
   useEffect(() => {
     const stored = getStoredTheme()
     document.documentElement.setAttribute('data-theme', stored)
   }, [])
 
-  const handleSave = async (e: FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    await new Promise((r) => setTimeout(r, 600))
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
+  // Persist notification toggles
+  useEffect(() => {
+    setNotificationsEnabled(notifications)
+  }, [notifications])
+
+  useEffect(() => {
+    setBrowserNotificationsEnabled(browserNotif)
+    if (browserNotif) requestNotificationPermission()
+  }, [browserNotif])
 
   const isId = language === 'id'
 
@@ -80,27 +66,26 @@ export function SettingsPage() {
               <small>{isId ? 'Informasi pribadi Anda' : 'Your personal information'}</small>
             </div>
           </div>
-          <form className="settings-form" onSubmit={handleSave}>
+          <div className="settings-form">
             <div className="settings-field">
-              <label htmlFor="settings-name">{isId ? 'Nama tampilan' : 'Display name'}</label>
+              <label>{isId ? 'Nama' : 'Name'}</label>
               <input
-                id="settings-name"
                 type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder={isId ? 'Nama Anda' : 'Your name'}
+                value={user?.name ?? ''}
+                disabled
+                className="disabled-input"
               />
+              <small>{isId ? 'Dikelola oleh administrator.' : 'Managed by administrator.'}</small>
             </div>
             <div className="settings-field">
-              <label htmlFor="settings-email">Email address</label>
+              <label>Email address</label>
               <input
-                id="settings-email"
                 type="email"
                 value={user?.email ?? ''}
                 disabled
                 className="disabled-input"
               />
-              <small>{isId ? 'Email tidak dapat diubah. Hubungi admin.' : 'Email cannot be changed. Contact admin to update.'}</small>
+              <small>{isId ? 'Dikelola oleh administrator.' : 'Managed by administrator.'}</small>
             </div>
             <div className="settings-field">
               <label>Role</label>
@@ -111,12 +96,7 @@ export function SettingsPage() {
                 <small>{isId ? 'Ditetapkan oleh administrator workspace' : 'Assigned by workspace administrator'}</small>
               </div>
             </div>
-            <div className="settings-actions">
-              <button type="submit" className="primary-button" disabled={saving || !displayName.trim()}>
-                {saving ? <><Loader2 size={15} className="spin" /> {isId ? 'Menyimpan…' : 'Saving…'}</> : saved ? <><Check size={15} /> {isId ? 'Tersimpan!' : 'Saved!'}</> : <><Save size={15} /> {isId ? 'Simpan perubahan' : 'Save changes'}</>}
-              </button>
-            </div>
-          </form>
+          </div>
         </section>
 
         {/* Workspace section */}
@@ -242,10 +222,23 @@ export function SettingsPage() {
             {/* Notifications */}
             <div className="settings-switch-row">
               <div className="settings-switch-info">
-                <label>{isId ? 'Notifikasi desktop' : 'Desktop notifications'}</label>
-                <small>{notifications ? (isId ? 'Dapatkan notifikasi pembaruan dokumen' : 'Get notified about document updates') : (isId ? 'Notifikasi dinonaktifkan' : 'Notifications are disabled')}</small>
+                <label>{isId ? 'Suara notifikasi' : 'Notification sound'}</label>
+                <small>{notifications ? (isId ? 'Suara dan getar aktif untuk pesan baru' : 'Sound and vibration active for new messages') : (isId ? 'Notifikasi dinonaktifkan' : 'Notifications are disabled')}</small>
               </div>
               <button className={`toggle-switch ${notifications ? 'on' : ''}`} onClick={() => setNotifications(!notifications)} type="button">
+                <span className="toggle-knob" />
+              </button>
+            </div>
+
+            {/* Browser notifications */}
+            <div className="settings-switch-row">
+              <div className="settings-switch-info">
+                <label>{isId ? 'Notifikasi browser' : 'Browser notifications'}</label>
+                <small>{browserNotif
+                  ? (isId ? 'Popup notifikasi muncul di layar' : 'Notification popups appear on screen')
+                  : (isId ? 'Popup notifikasi dinonaktifkan' : 'Notification popups are disabled')}</small>
+              </div>
+              <button className={`toggle-switch ${browserNotif ? 'on' : ''}`} onClick={() => setBrowserNotif(!browserNotif)} type="button">
                 <span className="toggle-knob" />
               </button>
             </div>

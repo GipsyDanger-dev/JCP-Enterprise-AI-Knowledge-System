@@ -2,6 +2,8 @@ import { createContext } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import type { Citation, DocumentItem, NavigationItem, Person, Role } from '@/types/domain'
 
+export type Language = 'en' | 'id'
+
 export interface WorkspaceContextValue {
   role: Role
   changeRole: (role: Role) => void
@@ -21,6 +23,10 @@ export interface WorkspaceContextValue {
   isUploading: boolean
   uploadError: string | null
   removeDocument: (id: number) => Promise<void>
+  language: Language
+  setLanguage: (lang: Language) => void
+  unreadMessages: number
+  setUnreadMessages: (count: number) => void
 }
 
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)

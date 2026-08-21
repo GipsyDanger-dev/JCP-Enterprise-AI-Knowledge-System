@@ -116,3 +116,41 @@ export interface ConversationDetail {
   title: string
   messages: ChatMessage[]
 }
+
+/* ============ Messaging (Employee ↔ Admin) ============ */
+export type MessageSender = 'employee' | 'admin'
+
+export interface DirectMessage {
+  id: number
+  conversationId: number
+  sender: MessageSender
+  senderName: string
+  content: string
+  /** ISO datetime */
+  createdAt: string
+  read: boolean
+}
+
+export interface DirectConversation {
+  id: number
+  employeeId: number
+  employeeName: string
+  employeeEmail: string
+  lastMessage: string
+  lastMessageAt: string
+  unreadCount: number
+}
+
+export interface SendMessageRequest {
+  content: string
+}
+
+export interface SendMessageResponse {
+  id: number
+  conversationId: number
+  sender: MessageSender
+  senderName: string
+  content: string
+  createdAt: string
+  read: boolean
+}
