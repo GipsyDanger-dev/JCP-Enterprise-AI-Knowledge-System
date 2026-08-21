@@ -273,7 +273,7 @@ button { cursor: pointer; }
 .topbar-left { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .search-shell { flex: 1; max-width: 520px; height: 34px; margin: 0 auto; display: flex; align-items: center; gap: 9px; background: var(--bg-page); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0 11px; color: var(--text-muted); }
 .search-shell input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text-strong); font-size: var(--fs-md); }
-.top-actions { position: absolute; right: 27px; display: flex; align-items: center; gap: 5px; }
+.top-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; margin-left: auto; }
 .icon-button, .menu-button { width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); display: grid; place-items: center; position: relative; transition: background var(--ease-fast), color var(--ease-fast); }
 .icon-button:hover, .menu-button:hover { background: var(--bg-hover); color: var(--text-strong); }
 .notification-dot { width: 6px; height: 6px; background: var(--brand-600); border: 2px solid var(--bg-card); border-radius: var(--radius-round); position: absolute; top: 5px; right: 5px; }
