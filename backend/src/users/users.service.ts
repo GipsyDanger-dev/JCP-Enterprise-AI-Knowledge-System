@@ -105,4 +105,27 @@ export class UsersService {
 
     return { success: true };
   }
+
+  async remove(id: string, actor: AuthenticatedUser) {
+    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true, email: true } });
+    if (!user) throw new NotFoundException('User not found');
+    if (id === actor.sub) throw new ConflictException('Cannot deactivate your own account');
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.user.update({
+        where: { id },
+        data: { isActive: false },
+      });
+      await this.auditLogs.record(transaction, {
+        actorType: AuditActorType.USER,
+        actorUserId: actor.sub,
+        action: AuditAction.USER_UPDATED,
+        targetType: 'USER',
+        targetId: id,
+        metadata: { action: 'deactivated', email: user.email },
+      });
+    });
+
+    return { id, isActive: false };
+  }
 }

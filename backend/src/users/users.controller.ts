@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -67,5 +67,15 @@ export class UsersController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.usersService.changePassword(id, input, actor);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Deactivate a user account (soft delete)' })
+  @ApiOkResponse({ description: 'User deactivated' })
+  remove(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.usersService.remove(id, actor);
   }
 }
