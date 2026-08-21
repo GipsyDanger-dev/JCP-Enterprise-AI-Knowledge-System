@@ -1,93 +1,151 @@
-# Kontrak API — Enterprise AI Knowledge System
+# Kontrak API Frontend–Backend
 
-Kesepakatan **Frontend ↔ Backend** (per slide 12 Technical Briefing). Semua perubahan schema/API yang menyentuh modul lain **harus lewat PR, didokumentasikan, dan disepakati sebelum merge**.
+Folder ini berisi API client, tipe TypeScript, mapper, dan implementasi mock.
+Backend NestJS menjadi sumber kontrak utama. Tipe auth, UUID, role, status
+dokumen, mock, dan mapper Frontend sudah diselaraskan dengan response Backend.
 
-## Aturan umum
+## Aturan Backend aktual
 
-- Format respons JSON; error object konsisten:
+- Base URL lokal: `http://localhost:8000` tanpa prefix global `/api`.
+- Auth menggunakan `Authorization: Bearer <accessToken>`.
+- ID menggunakan UUID bertipe `string`.
+- Role Backend adalah `ADMIN | USER`.
+- Status dokumen menggunakan uppercase:
+  `UPLOADED | QUEUED | PROCESSING | READY | FAILED | DELETED`.
+- Endpoint admin dilindungi Backend dengan JWT guard dan role guard.
 
-```json
-{ "error": { "code": "INVALID_CREDENTIALS", "message": "..." } }
-```
-
-- Status code: `200` sukses · `201` created · `204` deleted · `400` validasi · `401` token/login salah · `403` role tidak punya akses · `404` tidak ditemukan · `500` server error
-- **Role: `ADMIN | EMPLOYEE` (UPPERCASE)** — backend WAJIB menolak endpoint admin untuk `EMPLOYEE` (403), bukan hanya disembunyikan di UI
-- Auth: `Authorization: Bearer <token>`
-- Endpoint admin (documents upload/delete, users, status) hanya untuk `ADMIN`
-
-## Endpoint
+## Endpoint yang sudah tersedia
 
 ### Auth
-| Method | Path | Request | Response |
-|---|---|---|---|
-| POST | `/auth/login` | `{ email, password }` | `200 { token, user }` · `401` |
-| GET | `/auth/me` | — | `200 { user }` · `401` |
 
-### Users (admin)
-| Method | Path | Request | Response |
-|---|---|---|---|
-| GET | `/users` | — | `200 User[]` |
-| POST | `/users` | `{ name, email, role, password? }` | `201 User` |
-| DELETE | `/users/:id` | — | `204` |
+| Method | Path | Keterangan |
+| --- | --- | --- |
+| POST | `/auth/login` | Menerima `{ email, password }`, mengembalikan `accessToken` dan profil user |
+| GET | `/auth/me` | Mengembalikan payload user terautentikasi secara langsung |
 
-### Documents (admin: upload/delete; semua role: list)
-| Method | Path | Request | Response |
-|---|---|---|---|
-| POST | `/documents` | multipart `file` | `201 Document` (status `queued`) |
-| GET | `/documents` | — | `200 Document[]` |
-| GET | `/documents/:id/status` | — | `200 { id, status, error?, chunks? }` |
-| DELETE | `/documents/:id` | — | `204` |
+Response login aktual:
 
-### Chat
-| Method | Path | Request | Response |
-|---|---|---|---|
-| POST | `/chat/query` | `{ question, conversationId? }` | `200 { conversationId, answer, message?, citations }` |
-| GET | `/conversations` | — | `200 ConversationSummary[]` |
-| GET | `/conversations/:id` | — | `200 ConversationDetail` |
-
-## Tipe kunci
-
-```ts
-type ApiRole = 'ADMIN' | 'EMPLOYEE'
-type ApiDocumentStatus = 'queued' | 'processing' | 'ready' | 'failed'
-
-interface Citation {
-  documentId: number
-  filename: string
-  version?: string
-  pageNumber: number | null
-  sectionTitle: string | null
-  chunkId: number
+```json
+{
+  "accessToken": "jwt-token",
+  "tokenType": "Bearer",
+  "user": {
+    "id": "uuid",
+    "email": "user@company.test",
+    "displayName": "Nama User",
+    "role": "USER"
+  }
 }
 ```
 
-### No-answer (prinsip "No evidence = no answer")
-Saat retrieval tidak menemukan bukti cukup, backend mengembalikan `answer: null` + `message` penjelasan — **bukan jawaban karangan**:
+### Documents
+
+| Method | Path | Akses |
+| --- | --- | --- |
+| POST | `/documents` | `ADMIN`, multipart `file`, optional `title` |
+| GET | `/documents` | `ADMIN` dan `USER`; user hanya melihat status `READY` |
+| GET | `/documents/:id/status` | `ADMIN` |
+| DELETE | `/documents/:id` | `ADMIN` |
+
+Upload mengembalikan HTTP `201` dengan document, version, dan processing job.
+Delete mengembalikan HTTP `200` dengan `{ id, status: "DELETED", deletedAt }`,
+bukan response kosong `204`.
+
+Contoh bentuk item dari `GET /documents`:
 
 ```json
-{ "conversationId": 7, "answer": null,
-  "message": "Informasi tidak ditemukan pada dokumen yang tersedia.", "citations": [] }
+{
+  "id": "document-uuid",
+  "title": "SOP Perjalanan",
+  "status": "QUEUED",
+  "createdAt": "2026-08-19T00:00:00.000Z",
+  "updatedAt": "2026-08-19T00:00:00.000Z",
+  "uploadedBy": {
+    "id": "user-uuid",
+    "displayName": "Nama Admin"
+  },
+  "latestVersion": {
+    "id": "version-uuid",
+    "versionNumber": 1,
+    "originalFilename": "sop.pdf",
+    "mimeType": "application/pdf",
+    "fileSize": 1024,
+    "checksum": "sha256"
+  }
+}
 ```
 
-## Provenance (wajib ikut terus)
+Endpoint users, chat, dan conversations yang dipanggil Frontend belum tersedia
+karena modul Backend terkait masih skeleton.
 
-`document_id` · `filename` · `version` · `page_number` · `section_title` · `chunk_id` — citation di UI berasal dari metadata ini, **bukan dibuat ulang oleh LLM**.
+## Penyesuaian yang sudah dilakukan
 
-### Mock mode (development)
-Mock auth aktif **secara default di development** (`mockAuth.ts`) — tidak butuh backend:
+| Kontrak lama | Kontrak sekarang |
+| --- | --- |
+| `token` | `accessToken` |
+| `user.name` | `user.displayName` |
+| ID `number` | UUID `string` |
+| `ADMIN | EMPLOYEE` | `ADMIN | USER` |
+| status lowercase | status uppercase |
+| `{ error: { code, message } }` | error standar NestJS `{ statusCode, message, error }` |
+| delete `204` tanpa body | delete `200` dengan body |
 
-- Admin: `admin@jcp.co.id` / `admin123`
-- Employee: `nadia@jcp.co.id` / `employee123`
+File yang telah disesuaikan:
 
-Set `VITE_USE_MOCK_AUTH=false` saat backend sudah siap untuk memakai API asli. Di produksi, mock hanya aktif bila `VITE_USE_MOCK_AUTH=true` dieksplisitkan.
+```text
+types.ts
+auth.ts
+documents.ts
+chat.ts
+users.ts
+mappers.ts
+```
 
-Endpoint dokumen juga di-mock (`mockDocuments.ts`): upload langsung masuk antrean dan statusnya berjalan `queued → processing → ready` otomatis.
+Mock sekarang mengikuti UUID string, `accessToken`, `displayName`, role `USER`,
+status uppercase, dan format error NestJS.
 
-Chat juga di-mock (`mockChat.ts`): pertanyaan dengan keyword (hotel, cuti, reimburse, gaji, absen) mengembalikan jawaban + citation. Pertanyaan lain mengembalikan no-answer.
+## Pekerjaan integrasi yang tersisa
 
-## Implementasi frontend
+1. `/auth/me` hanya mengembalikan payload JWT tanpa `displayName`, sehingga
+   pemulihan sesi sementara memakai email sebagai nama tampilan.
+2. Backend users, chat, dan conversations masih skeleton.
+3. Backend documents belum mengembalikan jumlah chunk.
+4. Selector E2E login lama perlu diselaraskan dengan markup UI saat ini.
 
-- `client.ts` — `request<T>()` + `ApiError` (status, code); base URL dari `VITE_API_BASE_URL`
-- `types.ts` — schema typed untuk semua endpoint di atas
-- `auth.ts` / `documents.ts` / `chat.ts` / `users.ts` — fungsi per endpoint
-- `mappers.ts` — konversi tipe API ↔ tipe UI (role, status dokumen)
+## Mock mode
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+VITE_USE_MOCK_AUTH=true
+```
+
+| Role UI | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@jcp.co.id` | `admin123` |
+| Employee | `nadia@jcp.co.id` | `employee123` |
+
+Mock documents mensimulasikan `queued → processing → ready`. Mock chat hanya
+memberikan citation dari metadata mock yang sudah ditentukan dan mengembalikan
+no-answer untuk pertanyaan yang tidak cocok.
+
+## No-answer dan citation
+
+Citation tidak boleh dibuat oleh LLM. Citation harus berasal dari metadata chunk
+yang benar-benar diretrieval:
+
+```text
+document_version_id
+filename
+version
+page_number
+section_title
+chunk_id
+```
+
+Jika bukti tidak cukup, UI harus menampilkan:
+
+```text
+Informasi tidak ditemukan pada dokumen yang tersedia.
+```
+
+State no-answer bukan kegagalan HTTP.

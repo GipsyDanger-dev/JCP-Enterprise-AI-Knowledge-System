@@ -6,6 +6,7 @@ import { errorMessage } from '@/api/client'
 import { deleteDocument, getDocumentStatus, listDocuments, uploadDocument } from '@/api/documents'
 import { listConversations, getEmployeeConversation } from '@/api/messaging'
 import { toDomainDocument, toDomainDocumentStatus, toDomainRole } from '@/api/mappers'
+import type { ApiDocument } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import type { Citation } from '@/types/domain'
 import { initialDocuments, navigationFor, personFor } from '@/types/domain'
@@ -71,7 +72,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         getDocumentStatus(doc.id, token)
           .then((status) => {
             setDocuments((current) => current.map((item) => item.id === status.id
-              ? { ...item, status: toDomainDocumentStatus(status.status), chunks: status.chunks ?? item.chunks }
+              ? { ...item, status: toDomainDocumentStatus(status.status) }
               : item))
           })
           .catch(() => { /* biarkan polling berikutnya mencoba lagi */ })
@@ -128,6 +129,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (nextRole === 'employee' && location.pathname === '/users') navigate('/')
   }
 
+  const registerUploadedDocument = (document: ApiDocument) => {
+    const nextDocument = toDomainDocument(document)
+    setDocuments((current) => [nextDocument, ...current.filter((item) => item.id !== nextDocument.id)])
+  }
+
   const onUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -136,7 +142,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setUploadError(null)
     try {
       const doc = await uploadDocument(file, token ?? undefined)
-      setDocuments((current) => [toDomainDocument(doc), ...current])
+      registerUploadedDocument(doc)
     } catch (err) {
       setUploadError(errorMessage(err))
     } finally {
@@ -144,7 +150,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const removeDocument = async (id: number) => {
+  const removeDocument = async (id: string) => {
     if (!token) return
     try {
       await deleteDocument(id, token)
@@ -210,6 +216,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       onUpload,
       isUploading,
       uploadError,
+      registerUploadedDocument,
       removeDocument,
       language,
       setLanguage,

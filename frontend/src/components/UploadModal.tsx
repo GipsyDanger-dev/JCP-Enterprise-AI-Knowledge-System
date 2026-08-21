@@ -1,16 +1,17 @@
 import { useRef, useState } from 'react'
-import { FileText, FolderOpen, LoaderCircle, Upload, X } from 'lucide-react'
+import { FileText, LoaderCircle, Upload, X } from 'lucide-react'
 import { uploadDocument } from '@/api/documents'
 import { errorMessage } from '@/api/client'
+import type { ApiDocument } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
-const COLLECTIONS = ['Operations', 'IT & Security', 'Finance', 'People']
+const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 interface UploadModalProps {
   open: boolean
   onClose: () => void
-  onUploaded: () => void
+  onUploaded: (document: ApiDocument) => void
 }
 
 export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
@@ -19,18 +20,30 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const isId = language === 'id'
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
-  const [collection, setCollection] = useState(COLLECTIONS[0])
+  const [title, setTitle] = useState('')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   if (!open) return null
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0]
-    if (selected) {
-      setFile(selected)
-      setError(null)
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0]
+    event.target.value = ''
+    if (!selected) return
+
+    const extension = selected.name.split('.').pop()?.toLowerCase()
+    if (extension !== 'pdf' && extension !== 'docx') {
+      setFile(null)
+      setError('Only PDF and DOCX files are supported.')
+      return
     }
+    if (selected.size > MAX_FILE_SIZE) {
+      setFile(null)
+      setError('File size must not exceed 10 MB.')
+      return
+    }
+    setFile(selected)
+    setError(null)
   }
 
   const handleUpload = async () => {
@@ -38,9 +51,10 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     setUploading(true)
     setError(null)
     try {
-      await uploadDocument(file, token ?? undefined, collection)
+      const document = await uploadDocument(file, token ?? undefined, title)
       setFile(null)
-      onUploaded()
+      setTitle('')
+      onUploaded(document)
       onClose()
     } catch (err) {
       setError(errorMessage(err))
@@ -52,6 +66,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const handleClose = () => {
     if (uploading) return
     setFile(null)
+    setTitle('')
     setError(null)
     onClose()
   }
@@ -79,13 +94,28 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           ) : (
             <div className="upload-file-empty">
               <Upload size={24} />
+<<<<<<< HEAD
               <p>{isId ? 'Klik untuk memilih file' : 'Click to select file'}</p>
-              <small>{isId ? 'PDF atau DOCX, maks 50MB' : 'PDF or DOCX, max 50MB'}</small>
+              <small>{isId ? 'PDF atau DOCX, maks 10MB' : 'PDF or DOCX, max 10 MB'}</small>
+=======
+              <p>Click to select file</p>
+              <small>PDF or DOCX, max 10 MB</small>
+>>>>>>> origin/main
             </div>
           )}
         </div>
 
-        {/* Collection picker */}
+        <div className="upload-field">
+          <label>{isId ? 'Judul dokumen' : 'Document title'} ({isId ? 'opsional' : 'optional'})</label>
+          <input
+            id="upload-title"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder={file ? file.name.replace(/\.[^.]+$/, '') : (isId ? 'Masukkan judul dokumen' : 'Enter a document title')}
+            disabled={uploading}
+          />
+        </div>
+
         <div className="upload-field">
           <label>{isId ? 'Koleksi' : 'Collection'}</label>
           <div className="upload-collection-grid">

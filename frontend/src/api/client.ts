@@ -6,7 +6,7 @@
  * - response typed sesuai schema di src/api/types.ts
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 export class ApiError extends Error {
   readonly status: number
@@ -30,7 +30,11 @@ export function authHeaders(token?: string): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-type ErrorBody = { error?: { code?: string; message?: string } }
+type ErrorBody = {
+  statusCode?: number
+  message?: string | string[]
+  error?: string
+}
 
 /** Pesan error yang ramah pengguna (401/403/network) */
 export function errorMessage(error: unknown): string {
@@ -64,7 +68,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     } catch {
       // response bukan JSON — biarkan null
     }
-    throw new ApiError(response.status, errorBody?.error?.message ?? response.statusText, errorBody?.error?.code)
+    const backendMessage = Array.isArray(errorBody?.message)
+      ? errorBody.message.join(', ')
+      : errorBody?.message
+    throw new ApiError(response.status, backendMessage ?? response.statusText, errorBody?.error)
   }
 
   if (response.status === 204) return undefined as T

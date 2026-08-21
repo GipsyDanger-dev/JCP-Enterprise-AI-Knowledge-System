@@ -21,7 +21,7 @@ export function OverviewPage() {
 
 function AdminOverview({ isId }: { isId: boolean }) {
   const navigate = useNavigate()
-  const { documents, uploadError } = useWorkspace()
+  const { documents, uploadError, registerUploadedDocument } = useWorkspace()
   const [showUpload, setShowUpload] = useState(false)
   const readyCount = documents.filter((document) => document.status === 'Ready').length
   const totalChunks = documents.reduce((sum, document) => sum + (document.chunks ?? 0), 0)
@@ -55,7 +55,7 @@ function AdminOverview({ isId }: { isId: boolean }) {
       </section>
 
       <AgentPanel />
-      <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={() => {}} />
+      <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
     </div>
   )
 }

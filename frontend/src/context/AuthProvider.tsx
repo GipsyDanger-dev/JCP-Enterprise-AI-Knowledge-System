@@ -20,8 +20,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token) return
     let cancelled = false
     apiMe(token)
-      .then(({ user }) => {
-        if (!cancelled) setUser(user)
+      .then((profile) => {
+        if (!cancelled) {
+          setUser({
+            id: profile.sub,
+            displayName: profile.email,
+            email: profile.email,
+            role: profile.role,
+          })
+        }
       })
       .catch(() => {
         // Token tidak valid/kedaluwarsa — bersihkan sesi
@@ -38,8 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const response = await apiLogin({ email, password })
-    localStorage.setItem(TOKEN_KEY, response.token)
-    setToken(response.token)
+    localStorage.setItem(TOKEN_KEY, response.accessToken)
+    setToken(response.accessToken)
     setUser(response.user)
   }, [])
 

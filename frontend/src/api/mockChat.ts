@@ -9,6 +9,9 @@ import type { Citation, ChatQueryResponse } from './types'
 
 let conversationSeq = 100
 
+const mockId = (prefix: number, value: number) =>
+  `${prefix}0000000-0000-4000-8000-${String(value).padStart(12, '0')}`
+
 /** Database jawaban mock — dipilih berdasarkan keyword di pertanyaan */
 const answers: Array<{
   keywords: string[]
@@ -21,20 +24,22 @@ const answers: Array<{
       'Manajer level diizinkan biaya hotel maksimal Rp900.000 per malam. Kebijakan mensyaratkan kwitansi detail dan persetujuan terlebih dahulu untuk pengecualian.',
     citations: [
       {
-        documentId: 1,
+        documentId: mockId(2, 1),
+        documentVersionId: mockId(1, 1),
         filename: 'SOP Perjalanan Dinas 2026.pdf',
-        version: 'v2.1',
+        version: 2,
         pageNumber: 7,
         sectionTitle: 'Hotel Allowance',
-        chunkId: 42,
+        chunkId: 'mock-chunk-42',
         excerpt: 'Manajer level diizinkan biaya hotel maksimal Rp900.000 per malam dengan syarat kwitansi detail dan persetujuan atasan langsung.',
       },
       {
-        documentId: 3,
+        documentId: mockId(2, 3),
+        documentVersionId: mockId(1, 3),
         filename: 'Kebijakan Perjalanan Bisnis.pdf',
         pageNumber: 12,
         sectionTitle: 'Biaya Akomodasi',
-        chunkId: 87,
+        chunkId: 'mock-chunk-87',
         excerpt: 'Seluruh biaya akomodasi harus sesuai dengan standar perusahaan dan tidak melebihi batas yang ditetapkan untuk masing-masing level jabatan.',
       },
     ],
@@ -45,11 +50,12 @@ const answers: Array<{
       'Karyawan berhak atas 12 hari cuti tahunan. Cuti tambahan dapat diajukan untuk keperluan keluarga dengan persetujuan langsung dari HR.',
     citations: [
       {
-        documentId: 2,
+        documentId: mockId(2, 2),
+        documentVersionId: mockId(1, 2),
         filename: 'Panduan Karyawan 2026.pdf',
         pageNumber: 23,
         sectionTitle: 'Cuti Tahunan',
-        chunkId: 115,
+        chunkId: 'mock-chunk-115',
         excerpt: 'Setiap karyawan berhak atas 12 hari cuti tahunan. Pengajuan cuti harus disampaikan minimal 3 hari sebelum tanggal cuti yang dikehendaki.',
       },
     ],
@@ -60,11 +66,12 @@ const answers: Array<{
       'Pengajuan reimbursement harus dilakukan dalam 7 hari kerja setelah pengeluaran. Lampirkan bukti pembayaran asli dan formulir klaim yang sudah disetujui atasan.',
     citations: [
       {
-        documentId: 3,
+        documentId: mockId(2, 3),
+        documentVersionId: mockId(1, 3),
         filename: 'Kebijakan Perjalanan Bisnis.pdf',
         pageNumber: 5,
         sectionTitle: 'Prosedur Reimbursement',
-        chunkId: 31,
+        chunkId: 'mock-chunk-31',
         excerpt: 'Pengajuan reimbursement harus dilakukan dalam 7 hari kerja setelah pengeluaran. Lampirkan bukti pembayaran asli dan formulir klaim yang sudah disetujui atasan.',
       },
     ],
@@ -75,11 +82,12 @@ const answers: Array<{
       'Pembayaran gaji dilakukan pada tanggal 25 setiap bulan melalui transfer bank. Tunjangan transportasi dan makan sudah termasuk dalam paket kompensasi.',
     citations: [
       {
-        documentId: 2,
+        documentId: mockId(2, 2),
+        documentVersionId: mockId(1, 2),
         filename: 'Panduan Karyawan 2026.pdf',
         pageNumber: 8,
         sectionTitle: 'Kompensasi & Tunjangan',
-        chunkId: 52,
+        chunkId: 'mock-chunk-52',
         excerpt: 'Pembayaran gaji dilakukan pada tanggal 25 setiap bulan melalui transfer bank. Tunjangan transportasi dan makan sudah termasuk dalam paket kompensasi.',
       },
     ],
@@ -90,11 +98,12 @@ const answers: Array<{
       'Sistem presensi menggunakan fingerprint yang tersedia di setiap lantai. Keterlambatan lebih dari 15 menit akan tercatat otomatis dan mempengaruhi evaluasi kinerja.',
     citations: [
       {
-        documentId: 2,
+        documentId: mockId(2, 2),
+        documentVersionId: mockId(1, 2),
         filename: 'Panduan Karyawan 2026.pdf',
         pageNumber: 3,
         sectionTitle: 'Kehadiran & Presensi',
-        chunkId: 12,
+        chunkId: 'mock-chunk-12',
         excerpt: 'Sistem presensi menggunakan fingerprint yang tersedia di setiap lantai. Keterlambatan lebih dari 15 menit akan tercatat otomatis.',
       },
     ],
@@ -107,7 +116,7 @@ function pickAnswer(question: string): ChatQueryResponse {
   for (const entry of answers) {
     if (entry.keywords.some((kw) => q.includes(kw))) {
       return {
-        conversationId: conversationSeq++,
+        conversationId: mockId(4, conversationSeq++),
         answer: entry.answer,
         citations: entry.citations,
       }
@@ -116,7 +125,7 @@ function pickAnswer(question: string): ChatQueryResponse {
 
   // No-answer: pertanyaan tidak relevan dengan dokumen yang ada
   return {
-    conversationId: conversationSeq++,
+    conversationId: mockId(4, conversationSeq++),
     answer: null,
     message:
       'Informasi tidak ditemukan pada dokumen yang tersedia di knowledge base saat ini.',

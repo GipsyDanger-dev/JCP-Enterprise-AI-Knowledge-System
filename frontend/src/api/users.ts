@@ -13,7 +13,7 @@ export function createUser(data: CreateUserRequest, token?: string): Promise<Api
   return request<ApiUser>('/users', { method: 'POST', body: data, headers: authHeaders(token) })
 }
 
-export function deleteUser(id: number, token?: string): Promise<void> {
+export function deleteUser(id: string, token?: string): Promise<void> {
   if (USE_MOCK) return mockDeleteUser(id)
   return request<void>(`/users/${id}`, { method: 'DELETE', headers: authHeaders(token) })
 }

@@ -1,0 +1,93 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run start:dev"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      AI_SERVICE_URL: ${AI_SERVICE_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      WORKER_TOKEN: ${WORKER_TOKEN}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_USER_EMAIL: ${SEED_USER_EMAIL:-}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-}
+      PORT: ${BACKEND_PORT:-8000}
+      TSC_WATCHFILE: UsePolling
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/health | grep -q OK"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  ai-api:
+    build: ./AI
+    image: jcp-ai-engine:local
+    entrypoint: ["uvicorn", "http_api:app", "--host", "0.0.0.0", "--port", "8000"]
+    working_dir: /app
+    volumes:
+      - ./AI:/app
+    environment:
+      SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
+      # Tetap memakai database yang sama, tetapi tanpa query parameter Prisma
+      # `schema=public` yang tidak dikenali oleh psycopg/libpq.
+      DATABASE_URL: ${AI_DATABASE_URL}
+    ports:
+      # Host port digeser ke 8001 supaya tidak bentrok dengan backend (yang pakai 8000).
+      # Di dalam jaringan Docker, backend tetap memanggil lewat http://ai-api:8000
+      # (port internal container, tidak terpengaruh oleh mapping host ini).
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    command: npm run dev -- --host 0.0.0.0
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+      VITE_USE_MOCK_AUTH: ${VITE_USE_MOCK_AUTH:-false}
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  backend_node_modules:
+  frontend_node_modules:

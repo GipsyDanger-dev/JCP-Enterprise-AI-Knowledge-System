@@ -10,7 +10,7 @@ import type { DocumentItem } from '@/types/domain'
 const COLLECTIONS = ['All', 'Operations', 'IT & Security', 'Finance', 'People']
 
 export function DocumentsPage() {
-  const { documents, role, uploadError, removeDocument, language } = useWorkspace()
+  const { documents, role, uploadError, removeDocument, registerUploadedDocument, language } = useWorkspace()
   const canManage = role === 'admin'
   const isId = language === 'id'
   const [searchParams, setSearchParams] = useSearchParams()
@@ -41,7 +41,7 @@ export function DocumentsPage() {
     setSearchParams(searchParams)
   }
 
-  const handleDelete = async (id: number, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Hapus dokumen "${name}"?`)) {
       await removeDocument(id)
       if (selectedDoc?.id === id) setSelectedDoc(null)
@@ -171,7 +171,7 @@ export function DocumentsPage() {
         </div>
       )}
 
-      <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={() => {}} />
+      <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { createContext } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
+import type { ApiDocument } from '@/api/types'
 import type { Citation, DocumentItem, NavigationItem, Person, Role } from '@/types/domain'
 
 export type Language = 'en' | 'id'
@@ -22,6 +23,7 @@ export interface WorkspaceContextValue {
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void
   isUploading: boolean
   uploadError: string | null
+  registerUploadedDocument: (document: ApiDocument) => void
   removeDocument: (id: number) => Promise<void>
   language: Language
   setLanguage: (lang: Language) => void
