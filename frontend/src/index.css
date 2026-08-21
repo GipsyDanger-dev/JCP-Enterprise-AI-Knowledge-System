@@ -277,7 +277,7 @@ button { cursor: pointer; }
 .nav-item { position: relative; width: 100%; min-height: 39px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); text-align: left; font-size: var(--fs-lg); text-decoration: none; transition: background var(--ease-fast), color var(--ease-fast); }
 .nav-item:hover { background: var(--bg-hover); color: var(--text-strong); }
 .nav-item.active { background: var(--bg-hover); color: var(--text-primary); font-weight: var(--fw-semibold); }
-.nav-item.active i { width: 3px; height: 18px; border-radius: var(--radius-xs); background: var(--brand-600); position: absolute; left: 0; }
+.nav-item.active i { width: 3px; height: 18px; border-radius: var(--radius-xs); background: var(--brand-600); position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
 .nav-badge { min-width: 18px; height: 18px; border-radius: var(--radius-round); background: var(--brand-600); color: var(--on-dark); font-size: var(--fs-2xs); font-weight: var(--fw-bold); display: inline-grid; place-items: center; padding: 0 5px; margin-left: auto; flex-shrink: 0; line-height: 1; }
 .sidebar-lower { margin-top: auto; }
 .profile-row { margin-top: 12px; border-top: 1px solid var(--border-soft); padding: 16px 8px 0; display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 9px; }
@@ -306,10 +306,12 @@ button { cursor: pointer; }
 /* Collapsed sidebar */
 .app-shell.sidebar-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
 .app-shell.sidebar-collapsed .sidebar { padding: 20px 8px 15px; align-items: center; }
-.app-shell.sidebar-collapsed .sidebar .nav-item { justify-content: center; padding: 0; }
-.app-shell.sidebar-collapsed .sidebar .nav-item i { left: 0; }
-.app-shell.sidebar-collapsed .sidebar .nav-badge { position: absolute; top: 4px; right: 4px; min-width: 14px; height: 14px; font-size: 9px; padding: 0 3px; margin-left: 0; }
+.app-shell.sidebar-collapsed .sidebar { padding: 16px 0; align-items: center; }
+.app-shell.sidebar-collapsed .sidebar .nav-item { justify-content: center; padding: 0; min-height: 42px; }
+.app-shell.sidebar-collapsed .sidebar .nav-item i { left: 0; top: 50%; transform: translateY(-50%); }
+.app-shell.sidebar-collapsed .sidebar .nav-badge { position: absolute; top: 6px; right: 6px; min-width: 16px; height: 16px; font-size: 10px; padding: 0 4px; margin-left: 0; }
 .app-shell.sidebar-collapsed .sidebar-lower .nav-item { justify-content: center; }
+.app-shell.sidebar-collapsed .sidebar nav > p { display: none; }
 .app-shell.sidebar-collapsed .brand-lockup { justify-content: center; padding: 0; }
 .app-shell.sidebar-collapsed .topbar { padding: 0 16px; }
 
