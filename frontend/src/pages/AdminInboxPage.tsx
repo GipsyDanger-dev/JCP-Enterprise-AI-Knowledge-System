@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, MessageSquareText } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
@@ -146,6 +146,7 @@ export function AdminInboxPage() {
         <div className={`inbox-chat ${selectedConv ? 'inbox-chat-active' : ''}`}>
           {!selectedConv ? (
             <div className="inbox-chat-empty">
+              <span><MessageSquareText size={22} /></span>
               <p>{isId ? 'Pilih percakapan untuk mulai membalas.' : 'Select a conversation to start replying.'}</p>
             </div>
           ) : (
