@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Check, ChevronDown, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Camera, Check, ChevronDown, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { errorMessage } from '@/api/client'
 import { changePassword, createUser, deleteUser, listUsers, updateUser } from '@/api/users'
@@ -37,6 +37,7 @@ export function UsersPage() {
   const [editPassword, setEditPassword] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const editPhotoRef = useRef<HTMLInputElement>(null)
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
@@ -99,6 +100,19 @@ export function UsersPage() {
     setEditPhoto(user.photoUrl ?? '')
     setEditPassword('')
     setEditError(null)
+  }
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      setEditError(isId ? 'Ukuran foto maksimal 2MB' : 'Photo size must not exceed 2MB')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setEditPhoto(reader.result as string)
+    reader.readAsDataURL(file)
+    e.target.value = ''
   }
 
   const handleEdit = async (e: FormEvent) => {
@@ -230,8 +244,26 @@ export function UsersPage() {
               </div>
 
               <div className="auth-field">
-                <label>{isId ? 'Foto profil (URL)' : 'Profile photo (URL)'}</label>
-                <input type="url" value={editPhoto} onChange={(e) => setEditPhoto(e.target.value)} placeholder="https://example.com/photo.jpg" />
+                <label>{isId ? 'Foto profil' : 'Profile photo'}</label>
+                <div className="edit-photo-field">
+                  {editPhoto ? (
+                    <div className="edit-photo-preview">
+                      <img src={editPhoto} alt="" />
+                      <button type="button" className="edit-photo-remove" onClick={() => setEditPhoto('')}><X size={14} /></button>
+                    </div>
+                  ) : (
+                    <button type="button" className="edit-photo-upload" onClick={() => editPhotoRef.current?.click()}>
+                      <Camera size={20} />
+                      <span>{isId ? 'Pilih foto' : 'Choose photo'}</span>
+                    </button>
+                  )}
+                  <input ref={editPhotoRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
+                  {editPhoto && (
+                    <button type="button" className="edit-photo-change" onClick={() => editPhotoRef.current?.click()}>
+                      {isId ? 'Ganti foto' : 'Change photo'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="auth-field">
