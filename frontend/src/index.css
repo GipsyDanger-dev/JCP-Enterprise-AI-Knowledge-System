@@ -427,9 +427,8 @@ button { cursor: pointer; }
 .page-content { min-height: calc(100vh - 86px); }
 .overview-layout { display: grid; grid-template-columns: 1fr; max-width: 1100px; margin: 0 auto; }
 .overview-main { padding: 42px clamp(28px, 4vw, 58px) 56px; min-width: 0; }
-.overview-main .page-heading { justify-content: center; }
-.overview-main .page-heading > div:first-child { max-width: 100%; }
-.page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; margin-bottom: 27px; }
+
+.page-heading { display: flex; align-items: center; justify-content: space-between; gap: 22px; margin-bottom: 27px; }
 .page-heading > div:first-child { max-width: 610px; }
 .page-heading small { color: var(--brand-muted); text-transform: uppercase; letter-spacing: .09em; font-size: var(--fs-xs); font-weight: var(--fw-heavy); }
 .page-heading h1 { margin: 7px 0 7px; font-size: var(--fs-hero); line-height: 1.08; letter-spacing: 0; font-weight: var(--fw-heading); }
@@ -518,8 +517,7 @@ button { cursor: pointer; }
 
 /* ============ Dashboard Employee ============ */
 .employee-page { max-width: 1240px; margin: 0 auto; padding: 42px clamp(28px, 5vw, 68px) 58px; }
-.employee-page > .page-heading { margin-bottom: 24px; justify-content: center; }
-.employee-page > .page-heading > div:first-child { max-width: 100%; }
+.employee-page > .page-heading { margin-bottom: 24px; }
 .employee-ask { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--bg-card); padding: 24px; background-image: radial-gradient(var(--brand-200) .65px, transparent .65px); background-size: 12px 12px; }
 .employee-ask::after { content: ""; position: absolute; inset: 0 0 0 58%; background: var(--overlay-warm); pointer-events: none; }
 .employee-ask-copy, .employee-ask form, .employee-prompts { position: relative; z-index: 1; }
