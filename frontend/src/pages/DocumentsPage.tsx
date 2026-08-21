@@ -30,7 +30,7 @@ function DocViewer({ doc, isId, canManage, token, onClose, onDelete, onChunksLoa
       .then((res) => onChunksLoaded(res.chunks))
       .catch(() => onChunksLoaded([]))
       .finally(() => setChunksLoading(false))
-  }, [doc.id, doc.status])
+  }, [chunks.length, doc.id, doc.status, onChunksLoaded, setChunksLoading, token])
 
   // Group chunks by page
   const pages = useMemo(() => {

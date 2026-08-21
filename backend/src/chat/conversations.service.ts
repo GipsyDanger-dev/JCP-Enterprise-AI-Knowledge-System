@@ -104,7 +104,20 @@ export class ConversationsService {
       },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
-    return conversation;
+    return {
+      ...conversation,
+      messages: conversation.messages.map(({ citations, ...message }) => ({
+        ...message,
+        role: message.role.toLowerCase(),
+        citations: citations.map(({ documentVersion, ...citation }) => ({
+          ...citation,
+          documentId: documentVersion.document.id,
+          documentVersionId: documentVersion.id,
+          filename: documentVersion.originalFilename,
+          version: documentVersion.versionNumber,
+        })),
+      })),
+    };
   }
 
   async appendUserMessage(

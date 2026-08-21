@@ -144,13 +144,20 @@ export interface ChatQueryResponse {
 
 export interface ConversationSummary {
   id: string
-  title: string
+  title: string | null
   updatedAt: string
+  messageCount: number
+  latestMessage: {
+    id: string
+    role: 'USER' | 'ASSISTANT' | 'SYSTEM'
+    content: string
+    createdAt: string
+  } | null
 }
 
-export interface ChatMessage {
+export interface ConversationMessage {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
   citations: Citation[]
   createdAt: string
@@ -158,8 +165,8 @@ export interface ChatMessage {
 
 export interface ConversationDetail {
   id: string
-  title: string
-  messages: ChatMessage[]
+  title: string | null
+  messages: ConversationMessage[]
 }
 
 /* ============ Messaging (Employee ↔ Admin) ============ */

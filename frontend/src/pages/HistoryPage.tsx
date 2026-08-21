@@ -5,13 +5,14 @@ import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { listConversations } from '@/api/chat'
+import type { ConversationSummary } from '@/api/types'
 
 export function HistoryPage() {
   const navigate = useNavigate()
   const { token } = useAuth()
   const { language } = useWorkspace()
   const isId = language === 'id'
-  const [conversations, setConversations] = useState<any[]>([])
+  const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export function HistoryPage() {
       ) : (
         <div className="conversation-list">
           {conversations.map((conv: any) => (
-            <button key={conv.id} className="conversation-card" onClick={() => navigate('/chat')}>
+            <button key={conv.id} className="conversation-card" onClick={() => navigate(`/chat?conversation=${conv.id}`)}>
               <span className="conversation-icon"><Sparkles size={16} /></span>
               <div>
                 <strong>{conv.title || (isId ? 'Percakapan tanpa judul' : 'Untitled conversation')}</strong>

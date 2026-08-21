@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { queryChat } from '@/api/chat'
+import { getConversation, queryChat } from '@/api/chat'
 import { errorMessage } from '@/api/client'
 import { deleteDocument, getDocumentStatus, listDocuments, uploadDocument } from '@/api/documents'
 import { listConversations, getEmployeeConversation } from '@/api/messaging'
 import { toDomainDocument, toDomainDocumentStatus, toDomainRole } from '@/api/mappers'
-import type { ApiDocument } from '@/api/types'
+import type { ApiDocument, ConversationDetail } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import type { ChatMessage } from './workspaceContextValue'
 import { navigationFor } from '@/types/domain'
@@ -25,6 +25,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [question, setQuestion] = useState('')
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
+  const [conversationId, setConversationId] = useState<string | null>(null)
   const [isLoadingAnswer, setIsLoadingAnswer] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -42,6 +43,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setRole(user ? toDomainRole(user.role) : 'admin')
   }, [user])
+
+  useEffect(() => {
+    const requestedConversationId = new URLSearchParams(location.search).get('conversation')
+    if (!requestedConversationId || !token) return
+
+    let cancelled = false
+    getConversation(requestedConversationId, token)
+      .then((conversation) => {
+        if (cancelled) return
+        setConversationId(conversation.id)
+        setChatHistory(toWorkspaceHistory(conversation))
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setConversationId(null)
+          setChatHistory([])
+        }
+      })
+    return () => { cancelled = true }
+  }, [location.search, token])
 
   // Muat dokumen dari API saat login; fallback ke data lokal bila gagal
   useEffect(() => {
@@ -174,7 +195,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }])
     setIsLoadingAnswer(true)
     try {
-      const res = await queryChat({ question: q }, token ?? undefined)
+      const res = await queryChat({ question: q, conversationId: conversationId ?? undefined }, token ?? undefined)
+      setConversationId(res.conversationId)
       // Update the existing message with AI response
       setChatHistory((prev) => prev.map((msg) =>
         msg.id === messageId
@@ -241,4 +263,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       {children}
     </WorkspaceContext.Provider>
   )
+}
+
+function toWorkspaceHistory(conversation: ConversationDetail): ChatMessage[] {
+  const history: ChatMessage[] = []
+  for (const message of conversation.messages) {
+    if (message.role === 'user') {
+      history.push({
+        id: message.id,
+        question: message.content,
+        answer: '',
+        citations: [],
+        error: null,
+        timestamp: new Date(message.createdAt).getTime(),
+      })
+      continue
+    }
+    if (message.role !== 'assistant') continue
+    const latestQuestion = history[history.length - 1]
+    if (latestQuestion) {
+      latestQuestion.answer = message.content
+      latestQuestion.citations = message.citations
+    }
+  }
+  return history
 }
