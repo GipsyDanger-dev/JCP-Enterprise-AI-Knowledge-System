@@ -890,7 +890,7 @@ button { cursor: pointer; }
 }
 
 /* ============ Admin Inbox ============ */
-.admin-inbox-page { display: flex; flex-direction: column; height: calc(100vh - 58px - var(--banner-offset)); overflow: hidden; }
+.admin-inbox-page { display: flex; flex-direction: column; height: calc(100vh - 58px - var(--banner-offset)); overflow: hidden; padding: 0 clamp(28px, 4vw, 58px); }
 .inbox-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-xl); overflow: hidden; flex: 1; min-height: 0; margin: 0 clamp(28px, 5vw, 70px); }
 .inbox-list { border-right: 1px solid var(--border); overflow-y: auto; }
 .inbox-loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 32px; color: var(--text-muted); font-size: var(--fs-sm); }
