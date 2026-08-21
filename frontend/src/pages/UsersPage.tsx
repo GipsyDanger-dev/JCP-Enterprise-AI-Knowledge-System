@@ -225,50 +225,52 @@ export function UsersPage() {
               <button className="icon-button" onClick={() => setEditingUser(null)}><X size={18} /></button>
             </div>
             <form onSubmit={handleEdit}>
-              {editError && <div className="auth-error">{editError}</div>}
+              <div className="modal-body">
+                {editError && <div className="auth-error">{editError}</div>}
 
-              <div className="auth-field">
-                <label>{isId ? 'Nama' : 'Name'}</label>
-                <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} required />
-              </div>
-
-              <div className="auth-field">
-                <label>{isId ? 'Role' : 'Role'}</label>
-                <div className="select-wrapper">
-                  <select value={editRole} onChange={(e) => setEditRole(e.target.value as ApiRole)}>
-                    <option value="USER">Employee</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                  <ChevronDown size={15} className="select-icon" />
+                <div className="auth-field">
+                  <label>{isId ? 'Nama' : 'Name'}</label>
+                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} required placeholder={isId ? 'Nama lengkap' : 'Full name'} />
                 </div>
-              </div>
 
-              <div className="auth-field">
-                <label>{isId ? 'Foto profil' : 'Profile photo'}</label>
-                <div className="edit-photo-field">
-                  {editPhoto ? (
-                    <div className="edit-photo-preview">
-                      <img src={editPhoto} alt="" />
-                      <button type="button" className="edit-photo-remove" onClick={() => setEditPhoto('')}><X size={14} /></button>
-                    </div>
-                  ) : (
-                    <button type="button" className="edit-photo-upload" onClick={() => editPhotoRef.current?.click()}>
-                      <Camera size={20} />
-                      <span>{isId ? 'Pilih foto' : 'Choose photo'}</span>
-                    </button>
-                  )}
-                  <input ref={editPhotoRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
-                  {editPhoto && (
-                    <button type="button" className="edit-photo-change" onClick={() => editPhotoRef.current?.click()}>
-                      {isId ? 'Ganti foto' : 'Change photo'}
-                    </button>
-                  )}
+                <div className="auth-field">
+                  <label>{isId ? 'Role' : 'Role'}</label>
+                  <div className="select-wrapper">
+                    <select value={editRole} onChange={(e) => setEditRole(e.target.value as ApiRole)}>
+                      <option value="USER">Employee</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                    <ChevronDown size={15} className="select-icon" />
+                  </div>
                 </div>
-              </div>
 
-              <div className="auth-field">
-                <label>{isId ? 'Password baru (opsional)' : 'New password (optional)'}</label>
-                <input type="password" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder={isId ? 'Kosongkan jika tidak diubah' : 'Leave empty to keep current'} minLength={8} />
+                <div className="auth-field">
+                  <label>{isId ? 'Foto profil' : 'Profile photo'}</label>
+                  <div className="edit-photo-field">
+                    {editPhoto ? (
+                      <div className="edit-photo-preview">
+                        <img src={editPhoto} alt="" />
+                        <button type="button" className="edit-photo-remove" onClick={() => setEditPhoto('')}><X size={14} /></button>
+                      </div>
+                    ) : (
+                      <button type="button" className="edit-photo-upload" onClick={() => editPhotoRef.current?.click()}>
+                        <Camera size={20} />
+                        <span>{isId ? 'Pilih foto' : 'Choose photo'}</span>
+                      </button>
+                    )}
+                    <input ref={editPhotoRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
+                    {editPhoto && (
+                      <button type="button" className="edit-photo-change" onClick={() => editPhotoRef.current?.click()}>
+                        {isId ? 'Ganti foto' : 'Change photo'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="auth-field">
+                  <label>{isId ? 'Password baru (opsional)' : 'New password (optional)'}</label>
+                  <input type="password" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder={isId ? 'Kosongkan jika tidak diubah' : 'Leave empty to keep current'} minLength={8} />
+                </div>
               </div>
 
               <div className="modal-actions">
@@ -291,32 +293,34 @@ export function UsersPage() {
               <button className="icon-button" onClick={() => setShowForm(false)}><X size={18} /></button>
             </div>
             <form onSubmit={handleCreate}>
-              {formError && <div className="auth-error">{formError}</div>}
+              <div className="modal-body">
+                {formError && <div className="auth-error">{formError}</div>}
 
-              <div className="auth-field">
-                <label htmlFor="user-name">Nama</label>
-                <input id="user-name" type="text" value={formName} onChange={(e) => setFormName(e.target.value)} required placeholder="Nama lengkap" />
-              </div>
-
-              <div className="auth-field">
-                <label htmlFor="user-email">Email</label>
-                <input id="user-email" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} required placeholder="nama@perusahaan.com" />
-              </div>
-
-              <div className="auth-field">
-                <label htmlFor="user-role">Role</label>
-                <div className="select-wrapper">
-                  <select id="user-role" value={formRole} onChange={(e) => setFormRole(e.target.value as ApiRole)}>
-                    <option value="USER">Employee</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                  <ChevronDown size={15} className="select-icon" />
+                <div className="auth-field">
+                  <label htmlFor="user-name">Nama</label>
+                  <input id="user-name" type="text" value={formName} onChange={(e) => setFormName(e.target.value)} required placeholder="Nama lengkap" />
                 </div>
-              </div>
 
-              <div className="auth-field">
-                <label htmlFor="user-password">Password (opsional)</label>
-                <input id="user-password" type="password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder="Kosongkan untuk password default" />
+                <div className="auth-field">
+                  <label htmlFor="user-email">Email</label>
+                  <input id="user-email" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} required placeholder="nama@perusahaan.com" />
+                </div>
+
+                <div className="auth-field">
+                  <label htmlFor="user-role">Role</label>
+                  <div className="select-wrapper">
+                    <select id="user-role" value={formRole} onChange={(e) => setFormRole(e.target.value as ApiRole)}>
+                      <option value="USER">Employee</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                    <ChevronDown size={15} className="select-icon" />
+                  </div>
+                </div>
+
+                <div className="auth-field">
+                  <label htmlFor="user-password">Password (opsional)</label>
+                  <input id="user-password" type="password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder="Kosongkan untuk password default" />
+                </div>
               </div>
 
               <div className="modal-actions">
