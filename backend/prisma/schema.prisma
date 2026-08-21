@@ -64,6 +64,7 @@ model User {
   updatedAt     DateTime       @updatedAt @map("updated_at")
   documents     Document[]
   conversations Conversation[]
+  directConversations DirectConversation[]
   auditLogs     AuditLog[]
 
   @@map("users")
@@ -210,4 +211,34 @@ model AuditLog {
   @@index([actorUserId, createdAt])
   @@index([targetType, targetId])
   @@map("audit_logs")
+}
+
+model DirectConversation {
+  id             String          @id @default(uuid()) @db.Uuid
+  employeeId     String          @map("employee_id") @db.Uuid
+  employee       User            @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  lastMessage    String?         @map("last_message") @db.Text
+  lastMessageAt  DateTime?       @map("last_message_at")
+  unreadCount    Int             @default(0) @map("unread_count")
+  messages       DirectMessage[]
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  @@unique([employeeId])
+  @@index([updatedAt])
+  @@map("direct_conversations")
+}
+
+model DirectMessage {
+  id              String              @id @default(uuid()) @db.Uuid
+  conversationId  String              @map("conversation_id") @db.Uuid
+  conversation    DirectConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender          String              @db.VarChar(20)
+  senderName      String?             @map("sender_name") @db.VarChar(100)
+  content         String              @db.Text
+  attachments     Json?
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@map("direct_messages")
 }

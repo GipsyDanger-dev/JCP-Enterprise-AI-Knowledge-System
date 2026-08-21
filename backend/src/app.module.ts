@@ -6,6 +6,7 @@ import { ChatModule } from './chat/chat.module';
 import { DatabaseModule } from './database/database.module';
 import { DocumentsModule } from './documents/documents.module';
 import { HealthController } from './health.controller';
+import { MessagingModule } from './messaging/messaging.module';
 import { ProcessingJobsModule } from './processing-jobs/processing-jobs.module';
 import { UsersModule } from './users/users.module';
 
@@ -18,6 +19,7 @@ import { UsersModule } from './users/users.module';
     DocumentsModule,
     ProcessingJobsModule,
     ChatModule,
+    MessagingModule,
     AiModule,
   ],
   controllers: [HealthController],
