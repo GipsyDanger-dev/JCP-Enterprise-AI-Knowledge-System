@@ -5,8 +5,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
 export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
-  const { person } = useWorkspace()
+  const { person, language } = useWorkspace()
   const { logout } = useAuth()
+  const isId = language === 'id'
   const navigate = useNavigate()
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -38,8 +39,8 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
       <form className="search-shell" onSubmit={handleSearch}>
         <Search size={17} />
         <input
-          aria-label="Search workspace"
-          placeholder="Search documents, answers, or people"
+          aria-label={isId ? 'Cari di ruang kerja' : 'Search workspace'}
+          placeholder={isId ? 'Cari dokumen, jawaban, atau orang' : 'Search documents, answers, or people'}
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
         />
@@ -51,11 +52,11 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
           </button>
           {showNotifications && (
             <div className="topbar-dropdown notification-dropdown">
-              <div className="dropdown-header"><strong>Notifications</strong></div>
+              <div className="dropdown-header"><strong>{isId ? 'Notifikasi' : 'Notifications'}</strong></div>
               <div className="dropdown-item"><div className="dropdown-item-dot" /><div><small>2 menit lalu</small><p>Dokumen "SOP Perjalanan Dinas" selesai di-index</p></div></div>
               <div className="dropdown-item"><div className="dropdown-item-dot" /><div><small>1 jam lalu</small><p>3 dokumen baru ditambahkan ke Operations</p></div></div>
               <div className="dropdown-item dim"><div><small>Yesterday</small><p>System update selesai</p></div></div>
-              <div className="dropdown-footer"><button onClick={() => setShowNotifications(false)}>Dismiss all</button></div>
+              <div className="dropdown-footer"><button onClick={() => setShowNotifications(false)}>{isId ? 'Tutup semua' : 'Dismiss all'}</button></div>
             </div>
           )}
         </div>
@@ -71,8 +72,8 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
                 <div><strong>{person.name}</strong><small>{person.label}</small></div>
               </div>
               <div className="dropdown-divider" />
-              <button className="dropdown-item" onClick={() => { setShowProfile(false); navigate('/settings') }}><User size={15} /> Profile settings</button>
-              <button className="dropdown-item danger" onClick={logout}><LogOut size={15} /> Log out</button>
+              <button className="dropdown-item" onClick={() => { setShowProfile(false); navigate('/settings') }}><User size={15} /> {isId ? 'Pengaturan profil' : 'Profile settings'}</button>
+              <button className="dropdown-item danger" onClick={logout}><LogOut size={15} /> {isId ? 'Keluar' : 'Log out'}</button>
             </div>
           )}
         </div>

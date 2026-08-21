@@ -43,24 +43,51 @@ export const initialDocuments: DocumentItem[] = [
   { id: 'mock-document-4', name: 'Employee Handbook 2026.pdf', collection: 'People', updatedAt: '16 Aug, 13:05', status: 'Ready', chunks: 61 },
 ]
 
-export const adminNavigation: NavigationItem[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'documents', label: 'Documents', icon: FolderOpen },
-  { id: 'chat', label: 'AI Assistant', icon: MessageSquareText },
-  { id: 'users', label: 'People & access', icon: Users },
-]
+export function adminNavigation(lang: 'en' | 'id' = 'en'): NavigationItem[] {
+  return lang === 'id'
+    ? [
+        { id: 'overview', label: 'Ringkasan', icon: LayoutDashboard },
+        { id: 'documents', label: 'Dokumen', icon: FolderOpen },
+        { id: 'chat', label: 'Asisten AI', icon: MessageSquareText },
+        { id: 'users', label: 'Orang & akses', icon: Users },
+      ]
+    : [
+        { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+        { id: 'documents', label: 'Documents', icon: FolderOpen },
+        { id: 'chat', label: 'AI Assistant', icon: MessageSquareText },
+        { id: 'users', label: 'People & access', icon: Users },
+      ]
+}
 
-export const employeeNavigation: NavigationItem[] = [
-  { id: 'overview', label: 'Home', icon: LayoutDashboard },
-  { id: 'chat', label: 'Ask AI', icon: MessageSquareText },
-  { id: 'documents', label: 'Knowledge library', icon: Library },
-]
+export function employeeNavigation(lang: 'en' | 'id' = 'en'): NavigationItem[] {
+  return lang === 'id'
+    ? [
+        { id: 'overview', label: 'Beranda', icon: LayoutDashboard },
+        { id: 'chat', label: 'Tanya AI', icon: MessageSquareText },
+        { id: 'documents', label: 'Perpustakaan pengetahuan', icon: Library },
+      ]
+    : [
+        { id: 'overview', label: 'Home', icon: LayoutDashboard },
+        { id: 'chat', label: 'Ask AI', icon: MessageSquareText },
+        { id: 'documents', label: 'Knowledge library', icon: Library },
+      ]
+}
 
-export const quickQuestions = [
+export const quickQuestionsEn = [
   'What is the hotel allowance for managers?',
   'Summarize our procurement approval flow',
   'Which security policy applies to contractors?',
 ]
+
+export const quickQuestionsId = [
+  'Berapa tunjangan hotel untuk manajer?',
+  'Ringkas alur persetujuan procurement kami',
+  'Kebijakan keamanan mana yang berlaku untuk kontraktor?',
+]
+
+export function quickQuestions(lang: 'en' | 'id' = 'en') {
+  return lang === 'id' ? quickQuestionsId : quickQuestionsEn
+}
 
 export function personFor(role: Role): Person {
   return role === 'admin'
@@ -68,6 +95,6 @@ export function personFor(role: Role): Person {
     : { name: 'Nadia', initials: 'NS', label: '' }
 }
 
-export function navigationFor(role: Role): NavigationItem[] {
-  return role === 'admin' ? adminNavigation : employeeNavigation
+export function navigationFor(role: Role, lang: 'en' | 'id' = 'en'): NavigationItem[] {
+  return role === 'admin' ? adminNavigation(lang) : employeeNavigation(lang)
 }

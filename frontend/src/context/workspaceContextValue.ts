@@ -3,6 +3,8 @@ import type { ChangeEvent, FormEvent } from 'react'
 import type { ApiDocument } from '@/api/types'
 import type { Citation, DocumentItem, NavigationItem, Person, Role } from '@/types/domain'
 
+export type Language = 'en' | 'id'
+
 export interface WorkspaceContextValue {
   role: Role
   changeRole: (role: Role) => void
@@ -22,7 +24,11 @@ export interface WorkspaceContextValue {
   isUploading: boolean
   uploadError: string | null
   registerUploadedDocument: (document: ApiDocument) => void
-  removeDocument: (id: string) => Promise<void>
+  removeDocument: (id: number) => Promise<void>
+  language: Language
+  setLanguage: (lang: Language) => void
+  unreadMessages: number
+  setUnreadMessages: (count: number) => void
 }
 
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)

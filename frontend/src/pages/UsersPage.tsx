@@ -7,11 +7,14 @@ import { createUser, deleteUser, listUsers } from '@/api/users'
 import { userInitials, userRoleLabel } from '@/api/mockUsers'
 import type { ApiUser, ApiRole } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
+import { useWorkspace } from '@/hooks/useWorkspace'
 
 type FilterRole = 'all' | ApiRole
 
 export function UsersPage() {
   const { token } = useAuth()
+  const { language } = useWorkspace()
+  const isId = language === 'id'
   const [users, setUsers] = useState<ApiUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -21,7 +24,7 @@ export function UsersPage() {
   const [showForm, setShowForm] = useState(false)
   const [formName, setFormName] = useState('')
   const [formEmail, setFormEmail] = useState('')
-  const [formRole, setFormRole] = useState<ApiRole>('USER')
+  const [formRole, setFormRole] = useState<ApiRole>('EMPLOYEE')
   const [formPassword, setFormPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -43,7 +46,7 @@ export function UsersPage() {
 
   const filtered = filter === 'all' ? users : users.filter((u) => u.role === filter)
   const adminCount = users.filter((u) => u.role === 'ADMIN').length
-  const employeeCount = users.filter((u) => u.role === 'USER').length
+  const employeeCount = users.filter((u) => u.role === 'EMPLOYEE').length
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
@@ -52,7 +55,7 @@ export function UsersPage() {
     setFormError(null)
     try {
       const newUser = await createUser({
-        displayName: formName.trim(),
+        name: formName.trim(),
         email: formEmail.trim(),
         role: formRole,
         password: formPassword || undefined,
@@ -61,7 +64,7 @@ export function UsersPage() {
       setShowForm(false)
       setFormName('')
       setFormEmail('')
-      setFormRole('USER')
+      setFormRole('EMPLOYEE')
       setFormPassword('')
     } catch (err) {
       setFormError(errorMessage(err))
@@ -71,7 +74,7 @@ export function UsersPage() {
   }
 
   const handleDelete = async (user: ApiUser) => {
-    if (!confirm(`Hapus ${user.displayName}?`)) return
+    if (!confirm(`Hapus ${user.name}?`)) return
     try {
       await deleteUser(user.id, token ?? undefined)
       setUsers((prev) => prev.filter((u) => u.id !== user.id))
@@ -83,12 +86,12 @@ export function UsersPage() {
   return (
     <div className="standard-page">
       <PageHeading
-        eyebrow="Access management"
-        title="People & access"
-        detail="Manage who can access collections and AI answers."
+        eyebrow={isId ? 'Manajemen akses' : 'Access management'}
+        title={isId ? 'Orang & akses' : 'People & access'}
+        detail={isId ? 'Kelola siapa yang dapat mengakses koleksi dan jawaban AI.' : 'Manage who can access collections and AI answers.'}
         action={
           <button className="primary-button" onClick={() => setShowForm(true)}>
-            <Plus size={17} /> Invite person
+            <Plus size={17} /> {isId ? 'Undang orang' : 'Invite person'}
           </button>
         }
       />
@@ -96,13 +99,13 @@ export function UsersPage() {
       {/* Role filter */}
       <div className="users-filter">
         <button className={`filter-chip ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
-          All ({users.length})
+          {isId ? 'Semua' : 'All'} ({users.length})
         </button>
         <button className={`filter-chip ${filter === 'ADMIN' ? 'active' : ''}`} onClick={() => setFilter('ADMIN')}>
           Admin ({adminCount})
         </button>
-        <button className={`filter-chip ${filter === 'USER' ? 'active' : ''}`} onClick={() => setFilter('USER')}>
-          Employee ({employeeCount})
+        <button className={`filter-chip ${filter === 'EMPLOYEE' ? 'active' : ''}`} onClick={() => setFilter('EMPLOYEE')}>
+          {isId ? 'Karyawan' : 'Employee'} ({employeeCount})
         </button>
       </div>
 
@@ -117,9 +120,9 @@ export function UsersPage() {
           <table>
             <thead>
               <tr>
-                <th>Person</th>
+                <th>{isId ? 'Orang' : 'Person'}</th>
                 <th>Role</th>
-                <th>Access</th>
+                <th>{isId ? 'Akses' : 'Access'}</th>
                 <th>Status</th>
                 <th />
               </tr>
@@ -131,18 +134,18 @@ export function UsersPage() {
                 <tr key={user.id}>
                   <td>
                     <div className="person-cell">
-                      <span className="avatar">{userInitials(user.displayName)}</span>
+                      <span className="avatar">{userInitials(user.name)}</span>
                       <span>
-                        <strong>{user.displayName}</strong>
+                        <strong>{user.name}</strong>
                         <small>{user.email}</small>
                       </span>
                     </div>
                   </td>
-                  <td><span className={`role-badge ${user.role === 'ADMIN' ? 'admin' : 'employee'}`}>{userRoleLabel(user.role)}</span></td>
-                  <td>{user.role === 'ADMIN' ? 'Full access' : 'Knowledge library'}</td>
-                  <td><span className="active-user"><Check size={13} /> Active</span></td>
+                  <td><span className={`role-badge ${user.role.toLowerCase()}`}>{userRoleLabel(user.role)}</span></td>
+                  <td>{user.role === 'ADMIN' ? (isId ? 'Akses penuh' : 'Full access') : (isId ? 'Perpustakaan pengetahuan' : 'Knowledge library')}</td>
+                  <td><span className="active-user"><Check size={13} /> {isId ? 'Aktif' : 'Active'}</span></td>
                   <td>
-                    <button className="icon-button" title={`Hapus ${user.displayName}`} onClick={() => handleDelete(user)}>
+                    <button className="icon-button" title={`Hapus ${user.name}`} onClick={() => handleDelete(user)}>
                       <Trash2 size={15} />
                     </button>
                   </td>
@@ -158,7 +161,7 @@ export function UsersPage() {
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Invite person</h2>
+              <h2>{isId ? 'Undang orang' : 'Invite person'}</h2>
               <button className="icon-button" onClick={() => setShowForm(false)}><X size={18} /></button>
             </div>
             <form onSubmit={handleCreate}>
@@ -178,7 +181,7 @@ export function UsersPage() {
                 <label htmlFor="user-role">Role</label>
                 <div className="select-wrapper">
                   <select id="user-role" value={formRole} onChange={(e) => setFormRole(e.target.value as ApiRole)}>
-                    <option value="USER">Employee</option>
+                    <option value="EMPLOYEE">Employee</option>
                     <option value="ADMIN">Admin</option>
                   </select>
                   <ChevronDown size={15} className="select-icon" />
@@ -191,9 +194,9 @@ export function UsersPage() {
               </div>
 
               <div className="modal-actions">
-                <button type="button" className="secondary-button" onClick={() => setShowForm(false)}>Batal</button>
+                <button type="button" className="secondary-button" onClick={() => setShowForm(false)}>{isId ? 'Batal' : 'Cancel'}</button>
                 <button type="submit" className="primary-button" disabled={isSubmitting || !formName.trim() || !formEmail.trim()}>
-                  {isSubmitting ? <><Loader2 size={15} className="spin" /> Menambahkan…</> : <><Plus size={15} /> Tambah</>}
+                  {isSubmitting ? <><Loader2 size={15} className="spin" /> {isId ? 'Menambahkan…' : 'Adding…'}</> : <><Plus size={15} /> {isId ? 'Tambah' : 'Add'}</>}
                 </button>
               </div>
             </form>

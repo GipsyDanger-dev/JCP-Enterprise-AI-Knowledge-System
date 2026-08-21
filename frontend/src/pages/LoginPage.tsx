@@ -4,6 +4,7 @@ import { Eye, EyeOff, LoaderCircle, Lock, Mail, ShieldAlert } from 'lucide-react
 import { useNavigate } from 'react-router-dom'
 import { errorMessage } from '@/api/client'
 import { useAuth } from '@/hooks/useAuth'
+import { useWorkspace } from '@/hooks/useWorkspace'
 import { LogoMark } from '@/components/Logo'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -11,6 +12,8 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
+  const { language } = useWorkspace()
+  const isId = language === 'id'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -52,7 +55,7 @@ export function LoginPage() {
         <div className="login-card-header">
           <LogoMark size={48} />
           <h1>Enterprise AI</h1>
-          <p>Sign in to your knowledge workspace</p>
+          <p>{isId ? 'Masuk ke ruang kerja pengetahuan Anda' : 'Sign in to your knowledge workspace'}</p>
         </div>
 
         {error && (
@@ -63,7 +66,7 @@ export function LoginPage() {
 
         <form className="login-form-centered" onSubmit={handleSubmit} noValidate>
           <div className={`login-field ${emailInvalid ? 'invalid' : ''}`}>
-            <label htmlFor="login-email">Email address</label>
+            <label htmlFor="login-email">{isId ? 'Alamat email' : 'Email address'}</label>
             <div className="login-input-wrap">
               <Mail size={16} className="login-input-icon" />
               <input
@@ -72,16 +75,16 @@ export function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={() => setTouched((t) => ({ ...t, email: true }))}
-                placeholder="you@company.com"
+                placeholder={isId ? 'anda@perusahaan.com' : 'you@company.com'}
                 autoComplete="email"
                 disabled={submitting}
               />
             </div>
-            {emailInvalid && <span className="login-field-error">Please enter a valid email address.</span>}
+            {emailInvalid && <span className="login-field-error">{isId ? 'Masukkan alamat email yang valid.' : 'Please enter a valid email address.'}</span>}
           </div>
 
           <div className={`login-field ${passwordInvalid ? 'invalid' : ''}`}>
-            <label htmlFor="login-password">Password</label>
+            <label htmlFor="login-password">{isId ? 'Kata sandi' : 'Password'}</label>
             <div className="login-input-wrap">
               <Lock size={16} className="login-input-icon" />
               <input
@@ -90,7 +93,7 @@ export function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onBlur={() => setTouched((t) => ({ ...t, password: true }))}
-                placeholder="Enter your password"
+                placeholder={isId ? 'Masukkan kata sandi Anda' : 'Enter your password'}
                 autoComplete="current-password"
                 disabled={submitting}
               />
@@ -99,19 +102,19 @@ export function LoginPage() {
                 className="password-toggle"
                 onClick={() => setShowPassword(!showPassword)}
                 tabIndex={-1}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? (isId ? 'Sembunyikan kata sandi' : 'Hide password') : (isId ? 'Tampilkan kata sandi' : 'Show password')}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-            {passwordInvalid && <span className="login-field-error">Password must be at least 6 characters.</span>}
+            {passwordInvalid && <span className="login-field-error">{isId ? 'Kata sandi harus minimal 6 karakter.' : 'Password must be at least 6 characters.'}</span>}
           </div>
 
           <button className="login-submit" type="submit" disabled={submitting}>
             {submitting ? (
-              <><LoaderCircle size={16} className="spin" /> Signing in…</>
+              <><LoaderCircle size={16} className="spin" /> {isId ? 'Masuk…' : 'Signing in…'}</>
             ) : (
-              'Sign in'
+              isId ? 'Masuk' : 'Sign in'
             )}
           </button>
         </form>

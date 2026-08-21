@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { queryChat } from '@/api/chat'
 import { errorMessage } from '@/api/client'
 import { deleteDocument, getDocumentStatus, listDocuments, uploadDocument } from '@/api/documents'
+import { listConversations, getEmployeeConversation } from '@/api/messaging'
 import { toDomainDocument, toDomainDocumentStatus, toDomainRole } from '@/api/mappers'
 import type { ApiDocument } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
@@ -11,8 +12,11 @@ import type { Citation } from '@/types/domain'
 import { initialDocuments, navigationFor, personFor } from '@/types/domain'
 import type { Role } from '@/types/domain'
 import { WorkspaceContext } from './workspaceContextValue'
+import type { Language } from './workspaceContextValue'
+import { notifyNewMessage } from '@/utils/notifications'
 
 const POLL_INTERVAL_MS = 2000
+const LANG_KEY = 'jcp-lang'
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user, token } = useAuth()
@@ -25,6 +29,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [chatError, setChatError] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [language, setLanguageState] = useState<Language>(() => {
+    const v = localStorage.getItem(LANG_KEY)
+    return v === 'id' ? 'id' : 'en'
+  })
+  const [unreadMessages, setUnreadMessages] = useState(0)
+  const prevUnreadRef = useRef(0)
   const uploadRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
@@ -70,6 +80,49 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [documents, token])
+
+  // Polling unread messages + notification
+  useEffect(() => {
+    if (!user || !token) { setUnreadMessages(0); prevUnreadRef.current = 0; return }
+    let cancelled = false
+    const poll = async () => {
+      try {
+        let count = 0
+        let notifName: string | undefined
+        let notifPreview: string | undefined
+        if (user.role === 'ADMIN') {
+          const convs = await listConversations(token)
+          if (!cancelled) {
+            count = convs.reduce((sum, c) => sum + c.unreadCount, 0)
+            // Find conversation with new unread for notification context
+            const unread = convs.find((c) => c.unreadCount > 0)
+            if (unread) {
+              notifName = unread.employeeName
+              notifPreview = unread.lastMessage
+            }
+          }
+        } else {
+          const conv = await getEmployeeConversation(user.id, token)
+          if (!cancelled) {
+            count = conv.unreadCount
+            notifName = 'Admin'
+            notifPreview = conv.lastMessage
+          }
+        }
+        if (!cancelled) {
+          // Trigger notification when unread count increases
+          if (count > prevUnreadRef.current) {
+            notifyNewMessage(notifName, notifPreview)
+          }
+          prevUnreadRef.current = count
+          setUnreadMessages(count)
+        }
+      } catch { /* ignore */ }
+    }
+    poll()
+    const interval = setInterval(poll, 5000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [user, token])
 
   const changeRole = (nextRole: Role) => {
     setRole(nextRole)
@@ -139,12 +192,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const triggerUpload = () => uploadRef.current?.click()
 
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang)
+    localStorage.setItem(LANG_KEY, lang)
+  }
+
   return (
     <WorkspaceContext.Provider value={{
       role,
       changeRole,
       person: personFor(role),
-      navigation: navigationFor(role),
+      navigation: navigationFor(role, language),
       documents,
       question,
       setQuestion,
@@ -160,6 +218,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       uploadError,
       registerUploadedDocument,
       removeDocument,
+      language,
+      setLanguage,
+      unreadMessages,
+      setUnreadMessages,
     }}>
       <input ref={uploadRef} className="visually-hidden" type="file" accept=".pdf,.docx" onChange={onUpload} />
       {children}

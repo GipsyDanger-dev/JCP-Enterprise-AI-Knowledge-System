@@ -4,6 +4,7 @@ import { uploadDocument } from '@/api/documents'
 import { errorMessage } from '@/api/client'
 import type { ApiDocument } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
+import { useWorkspace } from '@/hooks/useWorkspace'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -15,6 +16,8 @@ interface UploadModalProps {
 
 export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const { token } = useAuth()
+  const { language } = useWorkspace()
+  const isId = language === 'id'
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
@@ -72,7 +75,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-card upload-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Upload document</h2>
+          <h2>{isId ? 'Unggah dokumen' : 'Upload document'}</h2>
           <button className="icon-button" onClick={handleClose} disabled={uploading}><X size={18} /></button>
         </div>
 
@@ -91,30 +94,51 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           ) : (
             <div className="upload-file-empty">
               <Upload size={24} />
+<<<<<<< HEAD
+              <p>{isId ? 'Klik untuk memilih file' : 'Click to select file'}</p>
+              <small>{isId ? 'PDF atau DOCX, maks 10MB' : 'PDF or DOCX, max 10 MB'}</small>
+=======
               <p>Click to select file</p>
               <small>PDF or DOCX, max 10 MB</small>
+>>>>>>> origin/main
             </div>
           )}
         </div>
 
         <div className="upload-field">
-          <label htmlFor="upload-title">Document title (optional)</label>
+          <label>{isId ? 'Judul dokumen' : 'Document title'} ({isId ? 'opsional' : 'optional'})</label>
           <input
             id="upload-title"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder={file ? file.name.replace(/\.[^.]+$/, '') : 'Enter a document title'}
+            placeholder={file ? file.name.replace(/\.[^.]+$/, '') : (isId ? 'Masukkan judul dokumen' : 'Enter a document title')}
             disabled={uploading}
           />
+        </div>
+
+        <div className="upload-field">
+          <label>{isId ? 'Koleksi' : 'Collection'}</label>
+          <div className="upload-collection-grid">
+            {COLLECTIONS.map((c) => (
+              <button
+                key={c}
+                className={`upload-collection-btn ${collection === c ? 'active' : ''}`}
+                onClick={() => setCollection(c)}
+                disabled={uploading}
+              >
+                <FolderOpen size={14} /> {c}
+              </button>
+            ))}
+          </div>
         </div>
 
         {error && <div className="upload-error-msg">{error}</div>}
 
         {/* Actions */}
         <div className="modal-actions">
-          <button className="secondary-button" onClick={handleClose} disabled={uploading}>Cancel</button>
+          <button className="secondary-button" onClick={handleClose} disabled={uploading}>{isId ? 'Batal' : 'Cancel'}</button>
           <button className="primary-button" onClick={handleUpload} disabled={!file || uploading}>
-            {uploading ? <><LoaderCircle size={15} className="spin" /> Uploading…</> : <><Upload size={15} /> Upload</>}
+            {uploading ? <><LoaderCircle size={15} className="spin" /> {isId ? 'Mengunggah…' : 'Uploading…'}</> : <><Upload size={15} /> {isId ? 'Unggah' : 'Upload'}</>}
           </button>
         </div>
       </div>
