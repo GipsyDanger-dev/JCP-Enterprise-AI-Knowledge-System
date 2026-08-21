@@ -98,11 +98,100 @@ def health() -> dict[str, Any]:
     }
 
 
+import re
+
+# Patterns for general chat (greetings, small talk, general knowledge)
+GENERAL_CHAT_PATTERNS = [
+    r'^(halo|hai|hi|hey|hello|selamat|morning|pagi|siang|sore|malam)[\s!.?]*$',
+    r'^(apa kabar|how are you|kabar)[\s!.?]*$',
+    r'^(siapa (kamu|anda|nama)|who are you|kenalan)[\s!.?]*$',
+    r'^(terima kasih|thank|thanks|makasih|thx)[\s!.?]*$',
+    r'^(bye|dadah|selamat tinggal|see you|sampai jumpa)[\s!.?]*$',
+    r'^(tolong|help|bantuan|bisa bantu)[\s!.?]*$',
+    r'^(apa itu|what is|what are|gimana|bagaimana|how)[\s]?$',
+    r'^(ceritain|cerita|tell me|explain)[\s]?$',
+    r'^(oks?|ok|baik|baiklah|siap|ready|noted)[\s!.?]*$',
+]
+
+def is_general_chat(query: str) -> bool:
+    """Detect if query is general chat, not document-specific."""
+    q = query.strip().lower()
+    
+    # Document-related keywords that indicate a document query
+    doc_keywords = [
+        'hotel', 'biaya', 'tunjangan', 'sop', 'prosedur', 'kebijakan',
+        'dokumen', 'policy', 'cuti', 'izin', 'gaji', 'tunjangan',
+        'reimbursement', 'approval', 'persetujuan',
+        'berapa', 'mengapa', 'kapan', 'dimana', 'kenapa',
+        'manajer', 'manager', 'karyawan', 'staff', 'jabatan',
+    ]
+    
+    # Check if query contains document-related keywords
+    for kw in doc_keywords:
+        if kw in q:
+            return False
+    
+    # Check general chat patterns
+    for pattern in GENERAL_CHAT_PATTERNS:
+        if re.match(pattern, q, re.IGNORECASE):
+            return True
+    
+    # Short queries without question marks and without doc keywords
+    if len(q.split()) <= 2 and '?' not in q:
+        return True
+    
+    return False
+
+
+SMART_RESPONSES = {
+    'halo': 'Halo! Selamat datang di Enterprise AI. Saya asisten Anda yang bisa membantu menjawab pertanyaan seputar dokumen perusahaan seperti SOP, kebijakan, dan prosedur. Silakan ketik pertanyaan Anda!',
+    'hai': 'Hai! Ada yang bisa saya bantu? Saya siap menjawab pertanyaan tentang dokumen perusahaan Anda.',
+    'hi': 'Hi! Welcome to Enterprise AI. I can help you find answers from company documents. Ask me anything!',
+    'apa kabar': 'Kabar baik! Saya Enterprise AI, siap membantu Anda menemukan informasi dari dokumen perusahaan. Ada yang ingin ditanyakan?',
+    'siapa': 'Saya Enterprise AI, asisten berbasis RAG (Retrieval-Augmented Generation) yang membantu Anda menjawab pertanyaan dari dokumen internal perusahaan. Saya bisa mencari informasi dari SOP, kebijakan, handbooks, dan dokumen lainnya.',
+    'terima kasih': 'Sama-sama! Senang bisa membantu. Jika ada pertanyaan lain tentang dokumen perusahaan, jangan ragu untuk bertanya.',
+    'thanks': 'You\'re welcome! If you have more questions about company documents, feel free to ask.',
+    'help': 'Tentu! Saya bisa membantu Anda dengan:\n- Mencari informasi dari dokumen perusahaan\n- Menjawab pertanyaan tentang SOP dan kebijakan\n- Memberikan ringkasan dari dokumen tertentu\n\nCukup ketik pertanyaan Anda!',
+    'bantuan': 'Tentu! Saya bisa membantu Anda mencari informasi dari dokumen perusahaan. Cukup ketik pertanyaan Anda, misalnya:\n- "Berapa biaya hotel untuk manager?"\n- "Apa prosedur cuti tahunan?"\n- "Ringkas SOP perjalanan dinas"',
+    'ok': 'Baik! Silakan ketik pertanyaan Anda tentang dokumen perusahaan.',
+    'siap': 'Siap! Saya menunggu pertanyaan Anda tentang dokumen perusahaan.',
+}
+
+DEFAULT_GENERAL_RESPONSE = 'Halo! Saya Enterprise AI. Saya bisa membantu menjawab pertanyaan tentang dokumen perusahaan seperti SOP, kebijakan, dan prosedur. Silakan ketik pertanyaan Anda!'
+
+
+def general_chat_response(query: str, model: str) -> dict[str, Any]:
+    """Smart keyword-based response for general chat."""
+    q = query.strip().lower()
+    
+    for keyword, response in SMART_RESPONSES.items():
+        if keyword in q:
+            return {
+                "answer": response,
+                "citations": [],
+                "grounded": False,
+                "retrieval": [],
+            }
+    
+    return {
+        "answer": DEFAULT_GENERAL_RESPONSE,
+        "citations": [],
+        "grounded": False,
+        "retrieval": [],
+    }
+
+
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> dict[str, Any]:
     """Retrieval -> (optional LLM) -> answer + citations."""
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="query must not be empty")
+    
+    # Check if this is general chat (greetings, small talk)
+    if is_general_chat(request.query):
+        return general_chat_response(request.query, request.model or DEFAULT_MODEL)
+    
+    # Document-specific query: use RAG pipeline
     store = current_store()
     if isinstance(store, PgVectorStore):
         return store.ask(

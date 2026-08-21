@@ -238,29 +238,80 @@ class PgVectorStore:
         api_key: str | None = None,
         filters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        query_vector = embed_texts([query], model=self.model, api_key=api_key)[0]
-        matches = [
-            (score, chunk)
-            for score, chunk in self.search(query_vector, top_k, filters=filters)
-            if score >= minimum_score
-        ]
-        if not matches:
-            return no_answer_response()
-        citations = citations_from_matches(matches)
-        answer = (
-            generate_answer(query, matches, model=model, api_key=api_key)
-            if use_llm
-            else matches[0][1]["text"]
-        )
-        return {
-            "answer": answer,
-            "citations": citations,
-            "grounded": True,
-            "retrieval": [
-                {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
-                for score, chunk in matches
-            ],
-        }
+        try:
+            query_vector = embed_texts([query], model=self.model, api_key=api_key)[0]
+            matches = [
+                (score, chunk)
+                for score, chunk in self.search(query_vector, top_k, filters=filters)
+                if score >= minimum_score
+            ]
+            if not matches:
+                return no_answer_response()
+            citations = citations_from_matches(matches)
+            answer = (
+                generate_answer(query, matches, model=model, api_key=api_key)
+                if use_llm
+                else matches[0][1]["text"]
+            )
+            return {
+                "answer": answer,
+                "citations": citations,
+                "grounded": True,
+                "retrieval": [
+                    {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
+                    for score, chunk in matches
+                ],
+            }
+        except Exception as exc:
+            # Fallback: TF-IDF search from DB chunks
+            print(f"[AI] Vector search failed ({exc}), falling back to TF-IDF")
+            try:
+                import psycopg
+                from retrieval.tfidf import TfidfRetriever
+                dsn = default_dsn()
+                if not dsn:
+                    return no_answer_response()
+                with psycopg.connect(dsn) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "SELECT c.chunk_id, c.document_version_id, d.title, "
+                            "dv.version_number, c.page_number, c.section_title, c.text "
+                            "FROM chunks c "
+                            "JOIN document_versions dv ON dv.id = c.document_version_id "
+                            "JOIN documents d ON d.id = dv.document_id "
+                            "ORDER BY c.created_at"
+                        )
+                        rows = cur.fetchall()
+                chunks = []
+                for row in rows:
+                    chunks.append({
+                        "chunk_id": row[0], "document_version_id": str(row[1]),
+                        "filename": row[2], "version": row[3],
+                        "page_number": row[4], "section_title": row[5] or "",
+                        "text": row[6],
+                    })
+                tfidf = TfidfRetriever(chunks)
+                matches = tfidf.search(query, top_k=top_k)
+                print(f"[AI] TF-IDF fallback: {len(chunks)} chunks loaded, {len(matches)} matches for '{query[:30]}'")
+                if not matches:
+                    return no_answer_response()
+                citations = citations_from_matches(matches)
+                answer = (
+                    generate_answer(query, matches, model=model, api_key=api_key)
+                    if use_llm
+                    else matches[0][1]["text"]
+                )
+                return {
+                    "answer": answer,
+                    "citations": citations,
+                    "grounded": True,
+                    "retrieval": [
+                        {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
+                        for score, chunk in matches
+                    ],
+                }
+            except Exception:
+                return no_answer_response()
 
 
 def content_hash(path: Path) -> str:
