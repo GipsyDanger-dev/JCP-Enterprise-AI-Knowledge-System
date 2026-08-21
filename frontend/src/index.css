@@ -599,7 +599,7 @@ button { cursor: pointer; }
 .chat-page .page-heading { text-align: center; padding: 0 28px 4px; flex-shrink: 0; justify-content: center; margin-bottom: 0; }
 .chat-page .page-heading > div:first-child { max-width: 100%; }
 .chat-page .page-heading p { text-align: center; }
-.chat-canvas { flex: 1; min-height: 0; overflow-y: auto; display: flex; align-items: center; justify-content: center; padding: 0 28px; }
+.chat-canvas { flex: 1; min-height: 0; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center; padding: 20px 28px; }
 .chat-empty { text-align: center; max-width: 570px; }
 .chat-empty > span { width: 54px; height: 54px; margin: 0 auto 16px; border-radius: var(--radius-round); display: grid; place-items: center; background: var(--brand-100); color: var(--brand-500); }
 .chat-empty h2 { margin: 0; font-size: var(--fs-4xl); }

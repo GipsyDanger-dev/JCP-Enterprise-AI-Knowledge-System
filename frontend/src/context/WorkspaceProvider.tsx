@@ -9,6 +9,7 @@ import { toDomainDocument, toDomainDocumentStatus, toDomainRole } from '@/api/ma
 import type { ApiDocument } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import type { Citation } from '@/types/domain'
+import type { ChatMessage } from './workspaceContextValue'
 import { initialDocuments, navigationFor, personFor } from '@/types/domain'
 import type { Role } from '@/types/domain'
 import { WorkspaceContext } from './workspaceContextValue'
@@ -23,11 +24,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>(() => (user ? toDomainRole(user.role) : 'admin'))
   const [documents, setDocuments] = useState(initialDocuments)
   const [question, setQuestion] = useState('')
-  const [submittedQuestion, setSubmittedQuestion] = useState('')
-  const [answer, setAnswer] = useState('')
-  const [citations, setCitations] = useState<Citation[]>([])
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [isLoadingAnswer, setIsLoadingAnswer] = useState(false)
-  const [chatError, setChatError] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [language, setLanguageState] = useState<Language>(() => {
@@ -163,20 +161,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const sendQuestion = async (q: string) => {
     if (!q.trim()) return
-    setSubmittedQuestion(q)
+    const messageId = `msg-${Date.now()}`
     setIsLoadingAnswer(true)
-    setChatError(null)
-    setAnswer('')
-    setCitations([])
+    setQuestion('')
     try {
       const res = await queryChat({ question: q }, token ?? undefined)
-      setAnswer(res.answer ?? '')
-      setCitations(res.citations)
-      if (!res.answer && res.message) {
-        setChatError(res.message)
-      }
+      setChatHistory((prev) => [...prev, {
+        id: messageId,
+        question: q,
+        answer: res.answer ?? '',
+        citations: res.citations,
+        error: !res.answer && res.message ? res.message : null,
+        timestamp: Date.now(),
+      }])
     } catch (err) {
-      setChatError(errorMessage(err))
+      setChatHistory((prev) => [...prev, {
+        id: messageId,
+        question: q,
+        answer: '',
+        citations: [],
+        error: errorMessage(err),
+        timestamp: Date.now(),
+      }])
     } finally {
       setIsLoadingAnswer(false)
     }
@@ -208,11 +214,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       documents,
       question,
       setQuestion,
-      submittedQuestion,
-      answer,
-      citations,
+      chatHistory,
       isLoadingAnswer,
-      chatError,
       onAsk,
       askQuestion,
       triggerUpload,

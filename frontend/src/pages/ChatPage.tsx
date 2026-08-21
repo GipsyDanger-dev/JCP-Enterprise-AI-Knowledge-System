@@ -1,14 +1,55 @@
+import { useEffect, useRef } from 'react'
 import { AlertTriangle, ArrowUpRight, Loader2, Send, Sparkles } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { SourceCard } from '@/components/SourceCard'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
+import type { ChatMessage } from '@/context/workspaceContextValue'
+
+function ChatMessageItem({ msg, isId }: { msg: ChatMessage; isId: boolean }) {
+  return (
+    <>
+      <div className="user-message">{msg.question}</div>
+      {msg.error && !msg.answer && (
+        <div className="assistant-message no-answer">
+          <div className="answer-label"><AlertTriangle size={16} /> Enterprise AI</div>
+          <p>{msg.error}</p>
+        </div>
+      )}
+      {msg.answer && (
+        <div className="assistant-message">
+          <div className="answer-label"><Sparkles size={16} /> Enterprise AI</div>
+          <p>{msg.answer}</p>
+          {msg.citations.length > 0 && (
+            <div className="citations">
+              {msg.citations.map((c, i) => (
+                <SourceCard
+                  key={`${c.documentId}-${c.chunkId}-${i}`}
+                  title={c.filename}
+                  detail={[c.sectionTitle, c.pageNumber ? `Page ${c.pageNumber}` : null, c.version].filter(Boolean).join(' · ')}
+                  excerpt={c.excerpt}
+                  trailing={<ArrowUpRight size={15} />}
+                />
+              ))}
+            </div>
+          )}
+          <VerifiedBadge />
+        </div>
+      )}
+    </>
+  )
+}
 
 export function ChatPage() {
-  const { question, setQuestion, submittedQuestion, answer, citations, isLoadingAnswer, chatError, onAsk, askQuestion, language } = useWorkspace()
-  const hasConversation = answer || chatError || isLoadingAnswer
+  const { question, setQuestion, chatHistory, isLoadingAnswer, onAsk, askQuestion, language } = useWorkspace()
+  const hasConversation = chatHistory.length > 0 || isLoadingAnswer
   const isId = language === 'id'
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatHistory, isLoadingAnswer])
 
   return (
     <div className="chat-page">
@@ -16,7 +57,9 @@ export function ChatPage() {
       <div className="chat-canvas">
         {hasConversation ? (
           <div className="conversation">
-            <div className="user-message">{submittedQuestion}</div>
+            {chatHistory.map((msg) => (
+              <ChatMessageItem key={msg.id} msg={msg} isId={isId} />
+            ))}
 
             {isLoadingAnswer && (
               <div className="assistant-message loading">
@@ -25,33 +68,7 @@ export function ChatPage() {
               </div>
             )}
 
-            {!isLoadingAnswer && chatError && !answer && (
-              <div className="assistant-message no-answer">
-                <div className="answer-label"><AlertTriangle size={16} /> Enterprise AI</div>
-                <p>{chatError}</p>
-              </div>
-            )}
-
-            {!isLoadingAnswer && answer && (
-              <div className="assistant-message">
-                <div className="answer-label"><Sparkles size={16} /> Enterprise AI</div>
-                <p>{answer}</p>
-                {citations.length > 0 && (
-                  <div className="citations">
-                    {citations.map((c, i) => (
-                      <SourceCard
-                        key={`${c.documentId}-${c.chunkId}-${i}`}
-                        title={c.filename}
-                        detail={[c.sectionTitle, c.pageNumber ? `Page ${c.pageNumber}` : null, c.version].filter(Boolean).join(' · ')}
-                        excerpt={c.excerpt}
-                        trailing={<ArrowUpRight size={15} />}
-                      />
-                    ))}
-                  </div>
-                )}
-                <VerifiedBadge />
-              </div>
-            )}
+            <div ref={bottomRef} />
           </div>
         ) : (
           <div className="chat-empty">

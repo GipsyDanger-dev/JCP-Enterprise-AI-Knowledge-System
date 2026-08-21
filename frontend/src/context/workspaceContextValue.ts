@@ -5,6 +5,15 @@ import type { Citation, DocumentItem, NavigationItem, Person, Role } from '@/typ
 
 export type Language = 'en' | 'id'
 
+export interface ChatMessage {
+  id: string
+  question: string
+  answer: string
+  citations: Citation[]
+  error: string | null
+  timestamp: number
+}
+
 export interface WorkspaceContextValue {
   role: Role
   changeRole: (role: Role) => void
@@ -13,11 +22,8 @@ export interface WorkspaceContextValue {
   documents: DocumentItem[]
   question: string
   setQuestion: (value: string) => void
-  submittedQuestion: string
-  answer: string
-  citations: Citation[]
+  chatHistory: ChatMessage[]
   isLoadingAnswer: boolean
-  chatError: string | null
   onAsk: (event: FormEvent) => void
   askQuestion: (value: string) => void
   triggerUpload: () => void
