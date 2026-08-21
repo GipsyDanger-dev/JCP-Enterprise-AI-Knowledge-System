@@ -43,7 +43,7 @@ export default function App() {
               <Route path="messages" element={<MessagingPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="help" element={<HelpPage />} />
-              <Route path="activity" element={<ActivityPage />} />
+              <Route path="activity" element={<RequireRole role="ADMIN"><ActivityPage /></RequireRole>} />
               <Route path="history" element={<HistoryPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
