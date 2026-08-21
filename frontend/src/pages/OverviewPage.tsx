@@ -60,7 +60,8 @@ function AdminOverview({ isId }: { isId: boolean }) {
 
 function EmployeeOverview({ isId }: { isId: boolean }) {
   const navigate = useNavigate()
-  const { question, setQuestion, answer, onAsk, askQuestion, language } = useWorkspace()
+  const { question, setQuestion, onAsk, askQuestion, language, chatHistory } = useWorkspace()
+  const answer = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].answer : ''
   const docsLabel = isId ? 'dokumen' : 'documents'
   return (
     <div className="employee-page">
