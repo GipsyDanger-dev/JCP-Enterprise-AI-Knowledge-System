@@ -60,7 +60,7 @@ export function ChatPage() {
   return (
     <div className="chat-page">
       <PageHeading eyebrow={isId ? 'Asisten AI' : 'AI assistant'} title={isId ? 'Tanyakan dengan percaya diri' : 'Ask with confidence'} detail={isId ? 'Setiap jawaban tetap terhubung ke sumbernya.' : 'Every answer stays linked to its source.'} />
-      <div className="chat-canvas">
+      <div className={`chat-canvas ${hasConversation ? 'has-history' : ''}`}>
         {hasConversation ? (
           <div className="conversation">
             {chatHistory.map((msg, index) => (
