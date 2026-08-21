@@ -20,7 +20,7 @@ export function MessagingPage() {
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [conversationId, setConversationId] = useState<number | null>(null)
+  const [conversationId, setConversationId] = useState<string | null>(null)
   const [isTyping, setIsTyping] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 

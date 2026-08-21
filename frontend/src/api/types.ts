@@ -175,20 +175,20 @@ export interface MessageAttachment {
 }
 
 export interface DirectMessage {
-  id: number
-  conversationId: number
-  sender: MessageSender
-  senderName: string
+  id: string
+  conversationId: string
+  sender: MessageSender
+  senderName: string | null
   content: string
-  attachments: MessageAttachment[]
+  attachments: MessageAttachment[] | null
   /** ISO datetime */
   createdAt: string
-  read: boolean
+  read?: boolean
 }
 
 export interface DirectConversation {
-  id: number
-  employeeId: number
+  id: string
+  employeeId: string
   employeeName: string
   employeeEmail: string
   lastMessage: string
@@ -202,12 +202,12 @@ export interface SendMessageRequest {
 }
 
 export interface SendMessageResponse {
-  id: number
-  conversationId: number
+  id: string
+  conversationId: string
   sender: MessageSender
-  senderName: string
+  senderName: string | null
   content: string
-  attachments: MessageAttachment[]
+  attachments: MessageAttachment[] | null
   createdAt: string
-  read: boolean
+  read?: boolean
 }
