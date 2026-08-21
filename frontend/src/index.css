@@ -312,8 +312,8 @@ button { cursor: pointer; }
 .app-shell.sidebar-collapsed .sidebar { padding: 20px 8px 15px; align-items: center; }
 .app-shell.sidebar-collapsed .sidebar { padding: 16px 0; align-items: center; }
 .app-shell.sidebar-collapsed .sidebar .nav-item { justify-content: center; padding: 0; min-height: 42px; }
-.app-shell.sidebar-collapsed .sidebar .nav-item i { left: 0; top: 50%; transform: translateY(-50%); }
-.app-shell.sidebar-collapsed .sidebar .nav-badge { position: absolute; top: 6px; right: 6px; min-width: 16px; height: 16px; font-size: 10px; padding: 0 4px; margin-left: 0; }
+.app-shell.sidebar-collapsed .sidebar .nav-item i { left: 50%; top: auto; bottom: 4px; transform: translateX(-50%); width: 16px; height: 3px; border-radius: 2px; }
+.app-shell.sidebar-collapsed .sidebar .nav-badge { position: absolute; top: 4px; right: 8px; min-width: 16px; height: 16px; font-size: 10px; padding: 0 4px; margin-left: 0; }
 .app-shell.sidebar-collapsed .sidebar-lower .nav-item { justify-content: center; }
 .app-shell.sidebar-collapsed .sidebar nav > p { display: none; }
 .app-shell.sidebar-collapsed .brand-lockup { justify-content: center; padding: 0; }
