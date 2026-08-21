@@ -61,7 +61,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     setUploading(true)
     setError(null)
     try {
-      const document = await uploadDocument(file, token ?? undefined, title)
+      const document = await uploadDocument(file, token ?? undefined, title, collection)
       setFile(null)
       setTitle('')
       setCollection('operations')

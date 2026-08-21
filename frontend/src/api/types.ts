@@ -34,7 +34,9 @@ export interface LoginResponse {
 export interface MeResponse {
   sub: string
   email: string
+  displayName?: string
   role: ApiRole
+  photoUrl?: string | null
 }
 
 export interface CreateUserRequest {
@@ -83,6 +85,7 @@ export interface ApiProcessingJob {
 export interface ApiDocument {
   id: string
   title: string
+  collection?: string
   status: ApiDocumentStatus
   createdAt?: string
   updatedAt?: string

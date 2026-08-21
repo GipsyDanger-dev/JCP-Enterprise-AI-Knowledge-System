@@ -24,9 +24,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           setUser({
             id: profile.sub,
-            displayName: profile.email,
+            displayName: profile.displayName || profile.email,
             email: profile.email,
             role: profile.role,
+            photoUrl: (profile as any).photoUrl,
           })
         }
       })
