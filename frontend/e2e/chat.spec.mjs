@@ -17,7 +17,7 @@ function assert(label, ok) {
 async function loginAs(role = 'admin') {
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle0' })
   const email = role === 'admin' ? 'admin@jcp.co.id' : 'nadia@jcp.co.id'
-  const pass  = role === 'admin' ? 'admin123' : 'employee123'
+  const pass  = role === 'admin' ? 'admin1234567' : 'employee12345'
   await page.type('input[type="email"]', email)
   await page.type('input[type="password"]', pass)
   await page.click('button[type="submit"]')
@@ -88,14 +88,13 @@ async function askQuestion(text) {
   const verified = await page.$('.assistant-message .verified')
   assert('badge "Evidence verified" muncul', !!verified)
 
-  // ── No-answer question ──
+  // ── Off-topic question (guardrail blocks) ──
   await page.goto(`${BASE}/chat`, { waitUntil: 'networkidle0' })
   await askQuestion('Apa resep masakan rendang padang?')
   await waitForChatAnswer()
-  const noAnswer = await page.$('.assistant-message.no-answer')
-  assert('no-answer state muncul untuk pertanyaan tidak relevan', !!noAnswer)
-  const noAnswerMsg = await page.$eval('.assistant-message.no-answer p', (el) => el.textContent)
-  assert('pesan "Informasi tidak ditemukan" ditampilkan', noAnswerMsg && noAnswerMsg.includes('Informasi tidak ditemukan'))
+  const offTopicAnswer = await page.$('.assistant-message > p')
+  const offTopicMsg = offTopicAnswer ? await page.$eval('.assistant-message > p', (el) => el.textContent) : ''
+  assert('off-topic ditolak dengan pesan guardrail', offTopicMsg && offTopicMsg.includes('dokumen perusahaan'))
 
   // ── Submit button disabled during loading ──
   await page.goto(`${BASE}/chat`, { waitUntil: 'networkidle0' })
