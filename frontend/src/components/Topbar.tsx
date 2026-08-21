@@ -35,8 +35,10 @@ export function Topbar({ onMenuOpen, onToggleSidebar, collapsed }: { onMenuOpen:
 
   return (
     <header className="topbar">
-      <button className="menu-button" title="Open navigation" onClick={onMenuOpen}><Menu size={20} /></button>
-      <button className="sidebar-toggle" title={collapsed ? 'Buka sidebar' : 'Tutup sidebar'} onClick={onToggleSidebar}>{collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}</button>
+      <div className="topbar-left">
+        <button className="menu-button" title="Open navigation" onClick={onMenuOpen}><Menu size={20} /></button>
+        <button className="sidebar-toggle" title={collapsed ? 'Buka sidebar' : 'Tutup sidebar'} onClick={onToggleSidebar}>{collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}</button>
+      </div>
       <form className="search-shell" onSubmit={handleSearch}>
         <Search size={17} />
         <input

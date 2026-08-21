@@ -269,8 +269,9 @@ button { cursor: pointer; }
 
 /* ============ Topbar ============ */
 .workspace { grid-column: 2; grid-row: 2; min-width: 0; }
-.topbar { height: 58px; padding: 0 28px; border-bottom: 1px solid var(--border); background: var(--topbar-bg); display: flex; align-items: center; justify-content: center; position: sticky; top: 0; z-index: 10; }
-.search-shell { width: min(520px, 55vw); height: 34px; display: flex; align-items: center; gap: 9px; background: var(--bg-page); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0 11px; color: var(--text-muted); }
+.topbar { height: 58px; padding: 0 28px; border-bottom: 1px solid var(--border); background: var(--topbar-bg); display: flex; align-items: center; position: sticky; top: 0; z-index: 10; gap: 10px; }
+.topbar-left { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.search-shell { flex: 1; max-width: 520px; height: 34px; margin: 0 auto; display: flex; align-items: center; gap: 9px; background: var(--bg-page); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0 11px; color: var(--text-muted); }
 .search-shell input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text-strong); font-size: var(--fs-md); }
 .top-actions { position: absolute; right: 27px; display: flex; align-items: center; gap: 5px; }
 .icon-button, .menu-button { width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); display: grid; place-items: center; position: relative; transition: background var(--ease-fast), color var(--ease-fast); }
@@ -894,7 +895,8 @@ button { cursor: pointer; }
   .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 99; animation: fadeIn .2s ease; }
 
   /* Topbar: susun rapi tanpa absolute-position (tidak ada risiko tumpang tindih) */
-  .topbar { padding: 0 17px; justify-content: space-between; }
+  .topbar { padding: 0 17px; gap: 8px; }
+  .topbar-left { gap: 2px; }
   .menu-button { display: grid; position: static; }
   .sidebar-toggle { display: none; }
   .search-shell { display: none; }
