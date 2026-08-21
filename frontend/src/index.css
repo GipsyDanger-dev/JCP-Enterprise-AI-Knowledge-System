@@ -595,8 +595,8 @@ button { cursor: pointer; }
 .person-cell small { color: var(--text-faint); font-size: var(--fs-2xs); margin-top: 3px; }
 
 /* ============ Chat ============ */
-.chat-page { max-width: 980px; margin: 0 auto; height: calc(100vh - 86px); display: flex; flex-direction: column; overflow: hidden; padding-top: 20px; }
-.chat-page .page-heading { text-align: center; padding: 0 28px 8px; flex-shrink: 0; justify-content: center; margin-bottom: 0; }
+.chat-page { max-width: 980px; margin: 0 auto; height: calc(100vh - 86px); display: flex; flex-direction: column; overflow: hidden; padding-top: 8px; }
+.chat-page .page-heading { text-align: center; padding: 0 28px 4px; flex-shrink: 0; justify-content: center; margin-bottom: 0; }
 .chat-page .page-heading > div:first-child { max-width: 100%; }
 .chat-page .page-heading p { text-align: center; }
 .chat-canvas { flex: 1; min-height: 0; overflow-y: auto; display: flex; align-items: center; justify-content: center; padding: 0 28px; }
