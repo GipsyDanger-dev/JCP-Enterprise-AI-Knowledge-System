@@ -125,10 +125,10 @@
   --text-strong: #f5f5f2;
   --text-card: #dcdcd8;
   --text-body: #c0c0bc;
-  --text-secondary: #9e9e9a;
-  --text-dim: #6e6e6a;
-  --text-muted: #5c5c58;
-  --text-faint: #4a4a46;
+  --text-secondary: #a8a8a4;
+  --text-dim: #8a8a86;
+  --text-muted: #7a7a76;
+  --text-faint: #6a6a66;
   --border-strong: #3a3a3e;
   --border: #2e2e32;
   --border-soft: #282830;
@@ -165,6 +165,51 @@
 [data-theme="dark"] th { background: var(--bg-subtle); color: var(--text-secondary); }
 [data-theme="dark"] td { border-color: var(--border-soft); }
 [data-theme="dark"] .badge, [data-theme="dark"] .pill { background: var(--bg-soft); color: var(--text-body); }
+[data-theme="dark"] small { color: var(--text-dim); }
+[data-theme="dark"] .nav-item { color: var(--text-secondary); }
+[data-theme="dark"] .nav-item.active { color: var(--text-primary); background: var(--bg-hover); }
+[data-theme="dark"] .nav-item:hover { color: var(--text-primary); background: var(--bg-hover); }
+[data-theme="dark"] .sidebar-user-info { background: var(--bg-subtle); border-color: var(--border); }
+[data-theme="dark"] .sidebar-user-info strong { color: var(--text-card); }
+[data-theme="dark"] .sidebar-user-info small { color: var(--text-dim); }
+[data-theme="dark"] .announcement { background: var(--ink); color: var(--ink-text); }
+[data-theme="dark"] .modal-card { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .modal-header h2 { color: var(--text-primary); }
+[data-theme="dark"] .modal-actions { background: var(--bg-page); border-color: var(--border); }
+[data-theme="dark"] .page-heading h1 { color: var(--text-primary); }
+[data-theme="dark"] .page-heading p { color: var(--text-secondary); }
+[data-theme="dark"] .metric-card > strong { color: var(--text-primary); }
+[data-theme="dark"] .metric-card > p { color: var(--text-card); }
+[data-theme="dark"] .metric-card > small { color: var(--text-dim); }
+[data-theme="dark"] .agent-body { background-color: var(--bg-panel); }
+[data-theme="dark"] .agent-composer { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .agent-composer input { color: var(--text-card); }
+[data-theme="dark"] .conversation-card { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .conversation-card strong { color: var(--text-card); }
+[data-theme="dark"] .conversation-card p { color: var(--text-secondary); }
+[data-theme="dark"] .conversation-card small { color: var(--text-dim); }
+[data-theme="dark"] .activity-log-item p { color: var(--text-card); }
+[data-theme="dark"] .activity-log-item small { color: var(--text-dim); }
+[data-theme="dark"] .settings-profile-photo { background: var(--bg-subtle); border-color: var(--border); }
+[data-theme="dark"] .settings-profile-info strong { color: var(--text-card); }
+[data-theme="dark"] .settings-profile-info small { color: var(--text-dim); }
+[data-theme="dark"] .disabled-input { background: var(--bg-subtle); color: var(--text-secondary); border-color: var(--border); }
+[data-theme="dark"] .employee-ask { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .employee-ask form { background: var(--bg-subtle); border-color: var(--border); }
+[data-theme="dark"] .employee-ask form input { color: var(--text-card); }
+[data-theme="dark"] .quick-library button { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .quick-library strong { color: var(--text-card); }
+[data-theme="dark"] .quick-library small { color: var(--text-dim); }
+[data-theme="dark"] .recent-item { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .recent-item strong { color: var(--text-card); }
+[data-theme="dark"] .recent-item p { color: var(--text-secondary); }
+[data-theme="dark"] .required-item { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .help-contact-card { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .help-contact-card strong { color: var(--text-card); }
+[data-theme="dark"] .help-contact-card small { color: var(--text-dim); }
+[data-theme="dark"] .faq-item { background: var(--bg-card); border-color: var(--border); }
+[data-theme="dark"] .faq-item summary { color: var(--text-card); }
+[data-theme="dark"] .faq-item p { color: var(--text-secondary); }
 [data-theme="dark"] .modal-card { background: var(--bg-panel); border-color: var(--border); }
 [data-theme="dark"] .modal-overlay { background: rgba(0, 0, 0, .6); }
 [data-theme="dark"] .announcement-bar { background: var(--bg-panel); border-color: var(--border); }
