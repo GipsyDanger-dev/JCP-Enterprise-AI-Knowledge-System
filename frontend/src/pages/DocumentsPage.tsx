@@ -116,6 +116,7 @@ export function DocumentsPage() {
               <button className="icon-button" onClick={() => setSelectedDoc(null)}><X size={18} /></button>
             </div>
 
+            <div className="modal-body">
             <div className="doc-detail-grid">
               <div className="doc-detail-field">
                 <label>{isId ? 'Status' : 'Status'}</label>
@@ -158,6 +159,8 @@ export function DocumentsPage() {
                 </div>
               </div>
             )}
+
+            </div>
 
             <div className="doc-detail-actions">
               {selectedDoc.status === 'Ready' && (
