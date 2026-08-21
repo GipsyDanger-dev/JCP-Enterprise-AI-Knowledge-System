@@ -232,7 +232,7 @@ jobs:
     name: Docker Build
     runs-on: ubuntu-latest
     needs: [backend-ci, frontend-ci, ai-engine-ci]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.PUBLISH_DOCKER_IMAGES == 'true'
 
     steps:
       - name: Checkout code
@@ -288,7 +288,7 @@ jobs:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: [docker-build, integration-tests]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.PUBLISH_DOCKER_IMAGES == 'true' && vars.ENABLE_PRODUCTION_DEPLOY == 'true'
     environment: production
 
     steps:
