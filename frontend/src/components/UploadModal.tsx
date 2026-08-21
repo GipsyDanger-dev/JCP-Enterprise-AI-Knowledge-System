@@ -20,12 +20,12 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const isId = language === 'id'
   const fileRef = useRef<HTMLInputElement>(null)
   const COLLECTIONS = [
-    { id: 'operations', label: 'Operations', icon: '📋' },
-    { id: 'it-security', label: 'IT & Security', icon: '🔒' },
-    { id: 'finance', label: 'Finance', icon: '💰' },
-    { id: 'people', label: 'People', icon: '👥' },
-    { id: 'legal', label: 'Legal', icon: '⚖️' },
-    { id: 'marketing', label: 'Marketing', icon: '📢' },
+    { id: 'operations', label: 'Operations' },
+    { id: 'it-security', label: 'IT & Security' },
+    { id: 'finance', label: 'Finance' },
+    { id: 'people', label: 'People' },
+    { id: 'legal', label: 'Legal' },
+    { id: 'marketing', label: 'Marketing' },
   ]
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
@@ -91,8 +91,8 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           <button className="icon-button" onClick={handleClose} disabled={uploading}><X size={18} /></button>
         </div>
 
-        {/* File picker */}
-        <div className="upload-file-area" onClick={() => !uploading && fileRef.current?.click()}>              <input ref={fileRef} type="file" accept=".pdf,.docx,.txt,.md" onChange={handleFileChange} style={{ display: 'none' }} />
+        <div className="modal-body">
+          <div className="upload-file-area" onClick={() => !uploading && fileRef.current?.click()}>              <input ref={fileRef} type="file" accept=".pdf,.docx,.txt,.md" onChange={handleFileChange} style={{ display: 'none' }} />
           {file ? (
             <div className="upload-file-selected">
               <span className="upload-file-icon"><FileText size={20} /></span>
@@ -133,15 +133,15 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
                 onClick={() => setCollection(col.id)}
                 disabled={uploading}
               >
-                <span>{col.icon}</span> {col.label}
+                {col.label}
               </button>
             ))}
           </div>
         </div>
 
         {error && <div className="upload-error-msg">{error}</div>}
+        </div>
 
-        {/* Actions */}
         <div className="modal-actions">
           <button className="secondary-button" onClick={handleClose} disabled={uploading}>{isId ? 'Batal' : 'Cancel'}</button>
           <button className="primary-button" onClick={handleUpload} disabled={!file || uploading}>
