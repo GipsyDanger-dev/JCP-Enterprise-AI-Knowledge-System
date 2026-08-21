@@ -548,7 +548,7 @@ button { cursor: pointer; }
 .employee-dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(235px, .7fr); gap: 28px; margin-top: 31px; }
 .employee-primary-column > section + section { margin-top: 30px; }
 .recent-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-.recent-item { min-height: 101px; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: start; gap: 10px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-card); padding: 13px; text-align: left; color: var(--text-card); transition: border-color var(--ease-fast), transform var(--ease-fast); }
+.recent-item { min-height: 101px; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-card); padding: 16px 18px; text-align: left; color: var(--text-card); transition: border-color var(--ease-fast), transform var(--ease-fast); }
 .recent-item:hover { border-color: var(--border-hover); transform: translateY(-1px); }
 .recent-icon { width: 34px; height: 34px; border-radius: var(--radius-md); display: grid; place-items: center; }
 .recent-icon.orange { background: var(--brand-100); color: var(--brand-400); }
