@@ -162,27 +162,31 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const sendQuestion = async (q: string) => {
     if (!q.trim()) return
     const messageId = `msg-${Date.now()}`
-    setIsLoadingAnswer(true)
     setQuestion('')
+    // Immediately add user message to history (bubble shows right away)
+    setChatHistory((prev) => [...prev, {
+      id: messageId,
+      question: q,
+      answer: '',
+      citations: [],
+      error: null,
+      timestamp: Date.now(),
+    }])
+    setIsLoadingAnswer(true)
     try {
       const res = await queryChat({ question: q }, token ?? undefined)
-      setChatHistory((prev) => [...prev, {
-        id: messageId,
-        question: q,
-        answer: res.answer ?? '',
-        citations: res.citations,
-        error: !res.answer && res.message ? res.message : null,
-        timestamp: Date.now(),
-      }])
+      // Update the existing message with AI response
+      setChatHistory((prev) => prev.map((msg) =>
+        msg.id === messageId
+          ? { ...msg, answer: res.answer ?? '', citations: res.citations, error: !res.answer && res.message ? res.message : null }
+          : msg
+      ))
     } catch (err) {
-      setChatHistory((prev) => [...prev, {
-        id: messageId,
-        question: q,
-        answer: '',
-        citations: [],
-        error: errorMessage(err),
-        timestamp: Date.now(),
-      }])
+      setChatHistory((prev) => prev.map((msg) =>
+        msg.id === messageId
+          ? { ...msg, error: errorMessage(err) }
+          : msg
+      ))
     } finally {
       setIsLoadingAnswer(false)
     }

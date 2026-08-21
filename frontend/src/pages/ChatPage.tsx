@@ -7,11 +7,17 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
 import type { ChatMessage } from '@/context/workspaceContextValue'
 
-function ChatMessageItem({ msg, isId }: { msg: ChatMessage; isId: boolean }) {
+function ChatMessageItem({ msg, isId, isPending }: { msg: ChatMessage; isId: boolean; isPending: boolean }) {
   return (
     <>
       <div className="user-message">{msg.question}</div>
-      {msg.error && !msg.answer && (
+      {isPending && !msg.answer && !msg.error && (
+        <div className="assistant-message loading">
+          <div className="answer-label"><Loader2 size={16} className="spin" /> Enterprise AI</div>
+          <p className="typing-indicator">{isId ? 'Mencari basis pengetahuan…' : 'Searching knowledge base…'}</p>
+        </div>
+      )}
+      {!isPending && msg.error && !msg.answer && (
         <div className="assistant-message no-answer">
           <div className="answer-label"><AlertTriangle size={16} /> Enterprise AI</div>
           <p>{msg.error}</p>
@@ -57,16 +63,9 @@ export function ChatPage() {
       <div className="chat-canvas">
         {hasConversation ? (
           <div className="conversation">
-            {chatHistory.map((msg) => (
-              <ChatMessageItem key={msg.id} msg={msg} isId={isId} />
+            {chatHistory.map((msg, index) => (
+              <ChatMessageItem key={msg.id} msg={msg} isId={isId} isPending={isLoadingAnswer && index === chatHistory.length - 1} />
             ))}
-
-            {isLoadingAnswer && (
-              <div className="assistant-message loading">
-                <div className="answer-label"><Loader2 size={16} className="spin" /> Enterprise AI</div>
-                <p className="typing-indicator">{isId ? 'Mencari basis pengetahuan…' : 'Searching knowledge base…'}</p>
-              </div>
-            )}
 
             <div ref={bottomRef} />
           </div>
