@@ -95,7 +95,7 @@ class PgVectorStore:
     def get_document_version(self, document_version_id: str) -> dict[str, Any] | None:
         sql = """
             SELECT d.id, dv.id, dv.original_filename, dv.version_number,
-                   dv.checksum, COUNT(c.chunk_id)::int
+                   dv.checksum, COUNT(c.chunk_id)::int, COUNT(c.embedding)::int
             FROM document_versions AS dv
             JOIN documents AS d ON d.id = dv.document_id
             LEFT JOIN chunks AS c ON c.document_version_id = dv.id
@@ -113,6 +113,7 @@ class PgVectorStore:
             "version": row[3],
             "content_hash": row[4],
             "num_chunks": row[5],
+            "embedding_count": row[6],
         }
 
     def replace_document_version(
@@ -164,6 +165,8 @@ class PgVectorStore:
     # ---------- embeddings ----------
 
     def store_embeddings(self, vectors: list[list[float]], chunk_ids: list[str]) -> None:
+        if len(vectors) != len(chunk_ids):
+            raise ValueError("embedding vector count does not match chunk count")
         with psycopg.connect(self.dsn) as conn:
             register_vector(conn)
             with conn.transaction():
@@ -182,7 +185,12 @@ class PgVectorStore:
         filters: dict[str, Any] | None = None,
     ) -> list[tuple[float, dict[str, Any]]]:
         """Cosine search joined to authoritative backend document metadata."""
-        conditions = ["c.embedding IS NOT NULL", "d.deleted_at IS NULL"]
+        conditions = [
+            "c.embedding IS NOT NULL",
+            "d.deleted_at IS NULL",
+            "d.status = 'READY'",
+            "dv.version_number = (SELECT MAX(v.version_number) FROM document_versions AS v WHERE v.document_id = d.id)",
+        ]
         filter_params: list[Any] = []
         if filters:
             filename = filters.get("filename")
@@ -237,11 +245,14 @@ class PgVectorStore:
             with _psycopg.connect(dsn) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT c.chunk_id, c.document_version_id, d.id, d.title, "
+                        "SELECT c.chunk_id, c.document_version_id, d.id, dv.original_filename, "
                         "dv.version_number, c.page_number, c.section_title, c.text "
                         "FROM chunks c "
                         "JOIN document_versions dv ON dv.id = c.document_version_id "
                         "JOIN documents d ON d.id = dv.document_id "
+                        "WHERE d.deleted_at IS NULL "
+                        "AND d.status = 'READY' "
+                        "AND dv.version_number = (SELECT MAX(v.version_number) FROM document_versions v WHERE v.document_id = d.id) "
                         "ORDER BY c.created_at"
                     )
                     rows = cur.fetchall()
@@ -362,7 +373,9 @@ def ingest_to_pg(
     if expected_hash and digest != expected_hash:
         raise ValueError("file checksum does not match document version")
 
-    if metadata["num_chunks"] > 0:
+    if metadata["num_chunks"] > 0 and (
+        not embed or metadata["embedding_count"] == metadata["num_chunks"]
+    ):
         return [{
             "filename": metadata["filename"],
             "document_id": metadata["document_id"],

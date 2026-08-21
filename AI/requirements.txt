@@ -6,6 +6,8 @@ pypdf>=4.0
 fastapi>=0.111
 uvicorn>=0.30
 pydantic>=2.7
+# Required by the current Starlette TestClient implementation used in AI tests.
+httpx2>=0.1
 
 # PostgreSQL + pgvector store (store.py) — required for the shared Data Layer.
 psycopg[binary]>=3.1

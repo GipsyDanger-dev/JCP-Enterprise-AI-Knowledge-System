@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
@@ -6,7 +8,10 @@ export class MessagingService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Get or create a direct conversation between employee and admin */
-  async getEmployeeConversation(employeeId: string) {
+  async getEmployeeConversation(employeeId: string, actor: AuthenticatedUser) {
+    if (actor.role !== UserRole.ADMIN && actor.sub !== employeeId) {
+      throw new ForbiddenException('You can only access your own conversation');
+    }
     const conv = await this.prisma.directConversation.findUnique({
       where: { employeeId },
       include: {
@@ -57,7 +62,8 @@ export class MessagingService {
   }
 
   /** Get messages in a conversation */
-  async getMessages(conversationId: string) {
+  async getMessages(conversationId: string, actor: AuthenticatedUser) {
+    await this.assertConversationAccess(conversationId, actor);
     const messages = await this.prisma.directMessage.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'asc' },
@@ -75,7 +81,15 @@ export class MessagingService {
   }
 
   /** Send a message in a conversation */
-  async sendMessage(conversationId: string, sender: string, senderName: string, content: string, attachments?: unknown) {
+  async sendMessage(
+    conversationId: string,
+    sender: string,
+    senderName: string,
+    content: string,
+    attachments: unknown,
+    actor: AuthenticatedUser,
+  ) {
+    await this.assertConversationAccess(conversationId, actor);
     const convId = conversationId;
     const msg = await this.prisma.directMessage.create({
       data: {
@@ -110,11 +124,24 @@ export class MessagingService {
   }
 
   /** Reset unread count */
-  async markAsRead(conversationId: string) {
+  async markAsRead(conversationId: string, actor: AuthenticatedUser) {
+    await this.assertConversationAccess(conversationId, actor);
     await this.prisma.directConversation.update({
       where: { id: conversationId },
       data: { unreadCount: 0 },
     });
     return { success: true };
+  }
+
+  private async assertConversationAccess(conversationId: string, actor: AuthenticatedUser) {
+    const conversation = await this.prisma.directConversation.findUnique({
+      where: { id: conversationId },
+      select: { employeeId: true },
+    });
+    if (!conversation) throw new NotFoundException('Conversation not found');
+    if (actor.role !== UserRole.ADMIN && conversation.employeeId !== actor.sub) {
+      throw new ForbiddenException('You can only access your own conversation');
+    }
+    return conversation;
   }
 }

@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { MessagingService } from './messaging.service';
@@ -8,51 +10,64 @@ import { UserRole } from '@prisma/client';
 
 @ApiTags('messaging')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('messaging')
 export class MessagingController {
   constructor(private readonly messagingService: MessagingService) {}
 
   /** Employee: get or create their conversation with admin */
   @Get('employee/:employeeId')
-  getEmployeeConversation(@Param('employeeId') employeeId: string) {
-    return this.messagingService.getEmployeeConversation(employeeId);
+  getEmployeeConversation(
+    @Param('employeeId', new ParseUUIDPipe({ version: '4' })) employeeId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.messagingService.getEmployeeConversation(employeeId, actor);
   }
 
   /** Admin: list all conversations */
   @Get('conversations')
+  @Roles(UserRole.ADMIN)
   listConversations() {
     return this.messagingService.listConversations();
   }
 
   /** Get messages in a conversation */
   @Get(':conversationId/messages')
-  getMessages(@Param('conversationId') conversationId: string) {
-    return this.messagingService.getMessages(conversationId);
+  getMessages(
+    @Param('conversationId', new ParseUUIDPipe({ version: '4' })) conversationId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.messagingService.getMessages(conversationId, actor);
   }
 
   /** Send a message — sender is determined from JWT, not body */
   @Post(':conversationId/messages')
   sendMessage(
-    @Param('conversationId') conversationId: string,
+    @Param('conversationId', new ParseUUIDPipe({ version: '4' })) conversationId: string,
     @Body() body: { content: string; attachments?: unknown },
     @CurrentUser() actor: AuthenticatedUser,
   ) {
-    // Determine sender from JWT role
+    const content = body.content?.trim();
+    if (!content) throw new BadRequestException('content must not be empty');
+    if (content.length > 8000) throw new BadRequestException('content must not exceed 8000 characters');
     const sender = actor.role === UserRole.ADMIN ? 'admin' : 'employee';
     const senderName = actor.displayName ?? (actor.role === UserRole.ADMIN ? 'Admin' : 'Employee');
     return this.messagingService.sendMessage(
       conversationId,
       sender,
       senderName,
-      body.content,
+      content,
       body.attachments,
+      actor,
     );
   }
 
   /** Reset unread count */
   @Put(':conversationId/read')
-  markAsRead(@Param('conversationId') conversationId: string) {
-    return this.messagingService.markAsRead(conversationId);
+  markAsRead(
+    @Param('conversationId', new ParseUUIDPipe({ version: '4' })) conversationId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.messagingService.markAsRead(conversationId, actor);
   }
 }
