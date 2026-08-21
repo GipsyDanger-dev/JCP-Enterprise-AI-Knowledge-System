@@ -19,11 +19,11 @@ export class JwtAuthGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, email: true, role: true, isActive: true },
+        select: { id: true, email: true, role: true, isActive: true, displayName: true },
       });
 
       if (!user?.isActive) throw new UnauthorizedException('Authentication required');
-      request.user = { sub: user.id, email: user.email, role: user.role };
+      request.user = { sub: user.id, email: user.email, role: user.role, displayName: user.displayName };
       return true;
     } catch {
       throw new UnauthorizedException('Authentication required');

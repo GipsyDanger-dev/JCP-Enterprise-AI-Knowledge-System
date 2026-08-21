@@ -28,7 +28,7 @@ export function getDirectMessages(conversationId: string, token?: string): Promi
   return request<DirectMessage[]>(`/messaging/${conversationId}/messages`, { headers: authHeaders(token) })
 }
 
-/** Send a message */
+/** Send a message — sender is determined by backend from JWT */
 export function sendDirectMessage(
   conversationId: string,
   body: SendMessageRequest,
@@ -63,7 +63,7 @@ export function onTypingChange(conversationId: string, listener: (typing: boolea
   return () => {}
 }
 
-/** Admin: send a message as admin */
+/** Admin: send a message — sender determined by backend from JWT */
 export function sendAdminMessage(
   conversationId: string,
   body: SendMessageRequest,

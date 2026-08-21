@@ -24,7 +24,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role };
+    const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role, displayName: user.displayName };
     const accessToken = await this.jwtService.signAsync(payload);
     await this.prisma.$transaction(async (transaction) => {
       await transaction.user.update({

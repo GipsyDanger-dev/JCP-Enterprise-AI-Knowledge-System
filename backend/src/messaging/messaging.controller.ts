@@ -1,7 +1,10 @@
 import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../auth/auth.types';
 import { MessagingService } from './messaging.service';
+import { UserRole } from '@prisma/client';
 
 @ApiTags('messaging')
 @ApiBearerAuth()
@@ -28,16 +31,20 @@ export class MessagingController {
     return this.messagingService.getMessages(conversationId);
   }
 
-  /** Send a message */
+  /** Send a message — sender is determined from JWT, not body */
   @Post(':conversationId/messages')
   sendMessage(
     @Param('conversationId') conversationId: string,
-    @Body() body: { content: string; sender?: string; senderName?: string; attachments?: unknown },
+    @Body() body: { content: string; attachments?: unknown },
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
+    // Determine sender from JWT role
+    const sender = actor.role === UserRole.ADMIN ? 'admin' : 'employee';
+    const senderName = actor.displayName ?? (actor.role === UserRole.ADMIN ? 'Admin' : 'Employee');
     return this.messagingService.sendMessage(
       conversationId,
-      body.sender ?? 'employee',
-      body.senderName ?? 'Employee',
+      sender,
+      senderName,
       body.content,
       body.attachments,
     );
