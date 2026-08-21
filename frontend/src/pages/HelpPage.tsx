@@ -1,6 +1,6 @@
 import { BookOpen, ChevronRight, ExternalLink, FileText, Mail, MessageSquareText, Phone } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
@@ -33,6 +33,15 @@ export function HelpPage() {
   const { language } = useWorkspace()
   const isId = language === 'id'
   const FAQ = isId ? FAQ_ID : FAQ_EN
+  const faqRef = useRef<HTMLDivElement>(null)
+
+  // Panduan memulai: open FAQ items 0-2 (upload, citation, formats)
+  const scrollToGuide = useCallback(() => {
+    setOpenIndex(0)
+    setTimeout(() => {
+      faqRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+  }, [])
 
   return (
     <div className="standard-page">
@@ -47,7 +56,7 @@ export function HelpPage() {
         <section className="help-section">
           <h3>{isId ? 'Tautan cepat' : 'Quick links'}</h3>
           <div className="help-links">
-            <button className="help-link-card" onClick={() => navigate('/chat')}>
+            <button className="help-link-card" onClick={scrollToGuide}>
               <span className="help-link-icon orange"><BookOpen size={18} /></span>
               <div>
                 <strong>{isId ? 'Panduan memulai' : 'Getting started guide'}</strong>
@@ -75,7 +84,7 @@ export function HelpPage() {
         </section>
 
         {/* FAQ */}
-        <section className="help-section">
+        <section className="help-section" ref={faqRef}>
           <h3>{isId ? 'Pertanyaan yang sering diajukan' : 'Frequently asked questions'}</h3>
           <div className="faq-list">
             {FAQ.map((item, index) => (
