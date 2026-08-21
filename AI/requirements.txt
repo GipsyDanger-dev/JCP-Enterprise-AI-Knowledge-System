@@ -6,6 +6,7 @@ pypdf>=4.0
 fastapi>=0.111
 uvicorn>=0.30
 pydantic>=2.7
+python-multipart>=0.0.9
 
 # PostgreSQL + pgvector store (store.py) — required for the shared Data Layer.
 psycopg[binary]>=3.1

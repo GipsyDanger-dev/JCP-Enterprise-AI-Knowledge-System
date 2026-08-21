@@ -71,27 +71,17 @@ export class DocumentProcessorService implements OnModuleInit {
       const fileContent = await this.storage.read(versionId);
       const content = Buffer.from(fileContent);
 
-      // Save to temp dir for AI engine ingestion
-      const { writeFileSync, mkdirSync, rmSync } = await import('node:fs');
-      const { join } = await import('node:path');
-      const tmpDir = join(process.cwd(), 'tmp', versionId);
-      mkdirSync(tmpDir, { recursive: true });
-      const filePath = join(tmpDir, filename);
-      writeFileSync(filePath, content);
+      const blob = new Blob([content]);
+      const formData = new FormData();
+      formData.append('file', blob, filename);
+      formData.append('document_version_id', versionId);
+      formData.append('embed', 'true');
 
-      // Call AI engine /ingest
-      const ingestResponse = await fetch(`${this.aiBaseUrl}/ingest`, {
+      // Call AI engine /ingest/file
+      const ingestResponse = await fetch(`${this.aiBaseUrl}/ingest/file`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input_dir: tmpDir,
-          document_version_id: versionId,
-          embed: true,
-        }),
+        body: formData,
       });
-
-      // Cleanup temp dir
-      rmSync(tmpDir, { recursive: true, force: true });
 
       if (!ingestResponse.ok) {
         const errorText = await ingestResponse.text();

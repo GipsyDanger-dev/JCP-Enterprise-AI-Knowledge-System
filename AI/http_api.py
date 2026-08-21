@@ -18,12 +18,14 @@ Endpoints (full OpenAPI docs at /docs):
 from __future__ import annotations
 
 import os
+import shutil
+import uuid
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 try:
-    from fastapi import FastAPI, HTTPException
+    from fastapi import FastAPI, HTTPException, UploadFile, File, Form
     from pydantic import BaseModel
 except ImportError:  # pragma: no cover - optional dependency
     raise RuntimeError(
@@ -152,6 +154,55 @@ def ingest_documents(request: IngestRequest) -> dict[str, Any]:
         ],
         "store": "json",
     }
+
+
+@app.post("/ingest/file", response_model=IngestResponse)
+def ingest_file_endpoint(
+    file: UploadFile = File(...),
+    document_version_id: UUID = Form(...),
+    embed: bool = Form(True),
+    model: str | None = Form(None)
+) -> dict[str, Any]:
+    """Parse -> chunk -> (embed) -> index a single uploaded document."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="uploaded file has no filename")
+
+    tmp_dir = PROJECT_DIR / "tmp" / str(uuid.uuid4())
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        file_path = tmp_dir / file.filename
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        store = current_store()
+        if isinstance(store, PgVectorStore):
+            try:
+                documents = ingest_to_pg(
+                    tmp_dir,
+                    store,
+                    str(document_version_id),
+                    embed=embed,
+                    api_key=os.environ.get("SUMOPOD_API_KEY"),
+                )
+            except ValueError as error:
+                raise HTTPException(status_code=400, detail=str(error)) from error
+            return {"documents": documents, "store": "pgvector"}
+        else:
+            from knowledge_base import ingest
+            ingest(tmp_dir, DEFAULT_INDEX, embed=embed)
+            kb = KnowledgeBase.load(DEFAULT_INDEX)
+            return {
+                "documents": [
+                    {"filename": d["filename"], "document_id": d["document_id"],
+                     "version": d["version"], "num_chunks": d["num_chunks"]}
+                    for d in kb.documents
+                ],
+                "store": "json",
+            }
+    finally:
+        if tmp_dir.exists():
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 @app.get("/documents", response_model=list[DocumentSummary])
