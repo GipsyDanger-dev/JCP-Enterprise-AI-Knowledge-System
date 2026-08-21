@@ -940,10 +940,12 @@ button { cursor: pointer; }
   .settings-info-grid { grid-template-columns: 1fr; }
   .settings-theme-grid { grid-template-columns: 1fr; }
   .help-contact-grid { grid-template-columns: 1fr; }
-  .inbox-layout { grid-template-columns: 1fr; }
+  .inbox-layout { grid-template-columns: 1fr; height: calc(100vh - 58px - var(--banner-offset)); margin: 0; border-radius: 0; border-left: 0; border-right: 0; }
   .inbox-list-hidden-mobile { display: none; }
-  .inbox-chat-active { grid-column: 1; }
+  .inbox-chat-active { grid-column: 1; display: flex; flex-direction: column; min-height: 0; }
   .inbox-back-btn { display: grid; }
+  .inbox-chat { min-height: 0; flex: 1; display: flex; flex-direction: column; }
+  .inbox-messages { flex: 1; min-height: 0; }
   .messaging-bubble { max-width: 85%; }
   .messaging-page { padding: 0; }
 }
