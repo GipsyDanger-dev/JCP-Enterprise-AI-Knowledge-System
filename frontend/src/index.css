@@ -909,9 +909,12 @@ button { cursor: pointer; }
   .page-heading { flex-direction: column; }
   .heading-actions { width: 100%; }
   .heading-actions button { flex: 1; }
-  .metrics-grid, .collection-grid { grid-template-columns: 1fr; }
-  .metric-card { border-right: 0; border-bottom: 1px solid var(--border-soft); }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .collection-grid { grid-template-columns: 1fr; }
+  .metric-card { min-height: 110px; padding: 14px; border-right: 0; border-bottom: 1px solid var(--border-soft); }
   .metric-card:last-child { border-bottom: 0; }
+  .metric-card:nth-child(2) { border-right: 1px solid var(--border-soft); }
+  .metric-card:nth-child(odd) { border-right: 0; }
 
   /* Activity row: stacking rapi 2 baris tanpa margin negatif */
   .activity-row { grid-template-columns: 36px minmax(0, 1fr) 30px; grid-template-rows: auto auto; row-gap: 2px; padding: 9px 0; }
