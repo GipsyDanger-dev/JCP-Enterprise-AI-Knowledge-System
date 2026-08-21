@@ -117,10 +117,14 @@ def is_general_chat(query: str) -> bool:
     """Detect if query is general chat, not document-specific."""
     q = query.strip().lower()
     
+    # Check off-topic first - these are NOT document queries
+    if is_off_topic(q):
+        return True
+    
     # Document-related keywords that indicate a document query
     doc_keywords = [
         'hotel', 'biaya', 'tunjangan', 'sop', 'prosedur', 'kebijakan',
-        'dokumen', 'policy', 'cuti', 'izin', 'gaji', 'tunjangan',
+        'dokumen', 'policy', 'cuti', 'izin', 'gaji',
         'reimbursement', 'approval', 'persetujuan',
         'berapa', 'mengapa', 'kapan', 'dimana', 'kenapa',
         'manajer', 'manager', 'karyawan', 'staff', 'jabatan',
@@ -137,7 +141,7 @@ def is_general_chat(query: str) -> bool:
             return True
     
     # Short queries without question marks and without doc keywords
-    if len(q.split()) <= 2 and '?' not in q:
+    if len(q.split()) <= 3 and '?' not in q:
         return True
     
     return False
@@ -157,13 +161,64 @@ SMART_RESPONSES = {
     'siap': 'Siap! Saya menunggu pertanyaan Anda tentang dokumen perusahaan.',
 }
 
+# Off-topic guardrail responses
+OFF_TOPIC_RESPONSES = [
+    'Maaf, saya hanya bisa menjawab pertanyaan seputar dokumen perusahaan seperti SOP, kebijakan, dan prosedur. Silakan ajukan pertanyaan tentang dokumen Anda.',
+    'Pertanyaan Anda di luar cakupan dokumen perusahaan. Saya hanya bisa membantu menjawab pertanyaan tentang SOP, kebijakan, dan prosedur internal.',
+    'Saya tidak dapat menjawab pertanyaan tersebut karena tidak berkaitan dengan dokumen perusahaan. Silakan tanyakan sesuatu tentang SOP atau kebijakan internal.',
+]
+
+# Off-topic detection keywords
+OFF_TOPIC_KEYWORDS = [
+    # Politik
+    'politik', 'presiden', 'gubernur', 'bupati', 'walikota', 'dpr', 'mpr', 'partai',
+    # Agama
+    'agama', 'allah', 'tuhan', 'yesus', 'nabi', 'rasul', 'ibadah', 'sholat', 'doa',
+    # Cuaca
+    'cuaca', 'hujan', 'panas', 'dingin', 'mendung', 'cerah',
+    # Olahraga
+    'sepak bola', 'basket', 'tenis', 'olahraga', 'piala', 'liga',
+    # Hiburan
+    'film', 'movie', 'musik', 'lagu', 'artis', 'selebriti', 'game',
+    # Teknologi umum
+    'iphone', 'android', 'samsung', 'xiaomi', 'laptop',
+    # Kesehatan umum
+    'sakit', 'demam', 'batuk', 'pilek', 'obat', 'dokter',
+    # Resep masakan
+    'resep', 'masakan', 'resep masak', 'cara memasak',
+    # Travel umum
+    'tiket', 'hotel murah', 'wisata', 'jalan-jalan',
+    # Keuangan pribadi
+    'saham', 'crypto', 'bitcoin', 'investasi pribadi',
+]
+
+def is_off_topic(query: str) -> bool:
+    """Detect if query is clearly off-topic (not related to company docs)."""
+    q = query.strip().lower()
+    for kw in OFF_TOPIC_KEYWORDS:
+        if kw in q:
+            return True
+    return False
+
+import random as _random
+
 DEFAULT_GENERAL_RESPONSE = 'Halo! Saya Enterprise AI. Saya bisa membantu menjawab pertanyaan tentang dokumen perusahaan seperti SOP, kebijakan, dan prosedur. Silakan ketik pertanyaan Anda!'
 
 
 def general_chat_response(query: str, model: str) -> dict[str, Any]:
-    """Smart keyword-based response for general chat."""
+    """Smart keyword-based response for general chat with off-topic guardrails."""
     q = query.strip().lower()
     
+    # Check for off-topic content first
+    if is_off_topic(q):
+        return {
+            "answer": _random.choice(OFF_TOPIC_RESPONSES),
+            "citations": [],
+            "grounded": False,
+            "retrieval": [],
+        }
+    
+    # Check for known patterns (greetings, small talk)
     for keyword, response in SMART_RESPONSES.items():
         if keyword in q:
             return {
