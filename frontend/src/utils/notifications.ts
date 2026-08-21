@@ -142,7 +142,7 @@ export function showBrowserNotification(title: string, body: string, icon?: stri
       badge: '/vite.svg',
       tag: 'jcp-message', // replaces previous notification
       renotify: true,
-    })
+    } as NotificationOptions & { renotify: boolean })
     notif.onclick = () => {
       window.focus()
       notif.close()

@@ -7,8 +7,8 @@ import type { ApiRole, ApiUser, LoginRequest, LoginResponse, MeResponse } from '
  * Ganti dengan API asli dengan mengatur VITE_USE_MOCK_AUTH=false.
  */
 const DEMO_ACCOUNTS: Array<{ id: string; email: string; password: string; displayName: string; role: ApiRole }> = [
-  { id: '00000000-0000-4000-8000-000000000001', email: 'admin@jcp.co.id', password: 'admin123', displayName: 'Adam', role: 'ADMIN' },
-  { id: '00000000-0000-4000-8000-000000000002', email: 'nadia@jcp.co.id', password: 'employee123', displayName: 'Nadia S.', role: 'USER' },
+  { id: '00000000-0000-4000-8000-000000000001', email: 'admin@jcp.co.id', password: 'admin1234567', displayName: 'Adam', role: 'ADMIN' },
+  { id: '00000000-0000-4000-8000-000000000002', email: 'nadia@jcp.co.id', password: 'employee12345', displayName: 'Nadia S.', role: 'USER' },
 ]
 
 const TOKEN_PREFIX = 'mock.'

@@ -23,6 +23,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>(() => (user ? toDomainRole(user.role) : 'admin'))
   const [documents, setDocuments] = useState(initialDocuments)
   const [question, setQuestion] = useState('')
+  const [submittedQuestion, setSubmittedQuestion] = useState('')
   const [answer, setAnswer] = useState('')
   const [citations, setCitations] = useState<Citation[]>([])
   const [isLoadingAnswer, setIsLoadingAnswer] = useState(false)
@@ -162,6 +163,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const sendQuestion = async (q: string) => {
     if (!q.trim()) return
+    setSubmittedQuestion(q)
     setIsLoadingAnswer(true)
     setChatError(null)
     setAnswer('')
@@ -206,6 +208,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       documents,
       question,
       setQuestion,
+      submittedQuestion,
       answer,
       citations,
       isLoadingAnswer,

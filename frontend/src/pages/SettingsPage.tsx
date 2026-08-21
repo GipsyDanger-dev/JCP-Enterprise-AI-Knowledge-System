@@ -71,7 +71,7 @@ export function SettingsPage() {
               <label>{isId ? 'Nama' : 'Name'}</label>
               <input
                 type="text"
-                value={user?.name ?? ''}
+                value={user?.displayName ?? ''}
                 disabled
                 className="disabled-input"
               />
@@ -91,7 +91,7 @@ export function SettingsPage() {
               <label>Role</label>
               <div className="settings-role-display">
                 <span className="settings-role-text">
-                  {userRoleLabel(user?.role ?? 'EMPLOYEE')}
+                  {userRoleLabel(user?.role ?? 'USER')}
                 </span>
                 <small>{isId ? 'Ditetapkan oleh administrator workspace' : 'Assigned by workspace administrator'}</small>
               </div>

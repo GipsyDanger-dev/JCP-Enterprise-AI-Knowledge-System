@@ -94,13 +94,8 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           ) : (
             <div className="upload-file-empty">
               <Upload size={24} />
-<<<<<<< HEAD
               <p>{isId ? 'Klik untuk memilih file' : 'Click to select file'}</p>
               <small>{isId ? 'PDF atau DOCX, maks 10MB' : 'PDF or DOCX, max 10 MB'}</small>
-=======
-              <p>Click to select file</p>
-              <small>PDF or DOCX, max 10 MB</small>
->>>>>>> origin/main
             </div>
           )}
         </div>
@@ -114,22 +109,6 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
             placeholder={file ? file.name.replace(/\.[^.]+$/, '') : (isId ? 'Masukkan judul dokumen' : 'Enter a document title')}
             disabled={uploading}
           />
-        </div>
-
-        <div className="upload-field">
-          <label>{isId ? 'Koleksi' : 'Collection'}</label>
-          <div className="upload-collection-grid">
-            {COLLECTIONS.map((c) => (
-              <button
-                key={c}
-                className={`upload-collection-btn ${collection === c ? 'active' : ''}`}
-                onClick={() => setCollection(c)}
-                disabled={uploading}
-              >
-                <FolderOpen size={14} /> {c}
-              </button>
-            ))}
-          </div>
         </div>
 
         {error && <div className="upload-error-msg">{error}</div>}

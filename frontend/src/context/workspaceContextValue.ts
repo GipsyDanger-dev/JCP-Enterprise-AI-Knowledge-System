@@ -13,6 +13,7 @@ export interface WorkspaceContextValue {
   documents: DocumentItem[]
   question: string
   setQuestion: (value: string) => void
+  submittedQuestion: string
   answer: string
   citations: Citation[]
   isLoadingAnswer: boolean
@@ -24,7 +25,7 @@ export interface WorkspaceContextValue {
   isUploading: boolean
   uploadError: string | null
   registerUploadedDocument: (document: ApiDocument) => void
-  removeDocument: (id: number) => Promise<void>
+  removeDocument: (id: string) => Promise<void>
   language: Language
   setLanguage: (lang: Language) => void
   unreadMessages: number

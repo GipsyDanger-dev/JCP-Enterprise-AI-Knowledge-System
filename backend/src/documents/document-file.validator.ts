@@ -16,6 +16,7 @@ const DOCX_MIME_TYPES = new Set([
   'application/octet-stream',
   'application/zip',
 ]);
+const TXT_MIME_TYPES = new Set(['text/plain', 'text/csv', 'application/octet-stream']);
 
 export function validateDocumentFile(file?: UploadedDocumentFile): UploadedDocumentFile {
   if (!file) throw new BadRequestException('A PDF or DOCX file is required');
@@ -33,9 +34,11 @@ export function validateDocumentFile(file?: UploadedDocumentFile): UploadedDocum
   const isPdf = extension === '.pdf' && PDF_MIME_TYPES.has(file.mimetype) && hasPdfSignature(file.buffer);
   const isDocx =
     extension === '.docx' && DOCX_MIME_TYPES.has(file.mimetype) && hasZipSignature(file.buffer);
+  const isTxt = extension === '.txt' && TXT_MIME_TYPES.has(file.mimetype);
+  const isMd = extension === '.md' && TXT_MIME_TYPES.has(file.mimetype);
 
-  if (!isPdf && !isDocx) {
-    throw new BadRequestException('Only valid PDF or DOCX files are allowed');
+  if (!isPdf && !isDocx && !isTxt && !isMd) {
+    throw new BadRequestException('Only valid PDF, DOCX, TXT, or MD files are allowed');
   }
 
   return { ...file, originalname: filename };

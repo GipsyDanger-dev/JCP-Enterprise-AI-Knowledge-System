@@ -1,5 +1,4 @@
 import { authHeaders, request } from './client'
-import { USE_MOCK } from './config'
 import {
   mockGetAdminMessages,
   mockGetDirectMessages,
@@ -16,15 +15,18 @@ import type {
   SendMessageResponse,
 } from './types'
 
+/** Messaging always uses mock until backend module is built */
+const USE_MOCK_MESSAGING = true
+
 /** Employee: get or create their conversation with admin */
-export function getEmployeeConversation(employeeId: number, token?: string): Promise<DirectConversation> {
-  if (USE_MOCK) return mockGetEmployeeConversation(employeeId)
+export function getEmployeeConversation(employeeId: string | number, token?: string): Promise<DirectConversation> {
+  if (USE_MOCK_MESSAGING) return mockGetEmployeeConversation(Number(employeeId))
   return request<DirectConversation>(`/messaging/employee/${employeeId}`, { headers: authHeaders(token) })
 }
 
 /** Get messages in a conversation */
 export function getDirectMessages(conversationId: number, token?: string): Promise<DirectMessage[]> {
-  if (USE_MOCK) return mockGetDirectMessages(conversationId)
+  if (USE_MOCK_MESSAGING) return mockGetDirectMessages(conversationId)
   return request<DirectMessage[]>(`/messaging/${conversationId}/messages`, { headers: authHeaders(token) })
 }
 
@@ -34,7 +36,7 @@ export function sendDirectMessage(
   body: SendMessageRequest,
   token?: string,
 ): Promise<SendMessageResponse> {
-  if (USE_MOCK) {
+  if (USE_MOCK_MESSAGING) {
     // Determine sender from context — default to employee for now
     return mockSendDirectMessage(conversationId, body, 'employee', 'Employee')
   }
@@ -47,26 +49,26 @@ export function sendDirectMessage(
 
 /** Admin: list all conversations */
 export function listConversations(token?: string): Promise<DirectConversation[]> {
-  if (USE_MOCK) return mockListConversations()
+  if (USE_MOCK_MESSAGING) return mockListConversations()
   return request<DirectConversation[]>('/messaging/conversations', { headers: authHeaders(token) })
 }
 
 /** Admin: get messages in a conversation */
 export function getAdminMessages(conversationId: number, token?: string): Promise<DirectMessage[]> {
-  if (USE_MOCK) return mockGetAdminMessages(conversationId)
+  if (USE_MOCK_MESSAGING) return mockGetAdminMessages(conversationId)
   return request<DirectMessage[]>(`/messaging/${conversationId}/messages`, { headers: authHeaders(token) })
 }
 
 /** Subscribe to typing state changes */
 export function onTypingChange(conversationId: number, listener: (typing: boolean) => void): () => void {
-  if (USE_MOCK) return mockOnTypingChange(conversationId, listener)
+  if (USE_MOCK_MESSAGING) return mockOnTypingChange(conversationId, listener)
   // Real backend would use WebSocket — no-op for now
   return () => {}
 }
 
 /** Check who is currently typing */
 export function getTypingUser(conversationId: number): 'employee' | 'admin' | null {
-  if (USE_MOCK) return mockGetTypingUser(conversationId)
+  if (USE_MOCK_MESSAGING) return mockGetTypingUser(conversationId)
   return null
 }
 
@@ -76,7 +78,7 @@ export function sendAdminMessage(
   body: SendMessageRequest,
   token?: string,
 ): Promise<SendMessageResponse> {
-  if (USE_MOCK) {
+  if (USE_MOCK_MESSAGING) {
     return mockSendDirectMessage(conversationId, body, 'admin', 'Adam')
   }
   return request<SendMessageResponse>(`/messaging/${conversationId}/messages`, {

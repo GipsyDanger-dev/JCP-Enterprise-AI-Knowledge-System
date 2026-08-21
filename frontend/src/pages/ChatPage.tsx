@@ -6,7 +6,7 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
 
 export function ChatPage() {
-  const { question, setQuestion, answer, citations, isLoadingAnswer, chatError, onAsk, askQuestion, language } = useWorkspace()
+  const { question, setQuestion, submittedQuestion, answer, citations, isLoadingAnswer, chatError, onAsk, askQuestion, language } = useWorkspace()
   const hasConversation = answer || chatError || isLoadingAnswer
   const isId = language === 'id'
 
@@ -16,7 +16,7 @@ export function ChatPage() {
       <div className="chat-canvas">
         {hasConversation ? (
           <div className="conversation">
-            <div className="user-message">{question}</div>
+            <div className="user-message">{submittedQuestion}</div>
 
             {isLoadingAnswer && (
               <div className="assistant-message loading">
