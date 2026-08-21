@@ -664,6 +664,11 @@ button { cursor: pointer; }
 .upload-field input { width: 100%; min-height: 40px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); color: var(--text-primary); padding: 0 11px; outline: none; }
 .upload-field input:focus { border-color: var(--brand-600); box-shadow: 0 0 0 3px var(--brand-100); }
 .upload-error-msg { margin-bottom: 12px; padding: 8px 10px; border-radius: var(--radius-md); background: var(--brand-100); color: var(--brand-800); font-size: var(--fs-xs); }
+.upload-collection-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.upload-collection-chip { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--bg-card); color: var(--text-secondary); font-size: var(--fs-xs); font-weight: 500; cursor: pointer; transition: all .15s; }
+.upload-collection-chip:hover { border-color: var(--border-hover); background: var(--bg-subtle); }
+.upload-collection-chip.active { border-color: var(--brand-600); background: var(--brand-50); color: var(--brand-700); font-weight: 600; }
+.upload-collection-chip:disabled { opacity: .5; cursor: not-allowed; }
 .select-wrapper select { width: 100%; height: 40px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 0 32px 0 12px; font-size: var(--fs-md); color: var(--text-card); background: var(--bg-card); outline: 0; appearance: none; cursor: pointer; }
 .select-wrapper select:focus { border-color: var(--brand-600); box-shadow: 0 0 0 3px var(--brand-100); }
 .select-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-muted); }

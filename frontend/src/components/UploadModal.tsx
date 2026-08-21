@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { FileText, LoaderCircle, Upload, X } from 'lucide-react'
+import { ChevronDown, FileText, FolderOpen, LoaderCircle, Upload, X } from 'lucide-react'
 import { uploadDocument } from '@/api/documents'
 import { errorMessage } from '@/api/client'
 import type { ApiDocument } from '@/api/types'
@@ -19,8 +19,17 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const { language } = useWorkspace()
   const isId = language === 'id'
   const fileRef = useRef<HTMLInputElement>(null)
+  const COLLECTIONS = [
+    { id: 'operations', label: 'Operations', icon: '📋' },
+    { id: 'it-security', label: 'IT & Security', icon: '🔒' },
+    { id: 'finance', label: 'Finance', icon: '💰' },
+    { id: 'people', label: 'People', icon: '👥' },
+    { id: 'legal', label: 'Legal', icon: '⚖️' },
+    { id: 'marketing', label: 'Marketing', icon: '📢' },
+  ]
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
+  const [collection, setCollection] = useState('operations')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,6 +64,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
       const document = await uploadDocument(file, token ?? undefined, title)
       setFile(null)
       setTitle('')
+      setCollection('operations')
       onUploaded(document)
       onClose()
     } catch (err) {
@@ -68,6 +78,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     if (uploading) return
     setFile(null)
     setTitle('')
+    setCollection('operations')
     setError(null)
     onClose()
   }
@@ -109,6 +120,23 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
             placeholder={file ? file.name.replace(/\.[^.]+$/, '') : (isId ? 'Masukkan judul dokumen' : 'Enter a document title')}
             disabled={uploading}
           />
+        </div>
+
+        <div className="upload-field">
+          <label><FolderOpen size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Koleksi' : 'Collection'}</label>
+          <div className="upload-collection-grid">
+            {COLLECTIONS.map((col) => (
+              <button
+                key={col.id}
+                type="button"
+                className={`upload-collection-chip ${collection === col.id ? 'active' : ''}`}
+                onClick={() => setCollection(col.id)}
+                disabled={uploading}
+              >
+                <span>{col.icon}</span> {col.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {error && <div className="upload-error-msg">{error}</div>}
