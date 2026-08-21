@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Loader2, Send } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { listConversations, getAdminMessages, sendAdminMessage, onTypingChange } from '@/api/messaging'
 import { errorMessage } from '@/api/client'
-import type { DirectConversation, DirectMessage } from '@/api/types'
+import type { DirectConversation, DirectMessage, MessageAttachment } from '@/api/types'
 import { userInitials } from '@/api/mockUsers'
 import { MessageList } from '@/components/MessageList'
+import { MessageComposer } from '@/components/MessageComposer'
 import { TypingIndicator } from '@/components/TypingIndicator'
 
 export function AdminInboxPage() {
@@ -18,7 +19,6 @@ export function AdminInboxPage() {
   const [conversations, setConversations] = useState<DirectConversation[]>([])
   const [selectedConv, setSelectedConv] = useState<DirectConversation | null>(null)
   const [messages, setMessages] = useState<DirectMessage[]>([])
-  const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
@@ -71,20 +71,18 @@ export function AdminInboxPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() || !selectedConv || !token) return
+  const handleSend = async (content: string, attachments: MessageAttachment[]) => {
+    if ((!content && attachments.length === 0) || !selectedConv || !token) return
     setSending(true)
     setError(null)
     try {
-      const msg = await sendAdminMessage(selectedConv.id, { content: input.trim() }, token)
+      const msg = await sendAdminMessage(selectedConv.id, { content, attachments }, token)
       setMessages((prev) => [...prev, msg])
-      setInput('')
       // Update conversation list
       setConversations((prev) =>
         prev.map((c) =>
           c.id === selectedConv.id
-            ? { ...c, lastMessage: input.trim(), lastMessageAt: msg.createdAt, unreadCount: 0 }
+            ? { ...c, lastMessage: content || '(attachment)', lastMessageAt: msg.createdAt, unreadCount: 0 }
             : c
         )
       )
@@ -179,17 +177,12 @@ export function AdminInboxPage() {
               </div>
 
               {/* Composer */}
-              <form className="messaging-composer" onSubmit={handleSend}>
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={isId ? 'Balas pesan…' : 'Type a reply…'}
-                  disabled={sending || loadingMessages}
-                />
-                <button type="submit" disabled={sending || !input.trim()}>
-                  {sending ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
-                </button>
-              </form>
+              <MessageComposer
+                onSend={handleSend}
+                disabled={sending || loadingMessages}
+                placeholder={isId ? 'Balas pesan…' : 'Type a reply…'}
+                isId={isId}
+              />
             </>
           )}
         </div>

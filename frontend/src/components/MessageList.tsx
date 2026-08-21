@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import type { DirectMessage } from '@/api/types'
+import type { DirectMessage, MessageAttachment } from '@/api/types'
+import { formatFileSize, getFileIcon } from '@/utils/files'
 
 interface MessageListProps {
   messages: DirectMessage[]
@@ -75,9 +76,20 @@ export function MessageList({ messages, currentSender, isId, bottomRef }: Messag
                   <span className="messaging-sender-name">{msg.senderName}</span>
                 )}
                 <div className={`messaging-bubble ${isMine ? 'sent' : 'received'}`}>
-                  <div className="messaging-bubble-content">
-                    <p>{msg.content}</p>
-                  </div>
+                  {/* Attachments */}
+                  {msg.attachments && msg.attachments.length > 0 && (
+                    <div className="mc-bubble-attachments">
+                      {msg.attachments.map((att) => (
+                        <AttachmentPreview key={att.id} attachment={att} />
+                      ))}
+                    </div>
+                  )}
+                  {/* Text content */}
+                  {msg.content && (
+                    <div className="messaging-bubble-content">
+                      <p>{msg.content}</p>
+                    </div>
+                  )}
                   <small className="messaging-bubble-time">{formatTime(msg.createdAt)}</small>
                 </div>
               </div>
@@ -86,6 +98,26 @@ export function MessageList({ messages, currentSender, isId, bottomRef }: Messag
         </div>
       ))}
       {bottomRef && <div ref={bottomRef} />}
+    </div>
+  )
+}
+
+function AttachmentPreview({ attachment }: { attachment: MessageAttachment }) {
+  if (attachment.type === 'image' && attachment.dataUrl) {
+    return (
+      <div className="mc-attachment-image">
+        <img src={attachment.dataUrl} alt={attachment.name} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="mc-attachment-file">
+      <span className="mc-attachment-file-icon">{getFileIcon(attachment.mimeType)}</span>
+      <div className="mc-attachment-file-info">
+        <span className="mc-attachment-file-name">{attachment.name}</span>
+        <span className="mc-attachment-file-size">{formatFileSize(attachment.size)}</span>
+      </div>
     </div>
   )
 }

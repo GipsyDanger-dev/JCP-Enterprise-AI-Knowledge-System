@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Loader2, Send } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { getEmployeeConversation, getDirectMessages, sendDirectMessage, onTypingChange } from '@/api/messaging'
 import { errorMessage } from '@/api/client'
-import type { DirectMessage } from '@/api/types'
+import type { DirectMessage, MessageAttachment } from '@/api/types'
 import { MessageList } from '@/components/MessageList'
+import { MessageComposer } from '@/components/MessageComposer'
 import { TypingIndicator } from '@/components/TypingIndicator'
 
 export function MessagingPage() {
@@ -16,7 +17,6 @@ export function MessagingPage() {
   const isId = language === 'id'
 
   const [messages, setMessages] = useState<DirectMessage[]>([])
-  const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -63,15 +63,13 @@ export function MessagingPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() || !conversationId || !token) return
+  const handleSend = async (content: string, attachments: MessageAttachment[]) => {
+    if ((!content && attachments.length === 0) || !conversationId || !token) return
     setSending(true)
     setError(null)
     try {
-      const msg = await sendDirectMessage(conversationId, { content: input.trim() }, token)
+      const msg = await sendDirectMessage(conversationId, { content, attachments }, token)
       setMessages((prev) => [...prev, msg])
-      setInput('')
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -116,17 +114,12 @@ export function MessagingPage() {
         )}
       </div>
 
-      <form className="messaging-composer" onSubmit={handleSend}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={isId ? 'Ketik pesan ke admin…' : 'Type a message to admin…'}
-          disabled={sending || loading}
-        />
-        <button type="submit" disabled={sending || !input.trim()}>
-          {sending ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
-        </button>
-      </form>
+      <MessageComposer
+        onSend={handleSend}
+        disabled={sending || loading}
+        placeholder={isId ? 'Ketik pesan ke admin…' : 'Type a message to admin…'}
+        isId={isId}
+      />
     </div>
   )
 }

@@ -120,12 +120,25 @@ export interface ConversationDetail {
 /* ============ Messaging (Employee ↔ Admin) ============ */
 export type MessageSender = 'employee' | 'admin'
 
+export type AttachmentType = 'image' | 'file'
+
+export interface MessageAttachment {
+  id: number
+  type: AttachmentType
+  name: string
+  /** Data URL for images, or null for files */
+  dataUrl: string | null
+  size: number
+  mimeType: string
+}
+
 export interface DirectMessage {
   id: number
   conversationId: number
   sender: MessageSender
   senderName: string
   content: string
+  attachments: MessageAttachment[]
   /** ISO datetime */
   createdAt: string
   read: boolean
@@ -143,6 +156,7 @@ export interface DirectConversation {
 
 export interface SendMessageRequest {
   content: string
+  attachments?: MessageAttachment[]
 }
 
 export interface SendMessageResponse {
@@ -151,6 +165,7 @@ export interface SendMessageResponse {
   sender: MessageSender
   senderName: string
   content: string
+  attachments: MessageAttachment[]
   createdAt: string
   read: boolean
 }

@@ -21,31 +21,37 @@ const messages: DirectMessage[] = [
   {
     id: 1, conversationId: 1, sender: 'employee', senderName: 'Nadia S.',
     content: 'Halo Admin, saya butuh akses ke koleksi Finance untuk proyek procurement. Bisa dibantu?',
+    attachments: [],
     createdAt: iso(new Date('2026-08-21T08:15:00Z')), read: true,
   },
   {
     id: 2, conversationId: 1, sender: 'admin', senderName: 'Adam',
     content: 'Halo Nadia, sudah saya berikan akses ke koleksi Finance. Silakan cek kembali.',
+    attachments: [],
     createdAt: iso(new Date('2026-08-21T08:32:00Z')), read: true,
   },
   {
     id: 3, conversationId: 1, sender: 'employee', senderName: 'Nadia S.',
     content: 'Terima kasih Admin! Sudah bisa akses sekarang. 🙏',
+    attachments: [],
     createdAt: iso(new Date('2026-08-21T08:35:00Z')), read: true,
   },
   {
     id: 4, conversationId: 2, sender: 'employee', senderName: 'Raka D.',
     content: 'Admin, apakah ada update untuk SOP Perjalanan Dinas yang versi terbaru?',
+    attachments: [],
     createdAt: iso(new Date('2026-08-20T14:20:00Z')), read: true,
   },
   {
     id: 5, conversationId: 2, sender: 'admin', senderName: 'Adam',
     content: 'SOP versi 2.1 sudah di-upload dan terindeks. Silakan cek di halaman Dokumen.',
+    attachments: [],
     createdAt: iso(new Date('2026-08-20T14:45:00Z')), read: true,
   },
   {
     id: 6, conversationId: 3, sender: 'employee', senderName: 'Nadia S.',
     content: 'Mau tanya soal kebijakan reimbursement untuk perjalanan dinas ke luar kota. Berapa batas maksimalnya?',
+    attachments: [],
     createdAt: iso(new Date('2026-08-19T10:00:00Z')), read: true,
   },
 ]
@@ -138,8 +144,9 @@ function simulateReply(conversationId: number, sender: 'employee' | 'admin', inc
       sender: replySender,
       senderName: replyName,
       content: pickAutoReply(incomingMessage),
+      attachments: [],
       createdAt: iso(new Date()),
-      read: sender === 'employee', // if employee sent, admin reply is unread for employee;反之亦然
+      read: sender === 'employee',
     }
     messages.push(reply)
     const conv = conversations.find((c) => c.id === conversationId)
@@ -194,8 +201,9 @@ export async function mockSendDirectMessage(
     sender,
     senderName,
     content: body.content,
+    attachments: body.attachments ?? [],
     createdAt: iso(new Date()),
-    read: sender === 'admin', // admin's own messages are read; employee messages to admin are unread
+    read: sender === 'admin',
   }
   messages.push(msg)
 
@@ -210,7 +218,7 @@ export async function mockSendDirectMessage(
   // Trigger auto-reply from the other party
   simulateReply(conversationId, sender, body.content)
 
-  return { ...msg }
+  return { ...msg, attachments: msg.attachments }
 }
 
 // --- Admin-facing API ---
