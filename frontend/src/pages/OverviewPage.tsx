@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { ArrowUpRight, BookOpen, ChevronRight, Database, FileText, Library, MessageSquareText, Send, ShieldAlert, ShieldCheck, Sparkles, Upload, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { AgentPanel } from '@/components/AgentPanel'
 import { UploadModal } from '@/components/UploadModal'
 import { Collection } from '@/components/Collection'
 import { DocumentActivity } from '@/components/DocumentActivity'
@@ -54,7 +53,6 @@ function AdminOverview({ isId }: { isId: boolean }) {
         </section>
       </section>
 
-      <AgentPanel />
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
     </div>
   )
