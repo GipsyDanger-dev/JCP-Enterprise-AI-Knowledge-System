@@ -949,6 +949,7 @@ button { cursor: pointer; }
   .inbox-chat { min-height: 0; flex: 1; display: flex; flex-direction: column; }
   .inbox-messages { flex: 1; min-height: 0; }
   .messaging-bubble { max-width: 85%; }
+  .messaging-composer { margin: 0 12px 8px; }
   .messaging-page { padding: 0; }
 }
 
