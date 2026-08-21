@@ -50,6 +50,7 @@ export class DocumentsService {
         data: {
           id: documentId,
           title,
+          collection: input.collection?.trim() || 'Operations',
           status: DocumentStatus.QUEUED,
           uploadedById: actor.sub,
         },
@@ -96,6 +97,7 @@ export class DocumentsService {
     return {
       id: documentId,
       title,
+      collection: input.collection?.trim() || 'Operations',
       status: DocumentStatus.QUEUED,
       version: {
         id: documentVersionId,
@@ -122,6 +124,7 @@ export class DocumentsService {
       select: {
         id: true,
         title: true,
+        collection: true,
         status: true,
         createdAt: true,
         updatedAt: true,

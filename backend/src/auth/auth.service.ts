@@ -52,4 +52,16 @@ export class AuthService {
       },
     };
   }
+
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return { sub: userId, email: '', role: 'USER' };
+    return {
+      sub: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      role: user.role,
+      photoUrl: user.photoUrl,
+    };
+  }
 }

@@ -8,4 +8,10 @@ export class CreateDocumentDto {
   @MinLength(1)
   @MaxLength(200)
   title?: string;
+
+  @ApiPropertyOptional({ description: 'Document collection (e.g. Operations, IT & Security)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  collection?: string;
 }

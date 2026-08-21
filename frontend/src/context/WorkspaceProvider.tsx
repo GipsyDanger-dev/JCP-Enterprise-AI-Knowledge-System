@@ -178,7 +178,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       // Update the existing message with AI response
       setChatHistory((prev) => prev.map((msg) =>
         msg.id === messageId
-          ? { ...msg, answer: res.answer ?? '', citations: res.citations, error: !res.answer && res.message ? res.message : null }
+          ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, error: null }
           : msg
       ))
     } catch (err) {

@@ -36,7 +36,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get the authenticated user from the access token' })
   @ApiOkResponse({ description: 'Authenticated token payload' })
   @ApiUnauthorizedResponse({ description: 'Missing, invalid, or expired token' })
-  me(@CurrentUser() user: AuthenticatedUser) {
-    return user;
+  async me(@CurrentUser() user: AuthenticatedUser) {
+    return this.authService.getProfile(user.sub);
   }
 }

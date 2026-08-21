@@ -41,14 +41,8 @@ export class ChatService {
       // If grounded, return answer with citations
       // If not grounded but has an answer (general chat), return it
       // If not grounded and no answer, return no-answer message
-      const hasAnswer = result.answer && result.answer.trim().length > 0;
-      const isNoAnswer = result.answer?.includes('Informasi tidak ditemukan');
-
       return {
-        answer: result.grounded ? result.answer : (hasAnswer && !isNoAnswer ? result.answer : null),
-        ...(!result.grounded && (!hasAnswer || isNoAnswer)
-          ? { message: 'Informasi tidak ditemukan pada dokumen yang tersedia.' }
-          : {}),
+        answer: result.answer,
         citations: result.citations.map((citation) => ({
           documentId: citation.document_id,
           documentVersionId: citation.document_version_id ?? `${citation.document_id}:${citation.version ?? 'unknown'}`,
