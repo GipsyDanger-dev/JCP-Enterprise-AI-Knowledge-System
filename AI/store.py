@@ -226,6 +226,58 @@ class PgVectorStore:
             results.append((float(row[8]), chunk))
         return results
 
+    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None) -> dict[str, Any]:
+        """TF-IDF fallback when vector search fails or finds nothing."""
+        try:
+            import psycopg as _psycopg
+            from retrieval.tfidf import TfidfRetriever
+            dsn = default_dsn()
+            if not dsn:
+                return no_answer_response()
+            with _psycopg.connect(dsn) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT c.chunk_id, c.document_version_id, d.id, d.title, "
+                        "dv.version_number, c.page_number, c.section_title, c.text "
+                        "FROM chunks c "
+                        "JOIN document_versions dv ON dv.id = c.document_version_id "
+                        "JOIN documents d ON d.id = dv.document_id "
+                        "ORDER BY c.created_at"
+                    )
+                    rows = cur.fetchall()
+            chunks = []
+            for row in rows:
+                chunks.append({
+                    "chunk_id": row[0], "document_version_id": str(row[1]),
+                    "document_id": str(row[2]),
+                    "filename": row[3], "version": row[4],
+                    "page_number": row[5], "section_title": row[6] or "",
+                    "text": row[7],
+                })
+            tfidf = TfidfRetriever(chunks)
+            matches = tfidf.search(query, top_k=top_k)
+            print(f"[AI] TF-IDF: {len(chunks)} chunks, {len(matches)} matches for '{query[:30]}'")
+            if not matches:
+                return no_answer_response()
+            citations = citations_from_matches(matches)
+            answer = (
+                generate_answer(query, matches, model=model, api_key=api_key)
+                if use_llm
+                else matches[0][1]["text"]
+            )
+            return {
+                "answer": answer,
+                "citations": citations,
+                "grounded": True,
+                "retrieval": [
+                    {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
+                    for score, chunk in matches
+                ],
+            }
+        except Exception as exc:
+            print(f"[AI] TF-IDF fallback failed: {exc}")
+            return no_answer_response()
+
     # ---------- orchestration ----------
 
     def ask(
@@ -246,7 +298,9 @@ class PgVectorStore:
                 if score >= minimum_score
             ]
             if not matches:
-                return no_answer_response()
+                # Vector search found nothing above threshold, try TF-IDF fallback
+                print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
+                return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key)
             citations = citations_from_matches(matches)
             answer = (
                 generate_answer(query, matches, model=model, api_key=api_key)
@@ -263,55 +317,8 @@ class PgVectorStore:
                 ],
             }
         except Exception as exc:
-            # Fallback: TF-IDF search from DB chunks
             print(f"[AI] Vector search failed ({exc}), falling back to TF-IDF")
-            try:
-                import psycopg
-                from retrieval.tfidf import TfidfRetriever
-                dsn = default_dsn()
-                if not dsn:
-                    return no_answer_response()
-                with psycopg.connect(dsn) as conn:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            "SELECT c.chunk_id, c.document_version_id, d.title, "
-                            "dv.version_number, c.page_number, c.section_title, c.text "
-                            "FROM chunks c "
-                            "JOIN document_versions dv ON dv.id = c.document_version_id "
-                            "JOIN documents d ON d.id = dv.document_id "
-                            "ORDER BY c.created_at"
-                        )
-                        rows = cur.fetchall()
-                chunks = []
-                for row in rows:
-                    chunks.append({
-                        "chunk_id": row[0], "document_version_id": str(row[1]),
-                        "filename": row[2], "version": row[3],
-                        "page_number": row[4], "section_title": row[5] or "",
-                        "text": row[6],
-                    })
-                tfidf = TfidfRetriever(chunks)
-                matches = tfidf.search(query, top_k=top_k)
-                print(f"[AI] TF-IDF fallback: {len(chunks)} chunks loaded, {len(matches)} matches for '{query[:30]}'")
-                if not matches:
-                    return no_answer_response()
-                citations = citations_from_matches(matches)
-                answer = (
-                    generate_answer(query, matches, model=model, api_key=api_key)
-                    if use_llm
-                    else matches[0][1]["text"]
-                )
-                return {
-                    "answer": answer,
-                    "citations": citations,
-                    "grounded": True,
-                    "retrieval": [
-                        {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
-                        for score, chunk in matches
-                    ],
-                }
-            except Exception:
-                return no_answer_response()
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key)
 
 
 def content_hash(path: Path) -> str:
