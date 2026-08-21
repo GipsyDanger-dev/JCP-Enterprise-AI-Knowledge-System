@@ -1,6 +1,7 @@
 import { BookOpen, ChevronRight, ExternalLink, FileText, Mail, MessageSquareText, Phone } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
 interface FaqItem {
@@ -27,6 +28,7 @@ const FAQ_EN: FaqItem[] = [
 ]
 
 export function HelpPage() {
+  const navigate = useNavigate()
   const [openIndex, setOpenIndex] = useState<number | null>(null)
   const { language } = useWorkspace()
   const isId = language === 'id'
@@ -45,30 +47,30 @@ export function HelpPage() {
         <section className="help-section">
           <h3>{isId ? 'Tautan cepat' : 'Quick links'}</h3>
           <div className="help-links">
-            <a href="#" className="help-link-card" onClick={(e) => e.preventDefault()}>
+            <button className="help-link-card" onClick={() => navigate('/chat')}>
               <span className="help-link-icon orange"><BookOpen size={18} /></span>
               <div>
                 <strong>{isId ? 'Panduan memulai' : 'Getting started guide'}</strong>
                 <small>{isId ? 'Pelajari dasar Enterprise AI' : 'Learn the basics of Enterprise AI'}</small>
               </div>
               <ExternalLink size={14} />
-            </a>
-            <a href="#" className="help-link-card" onClick={(e) => e.preventDefault()}>
+            </button>
+            <button className="help-link-card" onClick={() => navigate('/documents')}>
               <span className="help-link-icon mint"><FileText size={18} /></span>
               <div>
                 <strong>{isId ? 'Manajemen dokumen' : 'Document management'}</strong>
                 <small>{isId ? 'Unggah, organisasi, dan cari dokumen' : 'Upload, organize, and search documents'}</small>
               </div>
               <ExternalLink size={14} />
-            </a>
-            <a href="#" className="help-link-card" onClick={(e) => e.preventDefault()}>
+            </button>
+            <button className="help-link-card" onClick={() => navigate('/chat')}>
               <span className="help-link-icon violet"><MessageSquareText size={18} /></span>
               <div>
                 <strong>{isId ? 'Panduan Asisten AI' : 'AI Assistant guide'}</strong>
                 <small>{isId ? 'Cara mengajukan pertanyaan yang efektif' : 'How to ask effective questions'}</small>
               </div>
               <ExternalLink size={14} />
-            </a>
+            </button>
           </div>
         </section>
 

@@ -831,7 +831,7 @@ button { cursor: pointer; }
 .help-grid { display: grid; gap: 24px; }
 .help-section h3 { margin: 0 0 14px; font-size: var(--fs-lg); }
 .help-links { display: grid; gap: 10px; }
-.help-link-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); text-decoration: none; color: inherit; transition: border-color .15s, box-shadow .15s; }
+.help-link-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); text-decoration: none; color: inherit; transition: border-color .15s, box-shadow .15s; width: 100%; text-align: left; cursor: pointer; }
 .help-link-card:hover { border-color: var(--brand-600); box-shadow: 0 2px 8px rgba(255,112,67,.08); }
 .help-link-icon { width: 36px; height: 36px; border-radius: var(--radius-md); display: grid; place-items: center; flex-shrink: 0; }
 .help-link-icon.orange { background: var(--brand-50); color: var(--brand-600); }
