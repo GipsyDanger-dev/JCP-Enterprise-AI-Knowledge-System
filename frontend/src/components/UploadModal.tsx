@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ChevronDown, FileText, FolderOpen, LoaderCircle, Upload, X } from 'lucide-react'
+import { FileText, FolderOpen, LoaderCircle, Upload, X } from 'lucide-react'
 import { uploadDocument } from '@/api/documents'
 import { errorMessage } from '@/api/client'
 import type { ApiDocument } from '@/api/types'

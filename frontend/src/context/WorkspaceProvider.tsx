@@ -8,13 +8,13 @@ import { listConversations, getEmployeeConversation } from '@/api/messaging'
 import { toDomainDocument, toDomainDocumentStatus, toDomainRole } from '@/api/mappers'
 import type { ApiDocument } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
-import type { Citation } from '@/types/domain'
 import type { ChatMessage } from './workspaceContextValue'
-import { initialDocuments, navigationFor, personFor } from '@/types/domain'
-import type { Role } from '@/types/domain'
+import { navigationFor } from '@/types/domain'
+import type { DocumentItem, Role } from '@/types/domain'
 import { WorkspaceContext } from './workspaceContextValue'
 import type { Language } from './workspaceContextValue'
 import { notifyNewMessage } from '@/utils/notifications'
+import { userInitials } from '@/utils/users'
 
 const POLL_INTERVAL_MS = 2000
 const LANG_KEY = 'jcp-lang'
@@ -22,7 +22,7 @@ const LANG_KEY = 'jcp-lang'
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user, token } = useAuth()
   const [role, setRole] = useState<Role>(() => (user ? toDomainRole(user.role) : 'admin'))
-  const [documents, setDocuments] = useState(initialDocuments)
+  const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [question, setQuestion] = useState('')
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [isLoadingAnswer, setIsLoadingAnswer] = useState(false)
@@ -46,7 +46,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Muat dokumen dari API saat login; fallback ke data lokal bila gagal
   useEffect(() => {
     if (!user) {
-      setDocuments(initialDocuments)
+      setDocuments([])
       return
     }
     let cancelled = false
@@ -54,8 +54,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       .then((docs) => { if (!cancelled) setDocuments(docs.map(toDomainDocument)) })
       .catch((err) => {
         if (!cancelled) {
-          console.warn('Gagal memuat dokumen, memakai data lokal:', err)
-          setDocuments(initialDocuments)
+          console.warn('Gagal memuat dokumen:', err)
+          setDocuments([])
         }
       })
     return () => { cancelled = true }
@@ -213,7 +213,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     <WorkspaceContext.Provider value={{
       role,
       changeRole,
-      person: personFor(role),
+      person: {
+        name: user?.displayName ?? '',
+        initials: userInitials(user?.displayName ?? ''),
+        label: '',
+      },
       navigation: navigationFor(role, language),
       documents,
       question,

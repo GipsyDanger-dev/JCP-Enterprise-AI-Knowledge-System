@@ -1,8 +1,8 @@
 # Kontrak API Frontend–Backend
 
-Folder ini berisi API client, tipe TypeScript, mapper, dan implementasi mock.
+Folder ini berisi API client, tipe TypeScript, dan mapper untuk Backend NestJS.
 Backend NestJS menjadi sumber kontrak utama. Tipe auth, UUID, role, status
-dokumen, mock, dan mapper Frontend sudah diselaraskan dengan response Backend.
+dokumen dan mapper Frontend sudah diselaraskan dengan response Backend.
 
 ## Aturan Backend aktual
 
@@ -101,9 +101,6 @@ users.ts
 mappers.ts
 ```
 
-Mock sekarang mengikuti UUID string, `accessToken`, `displayName`, role `USER`,
-status uppercase, dan format error NestJS.
-
 ## Pekerjaan integrasi yang tersisa
 
 1. `/auth/me` hanya mengembalikan payload JWT tanpa `displayName`, sehingga
@@ -111,22 +108,6 @@ status uppercase, dan format error NestJS.
 2. Backend users, chat, dan conversations masih skeleton.
 3. Backend documents belum mengembalikan jumlah chunk.
 4. Selector E2E login lama perlu diselaraskan dengan markup UI saat ini.
-
-## Mock mode
-
-```env
-VITE_API_BASE_URL=http://localhost:8000
-VITE_USE_MOCK_AUTH=true
-```
-
-| Role UI | Email | Password |
-| --- | --- | --- |
-| Admin | `admin@jcp.co.id` | `admin123` |
-| Employee | `nadia@jcp.co.id` | `employee123` |
-
-Mock documents mensimulasikan `queued → processing → ready`. Mock chat hanya
-memberikan citation dari metadata mock yang sudah ditentukan dan mengembalikan
-no-answer untuk pertanyaan yang tidak cocok.
 
 ## No-answer dan citation
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileText, Key, Loader2, MessageCircle, Settings, Upload, UserPlus } from 'lucide-react'
+import { FileText, Key, Loader2, Settings, Upload, UserPlus } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'

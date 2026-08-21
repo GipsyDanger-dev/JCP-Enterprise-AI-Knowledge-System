@@ -1,5 +1,4 @@
 import { authHeaders, request } from './client'
-import { USE_MOCK } from './config'
 
 export interface AuditLogEntry {
   id: string
@@ -19,6 +18,5 @@ interface AuditLogResponse {
 }
 
 export function listAuditLogs(token?: string, limit = 50): Promise<AuditLogResponse> {
-  if (USE_MOCK) return Promise.resolve({ data: [], meta: { total: 0, page: 1, limit } })
   return request<AuditLogResponse>(`/audit-logs?limit=${limit}`, { headers: authHeaders(token) })
 }

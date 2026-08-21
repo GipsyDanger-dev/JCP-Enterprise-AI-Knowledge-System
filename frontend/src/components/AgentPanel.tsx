@@ -5,8 +5,9 @@ import { SourceCard } from './SourceCard'
 import { VerifiedBadge } from './VerifiedBadge'
 
 export function AgentPanel() {
-  const { question, setQuestion, answer, citations, isLoadingAnswer, chatError, onAsk, askQuestion, language } = useWorkspace()
-  const hasConversation = answer || chatError || isLoadingAnswer
+  const { question, setQuestion, chatHistory, isLoadingAnswer, onAsk, askQuestion, language } = useWorkspace()
+  const latestMessage = chatHistory[chatHistory.length - 1]
+  const hasConversation = Boolean(latestMessage) || isLoadingAnswer
   const isId = language === 'id'
 
   return (
@@ -32,18 +33,18 @@ export function AgentPanel() {
               </>
             )}
 
-            {!isLoadingAnswer && chatError && !answer && (
+            {!isLoadingAnswer && latestMessage?.error && !latestMessage.answer && (
               <>
                 <div className="answer-label"><AlertTriangle size={16} /> Enterprise AI</div>
-                <p>{chatError}</p>
+                <p>{latestMessage.error}</p>
               </>
             )}
 
-            {!isLoadingAnswer && answer && (
+            {!isLoadingAnswer && latestMessage?.answer && (
               <>
                 <div className="answer-label"><Sparkles size={16} /> Enterprise AI</div>
-                <p>{answer}</p>
-                {citations.length > 0 && citations.map((c, i) => (
+                <p>{latestMessage.answer}</p>
+                {latestMessage.citations.length > 0 && latestMessage.citations.map((c, i) => (
                   <SourceCard
                     key={`${c.documentId}-${c.chunkId}-${i}`}
                     title={c.filename}

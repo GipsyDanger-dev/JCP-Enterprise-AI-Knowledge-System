@@ -4,7 +4,7 @@ import { ShieldCheck } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { userRoleLabel } from '@/api/mockUsers'
+import { userRoleLabel } from '@/utils/users'
 import { isNotificationsEnabled, setNotificationsEnabled, isBrowserNotificationsEnabled, setBrowserNotificationsEnabled, requestNotificationPermission } from '@/utils/notifications'
 
 const THEME_KEY = 'jcp-theme'

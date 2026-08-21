@@ -4,7 +4,7 @@ import { Camera, Check, ChevronDown, Loader2, Pencil, Plus, Trash2, X } from 'lu
 import { PageHeading } from '@/components/PageHeading'
 import { errorMessage } from '@/api/client'
 import { changePassword, createUser, deleteUser, listUsers, updateUser } from '@/api/users'
-import { userInitials, userRoleLabel } from '@/api/mockUsers'
+import { userInitials, userRoleLabel } from '@/utils/users'
 import type { ApiUser, ApiRole } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'

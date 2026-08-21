@@ -36,13 +36,6 @@ export interface Person {
   label: string
 }
 
-export const initialDocuments: DocumentItem[] = [
-  { id: 'mock-document-1', name: 'SOP Perjalanan Dinas 2026.pdf', collection: 'Operations', updatedAt: '18 Aug, 10:42', status: 'Ready', chunks: 42 },
-  { id: 'mock-document-2', name: 'Kebijakan Keamanan Informasi.docx', collection: 'IT & Security', updatedAt: '18 Aug, 09:16', status: 'Ready', chunks: 28 },
-  { id: 'mock-document-3', name: 'Panduan Procurement.pdf', collection: 'Finance', updatedAt: '17 Aug, 16:30', status: 'Processing', chunks: null },
-  { id: 'mock-document-4', name: 'Employee Handbook 2026.pdf', collection: 'People', updatedAt: '16 Aug, 13:05', status: 'Ready', chunks: 61 },
-]
-
 export function adminNavigation(lang: 'en' | 'id' = 'en'): NavigationItem[] {
   return lang === 'id'
     ? [
@@ -87,12 +80,6 @@ export const quickQuestionsId = [
 
 export function quickQuestions(lang: 'en' | 'id' = 'en') {
   return lang === 'id' ? quickQuestionsId : quickQuestionsEn
-}
-
-export function personFor(role: Role): Person {
-  return role === 'admin'
-    ? { name: 'Adam', initials: 'AR', label: '' }
-    : { name: 'Nadia', initials: 'NS', label: '' }
 }
 
 export function navigationFor(role: Role, lang: 'en' | 'id' = 'en'): NavigationItem[] {
