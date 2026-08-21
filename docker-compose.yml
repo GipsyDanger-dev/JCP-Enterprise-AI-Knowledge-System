@@ -22,7 +22,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       AI_SERVICE_URL: ${AI_SERVICE_URL}
-      LLM_API_KEY: ${LLM_API_KEY}
+      SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
       WORKER_TOKEN: ${WORKER_TOKEN}
@@ -41,7 +41,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/health | grep -q OK"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/health | grep -qi 'ok'"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -76,7 +76,6 @@ services:
     command: npm run dev -- --host 0.0.0.0
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-      VITE_USE_MOCK_AUTH: ${VITE_USE_MOCK_AUTH:-false}
     ports:
       - "5173:5173"
     volumes:
