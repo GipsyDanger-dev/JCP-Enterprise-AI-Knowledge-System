@@ -84,10 +84,13 @@ export function UsersPage() {
   }
 
   const handleDelete = async (user: ApiUser) => {
-    if (!confirm(`Hapus ${user.displayName}?`)) return
+    const msg = isId
+      ? `Nonaktifkan ${user.displayName}?\n\nPengguna ini tidak akan bisa login lagi.`
+      : `Deactivate ${user.displayName}?\n\nThis user will no longer be able to log in.`
+    if (!confirm(msg)) return
     try {
       await deleteUser(user.id, token ?? undefined)
-      setUsers((prev) => prev.filter((u) => u.id !== user.id))
+      setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, isActive: false } : u))
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -198,7 +201,10 @@ export function UsersPage() {
                   </td>
                   <td><span className={`role-badge ${user.role.toLowerCase()}`}>{userRoleLabel(user.role)}</span></td>
                   <td>{user.role === 'ADMIN' ? (isId ? 'Akses penuh' : 'Full access') : (isId ? 'Perpustakaan pengetahuan' : 'Knowledge library')}</td>
-                  <td><span className="active-user"><Check size={13} /> {isId ? 'Aktif' : 'Active'}</span></td>
+                  <td>{user.isActive !== false
+                    ? <span className="active-user"><Check size={13} /> {isId ? 'Aktif' : 'Active'}</span>
+                    : <span className="inactive-user"><X size={13} /> {isId ? 'Nonaktif' : 'Inactive'}</span>
+                  }</td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button className="icon-button" title={isId ? `Edit ${user.displayName}` : `Edit ${user.displayName}`} onClick={() => openEdit(user)}>
