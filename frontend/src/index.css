@@ -708,9 +708,10 @@ button { cursor: pointer; }
 .settings-field input:focus { border-color: var(--brand-600); box-shadow: 0 0 0 3px var(--brand-100); }
 .settings-field small { display: block; margin-top: 4px; font-size: var(--fs-xs); color: var(--text-dim); }
 .disabled-input { background: var(--bg-subtle) !important; color: var(--text-muted) !important; cursor: not-allowed; }
-.settings-role-display { display: flex; align-items: center; gap: 10px; }
+.settings-role-display { display: flex; align-items: center; gap: 12px; }
 .settings-role-display small { color: var(--text-dim); font-size: var(--fs-xs); }
-.settings-role-text { font-size: var(--fs-md); color: var(--text-card); font-weight: 500; }
+.settings-role-text { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-pill); font-size: var(--fs-sm); font-weight: var(--fw-semibold); background: var(--brand-50); color: var(--brand-800); border: 1px solid var(--brand-200); }
+.settings-role-text::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--brand-600); flex-shrink: 0; }
 .settings-actions { padding-top: 8px; }
 .settings-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .settings-info-item label { display: block; font-size: var(--fs-xs); color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .03em; }
