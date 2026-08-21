@@ -90,7 +90,7 @@ export function DocumentsPage() {
               <td>{document.updatedAt}</td>
               <td><StatusBadge status={document.status} /></td>
               <td>{document.chunks ?? '—'}</td>
-              <td style={{ display: 'flex', gap: 4 }}>
+              <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>
                 {canManage
                   ? <button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button>
