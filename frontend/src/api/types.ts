@@ -16,6 +16,7 @@ export interface ApiUser {
   email: string
   role: ApiRole
   isActive?: boolean
+  photoUrl?: string | null
 }
 
 export interface LoginRequest {
@@ -41,6 +42,12 @@ export interface CreateUserRequest {
   email: string
   role: ApiRole
   password?: string
+}
+
+export interface UpdateUserRequest {
+  displayName?: string
+  role?: ApiRole
+  photoUrl?: string
 }
 
 /* ============ Documents ============ */

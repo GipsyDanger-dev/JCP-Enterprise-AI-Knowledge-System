@@ -43,6 +43,7 @@ enum AuditActorType {
 enum AuditAction {
   AUTH_LOGIN
   USER_CREATED
+  USER_UPDATED
   DOCUMENT_UPLOADED
   DOCUMENT_DELETED
   PROCESSING_JOB_CLAIMED
@@ -57,6 +58,7 @@ model User {
   displayName   String         @map("display_name")
   role          UserRole       @default(USER)
   isActive      Boolean        @default(true) @map("is_active")
+  photoUrl      String?        @map("photo_url")
   lastLoginAt   DateTime?      @map("last_login_at")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")

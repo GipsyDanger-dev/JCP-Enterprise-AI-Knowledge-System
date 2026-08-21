@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -17,6 +17,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UsersService } from './users.service';
 
 @ApiTags('users')
@@ -43,5 +45,27 @@ export class UsersController {
   @ApiConflictResponse({ description: 'The email address is already registered' })
   create(@Body() input: CreateUserDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.usersService.create(input, actor);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update user profile (name, role, photo)' })
+  @ApiOkResponse({ description: 'Updated user profile' })
+  update(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() input: UpdateUserDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.usersService.update(id, input, actor);
+  }
+
+  @Put(':id/password')
+  @ApiOperation({ summary: 'Change user password' })
+  @ApiOkResponse({ description: 'Password changed successfully' })
+  changePassword(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() input: ChangePasswordDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.usersService.changePassword(id, input, actor);
   }
 }

@@ -214,9 +214,11 @@ button { cursor: pointer; }
   padding: 20px 14px 15px;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - var(--banner-offset));
-  position: relative;
+  height: calc(100vh - var(--banner-offset));
+  position: sticky;
+  top: var(--banner-offset);
   z-index: 20;
+  overflow-y: auto;
 }
 .brand-lockup { height: 38px; display: flex; align-items: center; gap: 9px; padding: 0 9px; font-size: var(--fs-2xl); }
 .brand-mark { width: 28px; height: 28px; border-radius: var(--radius-lg); background: var(--brand-600); color: var(--on-dark); display: grid; place-items: center; }

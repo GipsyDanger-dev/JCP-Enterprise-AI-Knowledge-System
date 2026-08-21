@@ -14,14 +14,14 @@ export function Sidebar({ menuOpen, collapsed, onClose }: { menuOpen: boolean; c
       <button className="mobile-close" title={isId ? 'Tutup navigasi' : 'Close navigation'} onClick={onClose}><X size={20} /></button>
       {!collapsed && (
         <div className="sidebar-user-info">
-          <span className="avatar">{person.initials}</span>
+          {user?.photoUrl ? <img className="avatar" src={user.photoUrl} alt="" style={{ objectFit: 'cover' }} /> : <span className="avatar">{person.initials}</span>}
           <div>
             <strong>{user?.displayName ?? person.name}</strong>
             <small className="workspace-label">Jogja Creative</small>
           </div>
         </div>
       )}
-      {collapsed && <div className="sidebar-user-avatar"><span className="avatar">{person.initials}</span></div>}
+      {collapsed && <div className="sidebar-user-avatar">{user?.photoUrl ? <img className="avatar" src={user.photoUrl} alt="" style={{ objectFit: 'cover' }} /> : <span className="avatar">{person.initials}</span>}</div>}
       <nav aria-label="Primary navigation">
         {!collapsed && <p>{isId ? 'Ruang kerja' : 'Workspace'}</p>}
         {navigation.map(({ id, label, icon: Icon }) => (

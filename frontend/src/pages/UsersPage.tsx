@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Check, ChevronDown, Loader2, Plus, Trash2, X } from 'lucide-react'
+import { Check, ChevronDown, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { errorMessage } from '@/api/client'
-import { createUser, deleteUser, listUsers } from '@/api/users'
+import { changePassword, createUser, deleteUser, listUsers, updateUser } from '@/api/users'
 import { userInitials, userRoleLabel } from '@/api/mockUsers'
 import type { ApiUser, ApiRole } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
@@ -28,6 +28,15 @@ export function UsersPage() {
   const [formPassword, setFormPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Edit form
+  const [editingUser, setEditingUser] = useState<ApiUser | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editRole, setEditRole] = useState<ApiRole>('USER')
+  const [editPhoto, setEditPhoto] = useState('')
+  const [editPassword, setEditPassword] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
@@ -80,6 +89,38 @@ export function UsersPage() {
       setUsers((prev) => prev.filter((u) => u.id !== user.id))
     } catch (err) {
       setError(errorMessage(err))
+    }
+  }
+
+  const openEdit = (user: ApiUser) => {
+    setEditingUser(user)
+    setEditName(user.displayName)
+    setEditRole(user.role)
+    setEditPhoto(user.photoUrl ?? '')
+    setEditPassword('')
+    setEditError(null)
+  }
+
+  const handleEdit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!editingUser || !editName.trim()) return
+    setEditSaving(true)
+    setEditError(null)
+    try {
+      const updated = await updateUser(editingUser.id, {
+        displayName: editName.trim(),
+        role: editRole,
+        photoUrl: editPhoto || undefined,
+      }, token ?? undefined)
+      setUsers((prev) => prev.map((u) => u.id === updated.id ? updated : u))
+      if (editPassword.trim()) {
+        await changePassword(editingUser.id, editPassword, token ?? undefined)
+      }
+      setEditingUser(null)
+    } catch (err) {
+      setEditError(errorMessage(err))
+    } finally {
+      setEditSaving(false)
     }
   }
 
@@ -145,14 +186,67 @@ export function UsersPage() {
                   <td>{user.role === 'ADMIN' ? (isId ? 'Akses penuh' : 'Full access') : (isId ? 'Perpustakaan pengetahuan' : 'Knowledge library')}</td>
                   <td><span className="active-user"><Check size={13} /> {isId ? 'Aktif' : 'Active'}</span></td>
                   <td>
-                    <button className="icon-button" title={`Hapus ${user.displayName}`} onClick={() => handleDelete(user)}>
-                      <Trash2 size={15} />
-                    </button>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button className="icon-button" title={isId ? `Edit ${user.displayName}` : `Edit ${user.displayName}`} onClick={() => openEdit(user)}>
+                        <Pencil size={15} />
+                      </button>
+                      <button className="icon-button" title={isId ? `Hapus ${user.displayName}` : `Delete ${user.displayName}`} onClick={() => handleDelete(user)}>
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Edit user modal */}
+      {editingUser && (
+        <div className="modal-overlay" onClick={() => setEditingUser(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{isId ? 'Edit pengguna' : 'Edit user'}</h2>
+              <button className="icon-button" onClick={() => setEditingUser(null)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleEdit}>
+              {editError && <div className="auth-error">{editError}</div>}
+
+              <div className="auth-field">
+                <label>{isId ? 'Nama' : 'Name'}</label>
+                <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} required />
+              </div>
+
+              <div className="auth-field">
+                <label>{isId ? 'Role' : 'Role'}</label>
+                <div className="select-wrapper">
+                  <select value={editRole} onChange={(e) => setEditRole(e.target.value as ApiRole)}>
+                    <option value="USER">Employee</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                  <ChevronDown size={15} className="select-icon" />
+                </div>
+              </div>
+
+              <div className="auth-field">
+                <label>{isId ? 'Foto profil (URL)' : 'Profile photo (URL)'}</label>
+                <input type="url" value={editPhoto} onChange={(e) => setEditPhoto(e.target.value)} placeholder="https://example.com/photo.jpg" />
+              </div>
+
+              <div className="auth-field">
+                <label>{isId ? 'Password baru (opsional)' : 'New password (optional)'}</label>
+                <input type="password" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder={isId ? 'Kosongkan jika tidak diubah' : 'Leave empty to keep current'} minLength={8} />
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" className="secondary-button" onClick={() => setEditingUser(null)}>{isId ? 'Batal' : 'Cancel'}</button>
+                <button type="submit" className="primary-button" disabled={editSaving || !editName.trim()}>
+                  {editSaving ? <><Loader2 size={15} className="spin" /> {isId ? 'Menyimpan…' : 'Saving…'}</> : (isId ? 'Simpan' : 'Save')}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
