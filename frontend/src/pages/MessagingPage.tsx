@@ -47,6 +47,22 @@ export function MessagingPage() {
     return () => { cancelled = true }
   }, [user, token])
 
+  // Keep the employee conversation current without requiring a browser refresh.
+  useEffect(() => {
+    if (!conversationId || !token) return
+    let cancelled = false
+    const refreshMessages = () => {
+      getDirectMessages(conversationId, token)
+        .then((msgs) => { if (!cancelled) setMessages(msgs) })
+        .catch((err) => { if (!cancelled) setError(errorMessage(err)) })
+    }
+    const interval = window.setInterval(refreshMessages, 2_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [conversationId, token])
+
   // Reset unread count when opening messages
   useEffect(() => {
     setUnreadMessages(0)

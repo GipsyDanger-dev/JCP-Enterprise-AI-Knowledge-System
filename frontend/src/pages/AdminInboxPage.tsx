@@ -47,6 +47,17 @@ export function AdminInboxPage() {
 
   useEffect(() => { loadConversations() }, [loadConversations])
 
+  // Polling keeps the inbox list current for messages sent by employees.
+  useEffect(() => {
+    if (!token) return
+    const interval = window.setInterval(() => {
+      listConversations(token)
+        .then(setConversations)
+        .catch((err) => setError(errorMessage(err)))
+    }, 2_000)
+    return () => window.clearInterval(interval)
+  }, [token])
+
   // Load messages when conversation selected
   useEffect(() => {
     if (!selectedConv || !token) return
@@ -57,6 +68,22 @@ export function AdminInboxPage() {
       .catch((err) => { if (!cancelled) setError(errorMessage(err)) })
       .finally(() => { if (!cancelled) setLoadingMessages(false) })
     return () => { cancelled = true }
+  }, [selectedConv, token])
+
+  // Refresh the selected thread so employee replies appear without a reload.
+  useEffect(() => {
+    if (!selectedConv || !token) return
+    let cancelled = false
+    const refreshMessages = () => {
+      getAdminMessages(selectedConv.id, token)
+        .then((msgs) => { if (!cancelled) setMessages(msgs) })
+        .catch((err) => { if (!cancelled) setError(errorMessage(err)) })
+    }
+    const interval = window.setInterval(refreshMessages, 2_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
   }, [selectedConv, token])
 
   // Subscribe to typing state
