@@ -5,6 +5,7 @@ import { PageHeading } from '@/components/PageHeading'
 import { errorMessage } from '@/api/client'
 import { changePassword, createUser, deleteUser, listUsers, updateUser } from '@/api/users'
 import { userInitials, userRoleLabel } from '@/utils/users'
+import { prepareProfilePhoto } from '@/utils/profilePhoto'
 import type { ApiUser, ApiRole } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
@@ -105,17 +106,17 @@ export function UsersPage() {
     setEditError(null)
   }
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 2 * 1024 * 1024) {
-      setEditError(isId ? 'Ukuran foto maksimal 2MB' : 'Photo size must not exceed 2MB')
-      return
+    setEditError(null)
+    try {
+      setEditPhoto(await prepareProfilePhoto(file))
+    } catch (err) {
+      setEditError(isId ? errorMessage(err) : 'Unable to prepare this photo. Choose another image.')
+    } finally {
+      e.target.value = ''
     }
-    const reader = new FileReader()
-    reader.onload = () => setEditPhoto(reader.result as string)
-    reader.readAsDataURL(file)
-    e.target.value = ''
   }
 
   const handleEdit = async (e: FormEvent) => {
