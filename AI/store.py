@@ -30,7 +30,7 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from config import EMBEDDING_MODEL
 from generation.citations import citations_from_matches
-from generation.guardrails import no_answer_response
+from generation.guardrails import is_no_answer, no_answer_response
 from generation.llm import DEFAULT_MODEL, generate_answer
 from ingestion.chunking import chunk_pages
 from ingestion.parsers import read_document
@@ -276,6 +276,8 @@ class PgVectorStore:
                 if use_llm
                 else matches[0][1]["text"]
             )
+            if is_no_answer(answer):
+                return no_answer_response()
             return {
                 "answer": answer,
                 "citations": citations,
@@ -318,6 +320,8 @@ class PgVectorStore:
                 if use_llm
                 else matches[0][1]["text"]
             )
+            if is_no_answer(answer):
+                return no_answer_response()
             return {
                 "answer": answer,
                 "citations": citations,
