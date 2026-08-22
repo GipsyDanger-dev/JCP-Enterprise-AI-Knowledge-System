@@ -14,9 +14,9 @@ export class UpdateUserDto {
   @IsEnum(UserRole)
   role?: UserRole;
 
-  @ApiPropertyOptional({ example: 'https://example.com/photo.jpg' })
+  @ApiPropertyOptional({ example: 'https://example.com/photo.jpg', maxLength: 220000 })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(220000)
   photoUrl?: string;
 }
