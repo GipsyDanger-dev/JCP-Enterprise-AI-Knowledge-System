@@ -33,6 +33,15 @@ class HttpApiTests(unittest.TestCase):
         body = response.json()
         self.assertFalse(body["grounded"])
         self.assertEqual(body["answer"], "Informasi tidak ditemukan pada dokumen yang tersedia.")
+        self.assertEqual(body["citations"], [])
+
+    def test_ask_rejects_out_of_scope_math_without_citations(self):
+        response = self.client.post("/ask", json={"query": "1+1 berapa"})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertFalse(body["grounded"])
+        self.assertIn("hanya dapat membantu", body["answer"])
+        self.assertEqual(body["citations"], [])
 
     def test_ask_empty_query_is_400(self):
         response = self.client.post("/ask", json={"query": "   "})

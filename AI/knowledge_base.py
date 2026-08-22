@@ -22,7 +22,7 @@ from ingestion.parsers import read_document
 from ingestion.sections import extract_sections
 from retrieval.search import build_retriever
 from generation.citations import citations_from_matches
-from generation.guardrails import no_answer_response
+from generation.guardrails import is_no_answer, no_answer_response
 from generation.llm import DEFAULT_MODEL, generate_answer
 from config import EMBEDDING_MODEL
 
@@ -123,6 +123,8 @@ class KnowledgeBase:
             answer = generate_answer(query, matches, model=model, api_key=api_key)
         else:
             answer = matches[0][1]["text"]
+        if is_no_answer(answer):
+            return no_answer_response()
         return {
             "answer": answer,
             "citations": citations,
