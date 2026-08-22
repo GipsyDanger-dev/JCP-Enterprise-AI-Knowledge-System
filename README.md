@@ -6,24 +6,21 @@ dan menerima jawaban dengan citation dari chunk hasil retrieval.
 
 ## Status project
 
-Project ini merupakan hasil penggabungan Backend, Frontend, dan AI Service yang
-sebelumnya dikembangkan terpisah. Fondasi setiap service sudah tersedia, tetapi
-integrasi end-to-end belum selesai.
+Project ini menggabungkan Backend, Frontend, dan AI Service dalam satu alur
+RAG: login, upload dokumen, ingest, retrieval, chat, citation, dan riwayat
+percakapan.
 
 | Komponen | Status |
 | --- | --- |
 | Backend auth | Sudah diimplementasikan (JWT dan role guard) |
 | Backend documents | Sudah diimplementasikan (upload, list, status, delete) |
-| Backend chat, AI, users | Masih skeleton |
-| Frontend | UI dan mock API tersedia; belum teruji penuh dengan Backend asli |
+| Backend chat, AI, users | Terhubung ke AI Service dan database |
+| Frontend | Terhubung ke Backend asli, tanpa mock runtime |
 | AI Service | Ingestion, retrieval, generation, citation, dan evaluasi tersedia |
-| Integrasi Backend–AI | Belum selesai |
+| Integrasi Backend–AI | Backend meneruskan file ke endpoint ingestion AI |
 
-Masalah integrasi utama yang tersisa:
-
-1. Backend belum mengirim binary dokumen ke endpoint ingestion AI.
-2. Modul Backend chat, AI wrapper, dan users masih skeleton.
-3. Kontrak Frontend belum sama dengan Backend (field, UUID, role, dan status).
+Untuk runtime nyata, sistem memerlukan credential Neon (PostgreSQL dengan
+pgvector) dan SumoPod. Credential tidak disediakan oleh repository.
 
 ## Tech stack
 
@@ -50,14 +47,21 @@ JCP-Enterprise-AI-Knowledge-System/
 └── README.md
 ```
 
-## Menjalankan seluruh service
+## Menjalankan lokal tanpa Docker
 
-Prasyarat: Git, Docker Desktop/Docker Engine, dan Docker Compose v2.
+Prasyarat: Node.js, Python 3, dependensi masing-masing service sudah terpasang,
+database Neon dengan ekstensi `vector`, serta API key SumoPod yang aktif.
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up --build
+# Isi .env, lalu jalankan migration, optional seed, dan seluruh service native.
+powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1 -Seed
 ```
+
+Skrip membaca `.env` hanya ke process environment, tidak mencetak credential,
+menjalankan Prisma migration/seed, lalu menyalakan AI API, Backend, dan Frontend.
+Gunakan `-Seed` saat pertama kali menyiapkan akun uji; berikutnya parameter itu
+boleh dihilangkan.
 
 | Service | URL |
 | --- | --- |
@@ -68,14 +72,16 @@ docker compose up --build
 | AI Service | http://localhost:8001 |
 | AI health | http://localhost:8001/health |
 | AI Swagger | http://localhost:8001/docs |
-| PostgreSQL | localhost:5432 |
+| PostgreSQL | Neon (sesuai `DATABASE_URL`) |
 
-Hentikan service dengan `docker compose down`. Jangan gunakan flag `-v` kecuali
-memang ingin menghapus seluruh data PostgreSQL pada volume lokal.
+Hentikan service lokal dengan:
 
-> AI Service dan Backend memakai database yang sama. Schema chunk sudah
-> mereferensikan `document_versions`, tetapi alur pengiriman file dari Backend
-> ke AI belum diimplementasikan.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\stop-local.ps1
+```
+
+Docker Compose dipakai pada tahap deployment VPS, bukan sebagai prasyarat
+runtime lokal.
 
 ## Environment
 
@@ -85,13 +91,9 @@ Salin `.env.example` menjadi `.env`. Jangan commit `.env` atau credential asli.
 | --- | --- |
 | `DATABASE_URL` | Koneksi PostgreSQL bersama |
 | `JWT_SECRET` | Penandatanganan JWT Backend |
-| `AI_SERVICE_URL` | URL internal AI dari container Backend |
+| `AI_SERVICE_URL` | URL AI dari Backend; lokal `http://127.0.0.1:8001` |
 | `SUMOPOD_API_KEY` | Akses embedding/LLM AI Service |
-| `VITE_API_BASE_URL` | Base URL Backend dari Frontend |
-| `VITE_USE_MOCK_AUTH` | Mengaktifkan atau mematikan mock frontend |
-
-Di jaringan Docker, Backend memanggil AI melalui `http://ai-api:8000`. Port
-`8001` hanya merupakan port AI yang diekspos ke host.
+| `VITE_API_BASE_URL` | Base URL Backend dari browser lokal |
 
 ## Database dan seed
 
