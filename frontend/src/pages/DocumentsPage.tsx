@@ -4,7 +4,7 @@ import { ArrowUpRight, ChevronDown, Download, FileText, FolderOpen, Search, Shie
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { UploadModal } from '@/components/UploadModal'
-import { downloadDocument, getDocumentChunks, type DocumentChunk } from '@/api/documents'
+import { downloadDocument, getDocumentBlob, getDocumentChunks, type DocumentChunk } from '@/api/documents'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import type { DocumentItem } from '@/types/domain'
@@ -23,14 +23,48 @@ function DocViewer({ doc, isId, canManage, token, onClose, onDelete, onChunksLoa
   chunksLoading: boolean
   setChunksLoading: (v: boolean) => void
 }) {
+  const extension = doc.name.split('.').pop()?.toLowerCase()
+  const canRenderOriginal = extension === 'pdf' || extension === 'docx' || extension === 'txt' || extension === 'md'
+  const [readerUrl, setReaderUrl] = useState<string | null>(null)
+  const [readerText, setReaderText] = useState<string | null>(null)
+  const [readerLoading, setReaderLoading] = useState(false)
+  const [readerError, setReaderError] = useState(false)
+
   useEffect(() => {
-    if (doc.status !== 'Ready' || chunks.length > 0) return
+    if (doc.status !== 'Ready' || canRenderOriginal || chunks.length > 0) return
     setChunksLoading(true)
     getDocumentChunks(doc.id, token ?? undefined)
       .then((res) => onChunksLoaded(res.chunks))
       .catch(() => onChunksLoaded([]))
       .finally(() => setChunksLoading(false))
-  }, [chunks.length, doc.id, doc.status, onChunksLoaded, setChunksLoading, token])
+  }, [canRenderOriginal, chunks.length, doc.id, doc.status, onChunksLoaded, setChunksLoading, token])
+
+  useEffect(() => {
+    if (doc.status !== 'Ready' || !canRenderOriginal) return
+    let cancelled = false
+    let objectUrl: string | null = null
+    setReaderLoading(true)
+    setReaderError(false)
+    setReaderText(null)
+    setReaderUrl(null)
+
+    getDocumentBlob(doc.id, token ?? undefined)
+      .then(async (blob) => {
+        if (extension === 'pdf') {
+          objectUrl = URL.createObjectURL(blob)
+          if (!cancelled) setReaderUrl(objectUrl)
+          return
+        }
+        const text = extension === 'docx'
+          ? (await (await import('mammoth')).extractRawText({ arrayBuffer: await blob.arrayBuffer() })).value
+          : await blob.text()
+        if (!cancelled) setReaderText(text.trim())
+      })
+      .catch(() => { if (!cancelled) setReaderError(true) })
+      .finally(() => { if (!cancelled) setReaderLoading(false) })
+
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl) }
+  }, [canRenderOriginal, doc.id, doc.status, extension, token])
 
   // Group chunks by page
   const pages = useMemo(() => {
@@ -83,17 +117,32 @@ function DocViewer({ doc, isId, canManage, token, onClose, onDelete, onChunksLoa
                 : (isId ? 'Dokumen gagal diproses.' : 'Document failed to process.')}</p>
             </div>
           )}
-          {doc.status === 'Ready' && chunksLoading && (
+          {doc.status === 'Ready' && (chunksLoading || readerLoading) && (
             <div className="doc-viewer-loading">
-              <p>{isId ? 'Memuat pratinjau...' : 'Loading preview...'}</p>
+              <p>{isId ? 'Memuat dokumen...' : 'Loading document...'}</p>
             </div>
           )}
-          {doc.status === 'Ready' && !chunksLoading && chunks.length === 0 && (
+          {doc.status === 'Ready' && !readerLoading && readerUrl && (
+            <iframe className="doc-reader-pdf" title={doc.name} src={readerUrl} />
+          )}
+          {doc.status === 'Ready' && !readerLoading && readerText !== null && (
+            <article className="doc-reader-paper" aria-label={doc.name}>
+              {readerText ? readerText.split(/\n{2,}/).map((paragraph, index) => (
+                <p key={index}>{paragraph.replace(/\n/g, ' ')}</p>
+              )) : <p>{isId ? 'Dokumen ini tidak memiliki teks yang dapat dibaca.' : 'This document has no readable text.'}</p>}
+            </article>
+          )}
+          {doc.status === 'Ready' && !readerLoading && readerError && (
             <div className="doc-viewer-empty">
-              <p>{isId ? 'Tidak ada pratinjau tersedia.' : 'No preview available.'}</p>
+              <p>{isId ? 'Pratinjau asli tidak dapat dimuat. Unduh dokumen untuk membukanya.' : 'The original preview could not be loaded. Download the document to open it.'}</p>
             </div>
           )}
-          {doc.status === 'Ready' && !chunksLoading && pages.length > 0 && (
+          {doc.status === 'Ready' && !canRenderOriginal && !chunksLoading && chunks.length === 0 && (
+            <div className="doc-viewer-empty">
+              <p>{isId ? 'Pratinjau tidak tersedia untuk format ini. Unduh dokumen untuk membukanya.' : 'Preview is not available for this format. Download the document to open it.'}</p>
+            </div>
+          )}
+          {doc.status === 'Ready' && !canRenderOriginal && !chunksLoading && pages.length > 0 && (
             <div className="doc-viewer-pages">
               {pages.map(([pageNum, pageChunks]) => (
                 <div key={pageNum} className="doc-viewer-page">

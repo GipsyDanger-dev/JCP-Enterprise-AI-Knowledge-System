@@ -39,6 +39,13 @@ export function getDocumentChunks(id: string, token?: string): Promise<DocumentC
   return request<DocumentChunksResponse>(`/documents/${id}/chunks`, { headers: authHeaders(token) })
 }
 
+export async function getDocumentBlob(id: string, token?: string): Promise<Blob> {
+  const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/documents/${id}/download`
+  const response = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  if (!response.ok) throw new Error('Unable to load document')
+  return response.blob()
+}
+
 export function downloadDocument(id: string, filename: string, token?: string): void {
   const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/documents/${id}/download`
   const a = document.createElement('a')
