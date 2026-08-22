@@ -638,7 +638,7 @@ button { cursor: pointer; }
 .verified { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 6px 12px; background: var(--success-bg); border: 1px solid rgba(37,112,90,.15); border-radius: var(--radius-pill); font-size: var(--fs-xs); color: var(--success-strong); font-weight: var(--fw-semibold); }
 .verified-icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--success-strong); color: white; }
 .spin { animation: spin .8s linear infinite; }
-.chat-composer { width: min(760px, 100%); margin: 0 auto; flex-shrink: 0; border: 1px solid var(--border-strong); background: var(--bg-card); border-radius: var(--radius-lg); padding: 7px; display: flex; align-items: center; box-shadow: var(--shadow-md); transition: border-color var(--ease-fast), box-shadow var(--ease-fast); }
+.chat-composer { width: min(760px, 100%); margin: 0 auto 14px; flex-shrink: 0; border: 1px solid var(--border-strong); background: var(--bg-card); border-radius: var(--radius-lg); padding: 7px; display: flex; align-items: center; box-shadow: var(--shadow-md); transition: border-color var(--ease-fast), box-shadow var(--ease-fast); }
 .chat-composer:focus-within { border-color: var(--brand-400); box-shadow: 0 0 0 3px var(--brand-100), var(--shadow-md); }
 .chat-composer input { flex: 1; min-width: 0; min-height: 34px; border: 0; outline: 0; padding: 0 11px; font-size: var(--fs-md); background: transparent; }
 .chat-composer button { width: 36px; height: 36px; border: 0; border-radius: var(--radius-md); background: var(--brand-600); color: var(--on-dark); display: grid; place-items: center; cursor: pointer; transition: background var(--ease-fast), transform var(--ease-fast); }
