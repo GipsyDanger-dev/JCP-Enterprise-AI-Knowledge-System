@@ -63,6 +63,9 @@ menjalankan Prisma migration/seed, lalu menyalakan AI API, Backend, dan Frontend
 Gunakan `-Seed` saat pertama kali menyiapkan akun uji; berikutnya parameter itu
 boleh dihilangkan.
 
+Jika port `5173` sedang dipakai, isi `FRONTEND_PORT` dengan port kosong di
+`.env` sebelum menjalankan launcher.
+
 | Service | URL |
 | --- | --- |
 | Frontend | http://localhost:5173 |

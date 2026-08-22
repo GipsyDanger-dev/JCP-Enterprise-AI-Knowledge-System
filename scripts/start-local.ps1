@@ -77,13 +77,19 @@ if (-not $env:AI_SERVICE_URL) { $env:AI_SERVICE_URL = 'http://127.0.0.1:8001' }
 if (-not $env:VITE_API_BASE_URL) { $env:VITE_API_BASE_URL = 'http://127.0.0.1:8000' }
 if (-not $env:BACKEND_PORT) { $env:BACKEND_PORT = '8000' }
 if (-not $env:PORT) { $env:PORT = $env:BACKEND_PORT }
+if (-not $env:FRONTEND_PORT) { $env:FRONTEND_PORT = '5173' }
 
 if ($Seed) {
   Require-Environment -Names @('SEED_ADMIN_EMAIL', 'SEED_ADMIN_PASSWORD', 'SEED_USER_EMAIL', 'SEED_USER_PASSWORD')
 }
 
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
-& npm --prefix (Join-Path $projectRoot 'backend') exec prisma -- migrate deploy
+$prisma = Join-Path $projectRoot 'backend\node_modules\.bin\prisma.cmd'
+$prismaSchema = Join-Path $projectRoot 'backend\prisma\schema.prisma'
+if (-not (Test-Path $prisma)) {
+  throw "Prisma belum terpasang. Jalankan npm install pada $projectRoot\\backend terlebih dahulu."
+}
+& $prisma migrate deploy --schema $prismaSchema
 if ($LASTEXITCODE -ne 0) { throw 'Prisma migration gagal.' }
 
 if ($Seed) {
@@ -93,9 +99,9 @@ if ($Seed) {
 
 Start-LocalProcess -Name 'ai-api' -WorkingDirectory (Join-Path $projectRoot 'AI') -Command 'python -m uvicorn http_api:app --host 127.0.0.1 --port 8001'
 Start-LocalProcess -Name 'backend' -WorkingDirectory (Join-Path $projectRoot 'backend') -Command 'npm run start:dev'
-Start-LocalProcess -Name 'frontend' -WorkingDirectory (Join-Path $projectRoot 'frontend') -Command 'npm run dev -- --host 127.0.0.1'
+Start-LocalProcess -Name 'frontend' -WorkingDirectory (Join-Path $projectRoot 'frontend') -Command "npm run dev -- --host 127.0.0.1 --port $env:FRONTEND_PORT --strictPort"
 
 Wait-ForHealth -Url 'http://127.0.0.1:8001/health' -Name 'AI API'
 Wait-ForHealth -Url "http://127.0.0.1:$env:PORT/health" -Name 'Backend'
-Wait-ForHealth -Url 'http://127.0.0.1:5173' -Name 'Frontend'
-Write-Host 'Local runtime aktif di http://127.0.0.1:5173'
+Wait-ForHealth -Url "http://127.0.0.1:$env:FRONTEND_PORT" -Name 'Frontend'
+Write-Host "Local runtime aktif di http://127.0.0.1:$env:FRONTEND_PORT"
