@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ArrowUpRight, FileText, Loader2, Send, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, ArrowUpRight, FileText, Loader2, MessageSquareText, Send, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { SourceCard } from '@/components/SourceCard'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
@@ -63,7 +63,13 @@ export function ChatPage() {
 
   return (
     <div className="chat-page">
-      <PageHeading eyebrow={isId ? 'Asisten AI' : 'AI assistant'} title={isId ? 'Tanyakan dengan percaya diri' : 'Ask with confidence'} detail={isId ? 'Setiap jawaban tetap terhubung ke sumbernya.' : 'Every answer stays linked to its source.'} />
+      <div className="chat-workspace-header">
+        <PageHeading eyebrow={isId ? 'Asisten AI' : 'AI assistant'} title={isId ? 'Knowledge workspace' : 'Knowledge workspace'} detail={isId ? 'Jawaban berbasis dokumen perusahaan.' : 'Answers grounded in company documents.'} />
+        <div className="chat-trust-status">
+          <ShieldCheck size={16} />
+          <span>{isId ? 'Sumber terverifikasi' : 'Verified sources'}</span>
+        </div>
+      </div>
       <div className={`chat-canvas ${hasConversation ? 'has-history' : ''}`}>
         {hasConversation ? (
           <div className="conversation">
@@ -75,7 +81,7 @@ export function ChatPage() {
           </div>
         ) : (
           <div className="chat-empty">
-            <span><Sparkles size={27} /></span>
+            <span><MessageSquareText size={24} /></span>
             <h2>{isId ? 'Apa yang ingin Anda ketahui?' : 'What would you like to know?'}</h2>
             <p>{isId ? 'Tanyakan tentang kebijakan, SOP, handbooks, dan dokumen internal.' : 'Ask across policies, SOPs, handbooks, and internal documents.'}</p>
             <div>{quickQuestions(language).slice(0, 2).map((item) => (
