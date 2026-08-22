@@ -8,12 +8,24 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from typing import Any
 
 from config import DEFAULT_MODEL, SUMOPOD_API_KEY_ENV, SUMOPOD_BASE_URL
 from generation.prompts import build_messages
+
+
+_INTERNAL_CHUNK_REFERENCE = re.compile(
+    r"\s*\[[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}-\d+(?:\s*-\s*[^\]]*)?\]",
+    re.IGNORECASE,
+)
+
+
+def strip_internal_chunk_references(answer: str) -> str:
+    """Keep chunk coordinates out of text; citations are sent as metadata."""
+    return _INTERNAL_CHUNK_REFERENCE.sub("", answer).strip()
 
 
 def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
@@ -45,6 +57,6 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
     except urllib.error.URLError as exc:
         raise RuntimeError(f"SumoPod API unreachable: {exc.reason}") from exc
     try:
-        return data["choices"][0]["message"]["content"].strip()
+        return strip_internal_chunk_references(data["choices"][0]["message"]["content"])
     except (KeyError, IndexError, TypeError) as exc:
         raise RuntimeError(f"Unexpected SumoPod response: {json.dumps(data)[:300]}") from exc

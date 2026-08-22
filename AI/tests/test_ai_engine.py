@@ -59,7 +59,7 @@ class LlmModeTests(unittest.TestCase):
                 generate_answer("q", [])
         self.assertIn("SUMOPOD_API_KEY", str(ctx.exception))
 
-    def test_llm_answer_keeps_metadata_citations(self):
+    def test_llm_answer_hides_internal_chunk_coordinates(self):
         class FakeResponse:
             def __enter__(self):
                 return self
@@ -68,13 +68,13 @@ class LlmModeTests(unittest.TestCase):
                 return False
 
             def read(self):
-                return json.dumps({"choices": [{"message": {"content": "Maksimal Rp900.000 [doc-1-1]"}}]}).encode()
+                return json.dumps({"choices": [{"message": {"content": "Maksimal Rp900.000 [7db293d7-e271-473e-9d0d-431972042f04-1 - Biaya hotel]"}}]}).encode()
 
         with mock.patch.dict(os.environ, {"SUMOPOD_API_KEY": "sk-test"}, clear=False), \
              mock.patch("generation.llm.urllib.request.urlopen", return_value=FakeResponse()):
             result = self.kb.ask("Berapa maksimal biaya hotel Manager?", use_llm=True)
         self.assertTrue(result["grounded"])
-        self.assertEqual(result["answer"], "Maksimal Rp900.000 [doc-1-1]")
+        self.assertEqual(result["answer"], "Maksimal Rp900.000")
         self.assertEqual(result["citations"][0]["chunk_id"], "doc-1-1")
         self.assertEqual(result["citations"][0]["page_number"], 7)
 
