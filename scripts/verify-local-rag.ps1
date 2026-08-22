@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-  [string]$ApiBaseUrl = 'http://127.0.0.1:8000'
+  [string]$ApiBaseUrl = 'http://127.0.0.1:8000',
+  [string]$FixturePath,
+  [switch]$Cleanup
 )
 
 $ErrorActionPreference = 'Stop'
@@ -8,6 +10,7 @@ Add-Type -AssemblyName System.Net.Http
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $envFile = Join-Path $projectRoot '.env'
 $fixture = Join-Path $projectRoot 'frontend\e2e\fixtures\sample-policy.pdf'
+if ($FixturePath) { $fixture = $FixturePath }
 
 function Import-LocalEnvironment {
   if (-not (Test-Path $envFile)) { throw "File tidak ditemukan: $envFile" }
@@ -25,6 +28,7 @@ function Get-DocumentId {
   param([object]$Value)
   if ($null -eq $Value) { return $null }
   if ($Value.PSObject.Properties.Name -contains 'id') { return $Value.id }
+  if ($Value.PSObject.Properties.Name -contains 'documentId') { return $Value.documentId }
   if ($Value.PSObject.Properties.Name -contains 'document') { return Get-DocumentId $Value.document }
   return $null
 }
@@ -40,12 +44,13 @@ $login = Invoke-RestMethod -Method Post -Uri "$ApiBaseUrl/auth/login" -ContentTy
   password = $env:SEED_ADMIN_PASSWORD
 } | ConvertTo-Json)
 $headers = @{ Authorization = "Bearer $($login.accessToken)" }
+$title = "Local RAG verification $(Get-Date -Format 'yyyyMMddHHmmss')"
 
 $client = [System.Net.Http.HttpClient]::new()
 $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Post, "$ApiBaseUrl/documents")
 $request.Headers.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer', $login.accessToken)
 $form = [System.Net.Http.MultipartFormDataContent]::new()
-$form.Add([System.Net.Http.StringContent]::new('Local RAG verification policy'), 'title')
+$form.Add([System.Net.Http.StringContent]::new($title), 'title')
 $fileContent = [System.Net.Http.ByteArrayContent]::new([System.IO.File]::ReadAllBytes($fixture))
 $fileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse('application/pdf')
 $form.Add($fileContent, 'file', 'local-rag-verification-policy.pdf')
@@ -55,7 +60,7 @@ $uploadBody = $upload.Content.ReadAsStringAsync().GetAwaiter().GetResult()
 
 if ($upload.StatusCode.value__ -eq 409) {
   $documents = Invoke-RestMethod -Method Get -Uri "$ApiBaseUrl/documents" -Headers $headers
-  $document = @($documents | Where-Object { $_.title -eq 'Local RAG verification policy' }) | Select-Object -First 1
+  $document = @($documents | Where-Object { $_.title -eq $title }) | Select-Object -First 1
   $documentId = Get-DocumentId $document
 } elseif ($upload.IsSuccessStatusCode) {
   $documentId = Get-DocumentId ($uploadBody | ConvertFrom-Json)
@@ -63,13 +68,25 @@ if ($upload.StatusCode.value__ -eq 409) {
   throw "Upload gagal dengan HTTP $($upload.StatusCode.value__)."
 }
 
-if (-not $documentId) { throw 'ID dokumen upload tidak ditemukan.' }
+if (-not $documentId) { throw "ID dokumen upload tidak ditemukan: $uploadBody" }
 
 for ($attempt = 1; $attempt -le 30; $attempt++) {
   $status = Invoke-RestMethod -Method Get -Uri "$ApiBaseUrl/documents/$documentId/status" -Headers $headers
   $state = if ($status.status) { $status.status } elseif ($status.document.status) { $status.document.status } else { $null }
   if ($state -eq 'READY') {
-    Write-Host 'PASS: document upload and AI ingestion reached READY'
+    $chunks = Invoke-RestMethod -Method Get -Uri "$ApiBaseUrl/documents/$documentId/chunks" -Headers $headers
+    if (@($chunks).Count -lt 1) { throw 'Document READY without retrievable chunks.' }
+
+    $download = Invoke-WebRequest -Method Get -Uri "$ApiBaseUrl/documents/$documentId/download" -Headers $headers -UseBasicParsing
+    if ($download.RawContentLength -lt 1) { throw 'Document download returned no content.' }
+
+    Invoke-RestMethod -Method Get -Uri "$ApiBaseUrl/audit-logs?targetId=$documentId" -Headers $headers | Out-Null
+    Write-Host 'PASS: document upload, ingestion, chunks, download, and audit log'
+
+    if ($Cleanup) {
+      Invoke-RestMethod -Method Delete -Uri "$ApiBaseUrl/documents/$documentId" -Headers $headers | Out-Null
+      Write-Host 'PASS: document delete'
+    }
     exit 0
   }
   if ($state -eq 'FAILED') {

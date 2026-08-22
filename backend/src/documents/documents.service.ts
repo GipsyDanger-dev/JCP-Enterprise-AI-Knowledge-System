@@ -92,7 +92,7 @@ export class DocumentsService {
           fileSize: file.size,
         },
       });
-    });
+    }, { maxWait: 10_000, timeout: 20_000 });
 
     return {
       id: documentId,
