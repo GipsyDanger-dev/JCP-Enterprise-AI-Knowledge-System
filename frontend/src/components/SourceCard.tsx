@@ -6,11 +6,12 @@ interface SourceCardProps {
   detail: string
   excerpt?: string
   trailing?: ReactNode
+  onOpen?: () => void
 }
 
-export function SourceCard({ title, detail, excerpt, trailing }: SourceCardProps) {
+export function SourceCard({ title, detail, excerpt, trailing, onOpen }: SourceCardProps) {
   return (
-    <div className="source-card">
+    <button type="button" className="source-card" onClick={onOpen} title="Preview source">
       <div>
         <div className="source-card-header">
           <FileText size={17} />
@@ -26,7 +27,7 @@ export function SourceCard({ title, detail, excerpt, trailing }: SourceCardProps
           </div>
         )}
       </div>
-      {trailing ?? <button title="Open source"><ArrowUpRight size={15} /></button>}
-    </div>
+      {trailing ?? <ArrowUpRight size={15} />}
+    </button>
   )
 }

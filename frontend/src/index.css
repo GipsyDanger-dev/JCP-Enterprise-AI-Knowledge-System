@@ -1153,3 +1153,20 @@ button { cursor: pointer; }
   .user-message { max-width: 85%; }
   .data-table table { min-width: 620px; }
 }
+/* Compact source inspection and calmer message surfaces. */
+.source-card { width: 100%; text-align: left; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 12px; cursor: pointer; display: flex; gap: 12px; justify-content: space-between; color: inherit; }
+.source-card:hover { border-color: var(--accent); background: var(--surface-hover); }
+.source-card-header { display: flex; align-items: flex-start; gap: 8px; }
+.source-card-header strong, .source-card-header small { display: block; }
+.source-card-header small { margin-top: 3px; color: var(--muted); }
+.source-card-excerpt { display: flex; gap: 7px; margin-top: 9px; color: var(--muted); }
+.source-card-excerpt p { margin: 0; line-height: 1.5; }
+.source-preview-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgb(15 23 42 / 45%); }
+.source-preview { width: min(560px, 100%); border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 18px; box-shadow: 0 20px 48px rgb(15 23 42 / 24%); }
+.source-preview header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; color: var(--muted); }
+.source-preview header span { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.source-preview > strong, .source-preview > small { display: block; }
+.source-preview > small { margin-top: 5px; color: var(--muted); }
+.source-preview blockquote { margin: 18px 0 0; border-left: 3px solid var(--accent); padding: 8px 0 8px 14px; color: var(--text); line-height: 1.65; }
+.messaging-bubble-time { display: inline-flex; align-items: center; gap: 4px; }
+.messaging-bubble.sent .messaging-bubble-time svg { color: var(--accent); }

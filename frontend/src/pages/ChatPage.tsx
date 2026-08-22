@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { AlertTriangle, ArrowUpRight, Loader2, Send, Sparkles } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertTriangle, ArrowUpRight, FileText, Loader2, Send, Sparkles, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { SourceCard } from '@/components/SourceCard'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
@@ -7,7 +7,9 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
 import type { ChatMessage } from '@/context/workspaceContextValue'
 
-function ChatMessageItem({ msg, isId, isPending }: { msg: ChatMessage; isId: boolean; isPending: boolean }) {
+type Citation = ChatMessage['citations'][number]
+
+function ChatMessageItem({ msg, isId, isPending, onOpenSource }: { msg: ChatMessage; isId: boolean; isPending: boolean; onOpenSource: (citation: Citation) => void }) {
   return (
     <>
       <div className="user-message">{msg.question}</div>
@@ -36,6 +38,7 @@ function ChatMessageItem({ msg, isId, isPending }: { msg: ChatMessage; isId: boo
                   detail={[c.sectionTitle, c.pageNumber ? `Page ${c.pageNumber}` : null, c.version].filter(Boolean).join(' · ')}
                   excerpt={c.excerpt}
                   trailing={<ArrowUpRight size={15} />}
+                  onOpen={() => onOpenSource(c)}
                 />
               ))}
             </div>
@@ -52,6 +55,7 @@ export function ChatPage() {
   const hasConversation = chatHistory.length > 0 || isLoadingAnswer
   const isId = language === 'id'
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [selectedSource, setSelectedSource] = useState<Citation | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -64,7 +68,7 @@ export function ChatPage() {
         {hasConversation ? (
           <div className="conversation">
             {chatHistory.map((msg, index) => (
-              <ChatMessageItem key={msg.id} msg={msg} isId={isId} isPending={isLoadingAnswer && index === chatHistory.length - 1} />
+              <ChatMessageItem key={msg.id} msg={msg} isId={isId} isPending={isLoadingAnswer && index === chatHistory.length - 1} onOpenSource={setSelectedSource} />
             ))}
 
             <div ref={bottomRef} />
@@ -91,6 +95,19 @@ export function ChatPage() {
           {isLoadingAnswer ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
         </button>
       </form>
+      {selectedSource && (
+        <div className="source-preview-backdrop" role="presentation" onClick={() => setSelectedSource(null)}>
+          <section className="source-preview" role="dialog" aria-modal="true" aria-label="Source preview" onClick={(event) => event.stopPropagation()}>
+            <header>
+              <span><FileText size={18} /> {isId ? 'Sumber jawaban' : 'Answer source'}</span>
+              <button type="button" className="icon-button" title="Close" onClick={() => setSelectedSource(null)}><X size={18} /></button>
+            </header>
+            <strong>{selectedSource.filename}</strong>
+            <small>{[selectedSource.sectionTitle, selectedSource.pageNumber ? `Page ${selectedSource.pageNumber}` : null, selectedSource.version].filter(Boolean).join(' · ')}</small>
+            <blockquote>{selectedSource.excerpt || (isId ? 'Cuplikan tidak tersedia untuk sumber ini.' : 'No excerpt is available for this source.')}</blockquote>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

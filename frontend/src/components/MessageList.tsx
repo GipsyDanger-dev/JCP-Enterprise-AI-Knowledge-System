@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Check, CheckCheck } from 'lucide-react'
 import type { DirectMessage, MessageAttachment } from '@/api/types'
 import { formatFileSize, getFileIcon } from '@/utils/files'
 
@@ -90,7 +91,10 @@ export function MessageList({ messages, currentSender, isId, bottomRef }: Messag
                       <p>{msg.content}</p>
                     </div>
                   )}
-                  <small className="messaging-bubble-time">{formatTime(msg.createdAt)}</small>
+                  <small className="messaging-bubble-time">
+                    {formatTime(msg.createdAt)}
+                    {isMine && (msg.read ? <CheckCheck size={13} aria-label="Read" /> : <Check size={13} aria-label="Sent" />)}
+                  </small>
                 </div>
               </div>
             )
