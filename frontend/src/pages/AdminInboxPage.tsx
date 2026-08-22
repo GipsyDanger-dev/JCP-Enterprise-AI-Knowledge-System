@@ -135,11 +135,19 @@ export function AdminInboxPage() {
         eyebrow={isId ? 'Pesan' : 'Messages'}
         title={isId ? 'Kotak masuk' : 'Inbox'}
         detail={isId ? 'Pesan dari karyawan yang membutuhkan bantuan.' : 'Messages from employees who need help.'}
+        action={<span className="inbox-summary"><MessageSquareText size={15} /> {conversations.length} {isId ? 'percakapan' : 'conversations'}</span>}
       />
 
       <div className="inbox-layout">
         {/* Conversation list */}
         <div className={`inbox-list ${selectedConv ? 'inbox-list-hidden-mobile' : ''}`}>
+          <div className="inbox-list-header">
+            <div>
+              <strong>{isId ? 'Antrean percakapan' : 'Conversation queue'}</strong>
+              <small>{isId ? 'Pilih pesan untuk membalas' : 'Select a message to reply'}</small>
+            </div>
+            <span>{conversations.length}</span>
+          </div>
           {loading ? (
             <div className="inbox-loading">
               <Loader2 size={18} className="spin" /> {isId ? 'Memuat…' : 'Loading…'}
@@ -188,6 +196,7 @@ export function AdminInboxPage() {
                   <strong>{selectedConv.employeeName}</strong>
                   <small>{selectedConv.employeeEmail}</small>
                 </div>
+                <span className="inbox-thread-status">{isId ? 'Aktif' : 'Active'}</span>
               </div>
 
               {/* Messages */}
