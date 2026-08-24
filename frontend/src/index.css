@@ -1230,7 +1230,7 @@ button { cursor: pointer; }
 .source-card-excerpt { display: flex; gap: 7px; margin-top: 9px; color: var(--muted); }
 .source-card-excerpt p { margin: 0; line-height: 1.5; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .source-preview-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgb(15 23 42 / 55%); }
-.source-preview { width: min(760px, 100%); max-height: min(760px, calc(100dvh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius-xl); background: var(--bg-card); color: var(--text-body); padding: 20px; box-shadow: 0 20px 48px rgb(15 23 42 / 28%); }
+.source-preview { width: min(1180px, 100%); height: min(900px, calc(100dvh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius-xl); background: var(--bg-card); color: var(--text-body); padding: 24px; box-shadow: 0 20px 48px rgb(15 23 42 / 28%); }
 .source-preview header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; color: var(--text-secondary); }
 .source-preview header span { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-md); font-weight: var(--fw-heavy); }
 .source-preview > strong { flex: 0 0 auto; display: block; color: var(--text-strong); font-size: var(--fs-xl); line-height: 1.35; overflow-wrap: anywhere; }
@@ -1238,14 +1238,14 @@ button { cursor: pointer; }
 .source-preview blockquote { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 18px 0 0; border-left: 3px solid var(--brand-500); padding: 10px 14px; color: var(--text-body); font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 .source-preview-loading { margin-top: 18px; color: var(--text-muted); font-size: var(--fs-sm); }
 .source-preview-pdf { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; flex: 1 1 auto; min-height: 0; margin-top: 18px; }
-.source-preview-evidence { border-left: 3px solid var(--brand-500); padding: 9px 12px; background: var(--bg-subtle); color: var(--text-body); font-size: var(--fs-sm); line-height: 1.55; }
+.source-preview-evidence { border-left: 3px solid var(--brand-500); padding: 12px 16px; background: var(--bg-subtle); color: var(--text-body); font-size: var(--fs-md); line-height: 1.6; }
 .source-preview-evidence span { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: var(--fw-heavy); text-transform: uppercase; }
 .source-preview-evidence mark { display: block; padding: 2px 4px; color: inherit; background: color-mix(in srgb, var(--brand-300) 45%, transparent); white-space: pre-wrap; }
 .source-preview-pdf iframe { width: 100%; min-height: 0; height: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); background: white; }
 
 @media (max-width: 600px) {
   .source-preview-backdrop { padding: 12px; }
-  .source-preview { max-height: calc(100dvh - 24px); padding: 16px; }
+  .source-preview { width: 100%; height: calc(100dvh - 24px); padding: 16px; }
 }
 .messaging-bubble-time { display: inline-flex; align-items: center; gap: 4px; }
 .messaging-bubble.sent .messaging-bubble-time svg { color: var(--accent); }
