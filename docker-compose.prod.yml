@@ -1,0 +1,29 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      target: production
+    command: !reset null
+    volumes: !reset []
+
+  ai-api:
+    volumes: !reset []
+
+  ai-worker:
+    volumes: !reset []
+
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?VITE_API_BASE_URL is required}
+    command: ["nginx", "-g", "daemon off;"]
+    environment: !reset {}
+    volumes: !reset []
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173/healthz | grep -q OK"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s

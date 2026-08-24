@@ -15,6 +15,12 @@ from typing import Any
 
 from config import DEFAULT_MODEL, SUMOPOD_API_KEY_ENV, SUMOPOD_BASE_URL
 from generation.prompts import build_messages
+from provider_errors import (
+    ProviderConfigurationError,
+    ProviderHttpError,
+    ProviderResponseError,
+    ProviderUnavailableError,
+)
 
 
 _INTERNAL_CHUNK_REFERENCE = re.compile(
@@ -33,10 +39,7 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
     """Ask a SumoPod LLM to answer using intact page/section contexts only."""
     key = api_key or os.environ.get(SUMOPOD_API_KEY_ENV)
     if not key:
-        raise RuntimeError(
-            f"{SUMOPOD_API_KEY_ENV} is not set. Run e.g.: "
-            "$env:SUMOPOD_API_KEY=\"sk-...\" in the terminal before using --llm."
-        )
+        raise ProviderConfigurationError(SUMOPOD_API_KEY_ENV)
     payload = json.dumps({
         "model": model,
         "messages": build_messages(query, matches),
@@ -48,15 +51,34 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
         method="POST",
     )
+    failure = None
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
-            data = json.loads(response.read().decode("utf-8"))
+            body = response.read()
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")[:300]
-        raise RuntimeError(f"SumoPod API error {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"SumoPod API unreachable: {exc.reason}") from exc
+        status = exc.code
+        if exc.fp is not None:
+            exc.close()
+        failure = ProviderHttpError("chat", status)
+    except (urllib.error.URLError, TimeoutError, OSError):
+        failure = ProviderUnavailableError("chat")
+    if failure is not None:
+        raise failure
+
+    failure = None
+    content = ""
     try:
-        return strip_internal_chunk_references(data["choices"][0]["message"]["content"])
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError(f"Unexpected SumoPod response: {json.dumps(data)[:300]}") from exc
+        data = json.loads(body.decode("utf-8"))
+        content = data["choices"][0]["message"]["content"].strip()
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        KeyError,
+        IndexError,
+        TypeError,
+        AttributeError,
+    ):
+        failure = ProviderResponseError("chat")
+    if failure is not None:
+        raise failure
+    return strip_internal_chunk_references(content)

@@ -18,6 +18,7 @@ Endpoints (full OpenAPI docs at /docs):
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -33,6 +34,7 @@ except ImportError:  # pragma: no cover - optional dependency
 from config import DEFAULT_MODEL, EMBEDDING_MODEL
 from generation.guardrails import QUICK_SUGGESTIONS, is_out_of_scope, out_of_scope_response
 from knowledge_base import KnowledgeBase
+from provider_errors import ProviderError
 from store import PgVectorStore, default_dsn, ingest_to_pg
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -88,6 +90,10 @@ def current_store() -> PgVectorStore | KnowledgeBase:
     if default_dsn():
         return PgVectorStore(model=EMBEDDING_MODEL)
     return KnowledgeBase.load(DEFAULT_INDEX) if DEFAULT_INDEX.exists() else KnowledgeBase([], [], {})
+
+
+def provider_http_error(error: ProviderError) -> HTTPException:
+    return HTTPException(status_code=error.http_status, detail=error.public_detail)
 
 
 @app.get("/health")
@@ -197,23 +203,24 @@ def ask(request: AskRequest) -> dict[str, Any]:
     """Page/section retrieval -> (optional LLM) -> answer + citations."""
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="query must not be empty")
-    
     # Check if this is general chat (greetings, small talk)
     if is_general_chat(request.query):
         return general_chat_response(request.query, request.model or DEFAULT_MODEL)
-    
-    # Document-specific query: use RAG pipeline
-    store = current_store()
-    if isinstance(store, PgVectorStore):
+
+    try:
+        store = current_store()
+        if isinstance(store, PgVectorStore):
+            return store.ask(
+                request.query, top_k=request.top_k, use_llm=request.use_llm,
+                model=request.model or DEFAULT_MODEL, filters=request.filters,
+            )
         return store.ask(
             request.query, top_k=request.top_k, use_llm=request.use_llm,
-            model=request.model or DEFAULT_MODEL, filters=request.filters,
+            model=request.model or DEFAULT_MODEL, retriever=request.retriever,
+            filters=request.filters,
         )
-    return store.ask(
-        request.query, top_k=request.top_k, use_llm=request.use_llm,
-        model=request.model or DEFAULT_MODEL, retriever=request.retriever,
-        filters=request.filters,
-    )
+    except ProviderError as error:
+        raise provider_http_error(error) from None
 
 
 @app.post("/ingest", response_model=IngestResponse)
@@ -239,10 +246,15 @@ def ingest_documents(request: IngestRequest) -> dict[str, Any]:
             )
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
+        except ProviderError as error:
+            raise provider_http_error(error) from None
         return {"documents": documents, "store": "pgvector"}
     # JSON store: reuse the CLI ingest path.
     from knowledge_base import ingest
-    ingest(input_dir, DEFAULT_INDEX, embed=request.embed)
+    try:
+        ingest(input_dir, DEFAULT_INDEX, embed=request.embed)
+    except ProviderError as error:
+        raise provider_http_error(error) from None
     kb = KnowledgeBase.load(DEFAULT_INDEX)
     return {
         "documents": [

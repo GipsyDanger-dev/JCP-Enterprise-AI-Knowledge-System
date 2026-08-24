@@ -66,6 +66,17 @@ boleh dihilangkan.
 Jika port `5173` sedang dipakai, isi `FRONTEND_PORT` dengan port kosong di
 `.env` sebelum menjalankan launcher.
 
+Perintah di atas memakai frontend development untuk pekerjaan lokal. Untuk VPS,
+set `VITE_API_BASE_URL` ke URL HTTPS Backend lalu gunakan override production:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Override tersebut membangun aset Vite dengan URL Backend yang diberikan lalu
+menyajikannya melalui Nginx. Karena nilainya masuk saat build, perubahan
+`VITE_API_BASE_URL` memerlukan rebuild image frontend.
+
 | Service | URL |
 | --- | --- |
 | Frontend | http://localhost:5173 |

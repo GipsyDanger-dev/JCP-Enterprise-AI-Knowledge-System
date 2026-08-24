@@ -1,8 +1,10 @@
 import unittest
+from unittest import mock
 
 try:
     from fastapi.testclient import TestClient
     import http_api
+    from provider_errors import ProviderConfigurationError, ProviderHttpError
     HAS_DEPS = True
 except ImportError:  # pragma: no cover - optional dependencies
     HAS_DEPS = False
@@ -56,6 +58,32 @@ class HttpApiTests(unittest.TestCase):
     def test_delete_missing_document_is_404(self):
         response = self.client.delete("/documents/nggak_ada.pdf")
         self.assertEqual(response.status_code, 404)
+
+    def test_provider_http_error_maps_to_safe_502(self):
+        secret = "sk-provider-secret-value"
+
+        class FailingStore:
+            def ask(self, *_args, **_kwargs):
+                raise ProviderHttpError(f"chat Authorization: Bearer {secret}", 401)
+
+        with mock.patch("http_api.current_store", return_value=FailingStore()):
+            response = self.client.post("/ask", json={"query": "policy"})
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.json(), {"detail": "AI provider request failed"})
+        self.assertNotIn(secret, response.text)
+        self.assertNotIn("Authorization", response.text)
+
+    def test_missing_provider_configuration_maps_to_safe_503(self):
+        class FailingStore:
+            def ask(self, *_args, **_kwargs):
+                raise ProviderConfigurationError("SUMOPOD_API_KEY")
+
+        with mock.patch("http_api.current_store", return_value=FailingStore()):
+            response = self.client.post("/ask", json={"query": "policy"})
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json(), {"detail": "AI provider is not configured"})
 
 
 if __name__ == "__main__":

@@ -16,16 +16,19 @@ import urllib.request
 from typing import Any
 
 from config import EMBEDDING_MODEL, SUMOPOD_API_KEY_ENV, SUMOPOD_BASE_URL
+from provider_errors import (
+    ProviderConfigurationError,
+    ProviderHttpError,
+    ProviderResponseError,
+    ProviderUnavailableError,
+)
 from retrieval.filters import match_metadata
 
 
 def _api_key(api_key: str | None) -> str:
     key = api_key or os.environ.get(SUMOPOD_API_KEY_ENV)
     if not key:
-        raise RuntimeError(
-            f"{SUMOPOD_API_KEY_ENV} is not set. Run e.g.: "
-            "$env:SUMOPOD_API_KEY=\"sk-...\" in the terminal before using embeddings."
-        )
+        raise ProviderConfigurationError(SUMOPOD_API_KEY_ENV)
     return key
 
 
@@ -49,16 +52,29 @@ def embed_texts(
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             method="POST",
         )
+        failure = None
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
-                data = json.loads(response.read().decode("utf-8"))
+                body = response.read()
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")[:300]
-            raise RuntimeError(f"SumoPod embeddings error {exc.code}: {detail}") from exc
-        except urllib.error.URLError as exc:
-            raise RuntimeError(f"SumoPod API unreachable: {exc.reason}") from exc
-        items = sorted(data["data"], key=lambda item: item.get("index", 0))
-        vectors.extend(item["embedding"] for item in items)
+            status = exc.code
+            if exc.fp is not None:
+                exc.close()
+            failure = ProviderHttpError("embeddings", status)
+        except (urllib.error.URLError, TimeoutError, OSError):
+            failure = ProviderUnavailableError("embeddings")
+        if failure is not None:
+            raise failure
+
+        failure = None
+        try:
+            data = json.loads(body.decode("utf-8"))
+            items = sorted(data["data"], key=lambda item: item.get("index", 0))
+            vectors.extend(item["embedding"] for item in items)
+        except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, AttributeError):
+            failure = ProviderResponseError("embeddings")
+        if failure is not None:
+            raise failure
     return vectors
 
 
