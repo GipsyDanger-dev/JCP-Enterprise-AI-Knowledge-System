@@ -1,0 +1,6 @@
+SOP Keamanan Data 2026
+
+Semua karyawan wajib menjaga kerahasiaan data perusahaan.
+Password harus minimal 12 karakter.
+Two-factor authentication wajib diaktifkan untuk semua akun.
+Data sensitif tidak boleh disimpan di USB tanpa enkripsi.
