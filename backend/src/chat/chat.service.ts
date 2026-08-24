@@ -51,6 +51,8 @@ export class ChatService {
     conversationId?: string,
   ) {
     const conversation = await this.resolveConversation(question, actor, conversationId);
+    const contextChunkIds = await this.getContextChunkIds(conversation.id);
+    const conversationTopic = await this.getConversationTopic(conversation.id);
 
     await this.prisma.message.create({
       data: {
@@ -71,6 +73,9 @@ export class ChatService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: question,
+          // Only opaque chunk ids cross to the AI service. Previous user/assistant text stays in the database.
+          context_chunk_ids: contextChunkIds,
+          conversation_topic: conversationTopic,
           top_k: 5,
           use_llm: Boolean(process.env.SUMOPOD_API_KEY || process.env.LLM_API_KEY),
         }),
@@ -121,6 +126,40 @@ export class ChatService {
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
     return conversation;
+  }
+
+  private async getContextChunkIds(conversationId: string): Promise<string[]> {
+    const latestAnswer = await this.prisma.message.findFirst({
+      where: {
+        conversationId,
+        role: MessageRole.ASSISTANT,
+        citations: { some: {} },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        citations: {
+          select: { chunkId: true },
+          orderBy: { sortOrder: 'asc' },
+          take: 8,
+        },
+      },
+    });
+    return latestAnswer?.citations.map((citation) => citation.chunkId) ?? [];
+  }
+
+  private async getConversationTopic(conversationId: string): Promise<string | undefined> {
+    const messages = await this.prisma.message.findMany({
+      where: { conversationId, role: MessageRole.USER },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+      select: { content: true },
+    });
+    const text = messages.map((message) => message.content.toLowerCase()).join(' ');
+    if (/\b(cuti|izin)\b/.test(text)) return 'kebijakan cuti dan izin karyawan';
+    if (/\b(reimbursement|penggantian biaya|klaim)\b/.test(text)) return 'kebijakan reimbursement dan penggantian biaya';
+    if (/\b(perjalanan dinas|hotel|akomodasi)\b/.test(text)) return 'kebijakan perjalanan dinas';
+    if (/\b(keamanan|security|akses)\b/.test(text)) return 'prosedur keamanan dan akses informasi';
+    return undefined;
   }
 
   private toClientCitations(citations: AiCitation[]): ChatCitation[] {

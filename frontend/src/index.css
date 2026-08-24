@@ -1237,8 +1237,8 @@ button { cursor: pointer; }
 .source-preview > small { flex: 0 0 auto; display: block; margin-top: 5px; color: var(--text-muted); font-size: var(--fs-xs); }
 .source-preview blockquote { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 18px 0 0; border-left: 3px solid var(--brand-500); padding: 10px 14px; color: var(--text-body); font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 .source-preview-loading { margin-top: 18px; color: var(--text-muted); font-size: var(--fs-sm); }
-.source-preview-pdf { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; flex: 1 1 auto; min-height: 0; margin-top: 18px; }
-.source-preview-evidence { border-left: 3px solid var(--brand-500); padding: 12px 16px; background: var(--bg-subtle); color: var(--text-body); font-size: var(--fs-md); line-height: 1.6; }
+.source-preview-pdf { display: grid; grid-template-columns: minmax(280px, 34%) minmax(0, 1fr); gap: 18px; flex: 1 1 auto; min-height: 0; margin-top: 18px; }
+.source-preview-evidence { min-height: 0; overflow-y: auto; border-left: 3px solid var(--brand-500); padding: 12px 16px; background: var(--bg-subtle); color: var(--text-body); font-size: var(--fs-md); line-height: 1.6; }
 .source-preview-evidence span { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: var(--fw-heavy); text-transform: uppercase; }
 .source-preview-evidence mark { display: block; padding: 2px 4px; color: inherit; background: color-mix(in srgb, var(--brand-300) 45%, transparent); white-space: pre-wrap; }
 .source-preview-pdf iframe { width: 100%; min-height: 0; height: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); background: white; }
@@ -1246,6 +1246,7 @@ button { cursor: pointer; }
 @media (max-width: 600px) {
   .source-preview-backdrop { padding: 12px; }
   .source-preview { width: 100%; height: calc(100dvh - 24px); padding: 16px; }
+  .source-preview-pdf { grid-template-columns: 1fr; grid-template-rows: minmax(120px, auto) minmax(0, 1fr); gap: 12px; }
 }
 .messaging-bubble-time { display: inline-flex; align-items: center; gap: 4px; }
 .messaging-bubble.sent .messaging-bubble-time svg { color: var(--accent); }

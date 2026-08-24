@@ -50,6 +50,8 @@ app = FastAPI(
 
 class AskRequest(BaseModel):
     query: str
+    context_chunk_ids: list[str] = []
+    conversation_topic: str | None = None
     top_k: int = 5
     filters: dict[str, str] | None = None
     use_llm: bool = False
@@ -198,24 +200,36 @@ def general_chat_response(query: str, model: str) -> dict[str, Any]:
     }
 
 
+def contextualize_query(query: str, topic: str | None) -> str:
+    """Use a minimal local topic label for follow-up retrieval, not chat history."""
+    if not topic:
+        return query
+    return f"Topik percakapan sebelumnya: {topic}. Pertanyaan terbaru: {query}"
+
+
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> dict[str, Any]:
     """Page/section retrieval -> (optional LLM) -> answer + citations."""
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="query must not be empty")
-    # Check if this is general chat (greetings, small talk)
-    if is_general_chat(request.query):
+    # Guardrails evaluate the new user question before a local topic label is applied.
+    if is_out_of_scope(request.query):
+        return out_of_scope_response()
+    if is_general_chat(request.query) and not request.conversation_topic:
         return general_chat_response(request.query, request.model or DEFAULT_MODEL)
+
+    retrieval_query = contextualize_query(request.query, request.conversation_topic)
 
     try:
         store = current_store()
         if isinstance(store, PgVectorStore):
             return store.ask(
-                request.query, top_k=request.top_k, use_llm=request.use_llm,
+                retrieval_query, top_k=request.top_k, use_llm=request.use_llm,
                 model=request.model or DEFAULT_MODEL, filters=request.filters,
+                context_chunk_ids=request.context_chunk_ids,
             )
         return store.ask(
-            request.query, top_k=request.top_k, use_llm=request.use_llm,
+            retrieval_query, top_k=request.top_k, use_llm=request.use_llm,
             model=request.model or DEFAULT_MODEL, retriever=request.retriever,
             filters=request.filters,
         )

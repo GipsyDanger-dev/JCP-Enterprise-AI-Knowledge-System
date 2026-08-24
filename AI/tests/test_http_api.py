@@ -49,6 +49,14 @@ class HttpApiTests(unittest.TestCase):
         response = self.client.post("/ask", json={"query": "   "})
         self.assertEqual(response.status_code, 400)
 
+    def test_contextualize_query_keeps_follow_up_topic(self):
+        query = http_api.contextualize_query(
+            "Berarti karyawan biasa tidak bisa ya?",
+            "kebijakan cuti dan izin karyawan",
+        )
+        self.assertIn("kebijakan cuti dan izin karyawan", query)
+        self.assertIn("Berarti karyawan biasa tidak bisa ya?", query)
+
     def test_documents_list(self):
         response = self.client.get("/documents")
         self.assertEqual(response.status_code, 200)

@@ -234,6 +234,38 @@ class PgVectorStore:
             results.append((float(row[8]), chunk))
         return results
 
+    def context_chunks(self, chunk_ids: list[str]) -> list[tuple[float, dict[str, Any]]]:
+        """Load cited chunks from the prior answer without sending chat history to a provider."""
+        ids = list(dict.fromkeys(chunk_ids))[:8]
+        if not ids:
+            return []
+        sql = """
+            SELECT c.chunk_id, d.id, dv.id, dv.original_filename,
+                   dv.version_number, c.page_number, c.section_title, c.text
+            FROM chunks AS c
+            JOIN document_versions AS dv ON dv.id = c.document_version_id
+            JOIN documents AS d ON d.id = dv.document_id
+            WHERE c.chunk_id = ANY(%s)
+              AND d.deleted_at IS NULL
+              AND d.status = 'READY'
+        """
+        with psycopg.connect(self.dsn) as conn:
+            rows = conn.execute(sql, (ids,)).fetchall()
+        chunks = {
+            row[0]: {
+                "chunk_id": row[0],
+                "document_id": str(row[1]),
+                "document_version_id": str(row[2]),
+                "filename": row[3],
+                "version": row[4],
+                "page_number": row[5],
+                "section_title": row[6] or "",
+                "text": row[7],
+            }
+            for row in rows
+        }
+        return [(1.0, chunks[chunk_id]) for chunk_id in ids if chunk_id in chunks]
+
     def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None) -> dict[str, Any]:
         """TF-IDF fallback when vector search fails or finds nothing."""
         try:
@@ -302,14 +334,21 @@ class PgVectorStore:
         model: str = DEFAULT_MODEL,
         api_key: str | None = None,
         filters: dict[str, Any] | None = None,
+        context_chunk_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         try:
+            context_matches = self.context_chunks(context_chunk_ids or [])
             query_vector = embed_texts([query], model=self.model, api_key=api_key)[0]
-            matches = [
+            retrieved_matches = [
                 (score, chunk)
                 for score, chunk in self.search(query_vector, top_k, filters=filters)
                 if score >= minimum_score
             ]
+            seen = {chunk["chunk_id"] for _, chunk in context_matches}
+            matches = context_matches + [
+                match for match in retrieved_matches if match[1]["chunk_id"] not in seen
+            ]
+            matches = matches[:top_k]
             if not matches:
                 # Vector search found nothing above threshold, try TF-IDF fallback
                 print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
