@@ -11,7 +11,33 @@ import type { ChatMessage } from '@/context/workspaceContextValue'
 
 type Citation = ChatMessage['citations'][number]
 
-function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: { msg: ChatMessage; isId: boolean; isPending: boolean; onOpenSource: (citation: Citation) => void; onSuggestion: (value: string) => void }) {
+const COMMON_QUERY_WORDS = new Set(['yang', 'dengan', 'untuk', 'dalam', 'tentang', 'pada', 'dari', 'atau', 'dan', 'saya', 'kami', 'bisa', 'bagaimana', 'berapa', 'apakah', 'tolong', 'dokumen', 'perusahaan'])
+
+function formatEvidencePreview(excerpt: string, question: string | null) {
+  const normalized = excerpt
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const firstSection = normalized.search(/\b1\.\s+[A-Z][A-Z\s]{2,}(?=\s)/)
+  const content = (firstSection >= 0 ? normalized.slice(firstSection) : normalized).trim()
+  const sections = content
+    .split(/(?=\b\d+\.\s+[A-Z][A-Z\s]{2,}(?=\s))/)
+    .map((section) => section.trim())
+    .filter(Boolean)
+  const keywords = (question ?? '').toLowerCase().match(/[\p{L}\p{N}]{4,}/gu)?.filter((word) => !COMMON_QUERY_WORDS.has(word)) ?? []
+  const ranked = sections
+    .map((section, index) => ({
+      section,
+      index,
+      score: keywords.reduce((score, word) => score + (section.toLowerCase().includes(word) ? 1 : 0), 0),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, Math.min(2, sections.length))
+    .map(({ section }) => section.length > 520 ? `${section.slice(0, 520).trimEnd()}...` : section)
+  return (ranked.length > 0 ? ranked : [content.slice(0, 720)]).join('\n\n')
+}
+
+function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: { msg: ChatMessage; isId: boolean; isPending: boolean; onOpenSource: (citation: Citation, question: string) => void; onSuggestion: (value: string) => void }) {
   return (
     <>
       <div className="user-message">{msg.question}</div>
@@ -42,7 +68,7 @@ function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: {
                   detail={[c.sectionTitle, c.pageNumber ? `Page ${c.pageNumber}` : null, c.version].filter(Boolean).join(' · ')}
                   excerpt={c.excerpt}
                   trailing={<ArrowUpRight size={15} />}
-                  onOpen={() => onOpenSource(c)}
+                  onOpen={() => onOpenSource(c, msg.question)}
                 />
               ))}
             </div>
@@ -85,6 +111,7 @@ export function ChatPage() {
   const isId = language === 'id'
   const bottomRef = useRef<HTMLDivElement>(null)
   const [selectedSource, setSelectedSource] = useState<Citation | null>(null)
+  const [selectedSourceQuestion, setSelectedSourceQuestion] = useState<string | null>(null)
   const [sourcePreviewText, setSourcePreviewText] = useState<string | null>(null)
   const [sourcePreviewLoading, setSourcePreviewLoading] = useState(false)
   const [sourcePdfUrl, setSourcePdfUrl] = useState<string | null>(null)
@@ -94,6 +121,7 @@ export function ChatPage() {
     if (!selectedSource) {
       setSourcePreviewText(null)
       setSourcePdfUrl(null)
+      setSelectedSourceQuestion(null)
       return
     }
     let cancelled = false
@@ -135,6 +163,8 @@ export function ChatPage() {
     }
   }, [selectedSource, token])
 
+  const evidencePreview = sourcePreviewText ? formatEvidencePreview(sourcePreviewText, selectedSourceQuestion) : null
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatHistory, isLoadingAnswer])
@@ -152,7 +182,7 @@ export function ChatPage() {
         {hasConversation ? (
           <div className="conversation">
             {chatHistory.map((msg, index) => (
-              <ChatMessageItem key={msg.id} msg={msg} isId={isId} isPending={isLoadingAnswer && index === chatHistory.length - 1} onOpenSource={setSelectedSource} onSuggestion={askQuestion} />
+              <ChatMessageItem key={msg.id} msg={msg} isId={isId} isPending={isLoadingAnswer && index === chatHistory.length - 1} onOpenSource={(citation, sourceQuestion) => { setSelectedSourceQuestion(sourceQuestion); setSelectedSource(citation) }} onSuggestion={askQuestion} />
             ))}
 
             <div ref={bottomRef} />
@@ -184,7 +214,7 @@ export function ChatPage() {
           <section className="source-preview" role="dialog" aria-modal="true" aria-label="Source preview" onClick={(event) => event.stopPropagation()}>
             <header>
               <span><FileText size={18} /> {isId ? 'Sumber jawaban' : 'Answer source'}</span>
-              <button type="button" className="icon-button" title="Close" onClick={() => setSelectedSource(null)}><X size={18} /></button>
+              <button type="button" className="icon-button" title="Close" onClick={() => { setSelectedSourceQuestion(null); setSelectedSource(null) }}><X size={18} /></button>
             </header>
             <strong>{selectedSource.filename}</strong>
             <small>{[selectedSource.sectionTitle, selectedSource.pageNumber ? `Page ${selectedSource.pageNumber}` : null, selectedSource.version].filter(Boolean).join(' · ')}</small>
@@ -193,12 +223,12 @@ export function ChatPage() {
               <div className="source-preview-pdf">
                 <div className="source-preview-evidence">
                   <span>{isId ? 'Bukti yang digunakan untuk jawaban' : 'Evidence used for this answer'}</span>
-                  <mark>{sourcePreviewText || (isId ? 'Cuplikan citation tidak tersedia.' : 'Citation excerpt is unavailable.')}</mark>
+                  <mark>{evidencePreview || (isId ? 'Cuplikan citation tidak tersedia.' : 'Citation excerpt is unavailable.')}</mark>
                 </div>
                 <iframe title={`${selectedSource.filename} page ${selectedSource.pageNumber ?? 1}`} src={sourcePdfUrl} />
               </div>
             ) : (
-              <blockquote>{sourcePreviewLoading ? (isId ? 'Memuat cuplikan...' : 'Loading excerpt...') : sourcePreviewText || (isId ? 'Cuplikan tidak tersedia untuk sumber ini.' : 'No excerpt is available for this source.')}</blockquote>
+              <blockquote>{sourcePreviewLoading ? (isId ? 'Memuat cuplikan...' : 'Loading excerpt...') : evidencePreview || (isId ? 'Cuplikan tidak tersedia untuk sumber ini.' : 'No excerpt is available for this source.')}</blockquote>
             )}
           </section>
         </div>

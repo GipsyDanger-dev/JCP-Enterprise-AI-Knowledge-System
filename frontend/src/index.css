@@ -1240,7 +1240,7 @@ button { cursor: pointer; }
 .source-preview-pdf { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; flex: 1 1 auto; min-height: 0; margin-top: 18px; }
 .source-preview-evidence { border-left: 3px solid var(--brand-500); padding: 9px 12px; background: var(--bg-subtle); color: var(--text-body); font-size: var(--fs-sm); line-height: 1.55; }
 .source-preview-evidence span { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: var(--fw-heavy); text-transform: uppercase; }
-.source-preview-evidence mark { padding: 0 2px; color: inherit; background: color-mix(in srgb, var(--brand-300) 45%, transparent); }
+.source-preview-evidence mark { display: block; padding: 2px 4px; color: inherit; background: color-mix(in srgb, var(--brand-300) 45%, transparent); white-space: pre-wrap; }
 .source-preview-pdf iframe { width: 100%; min-height: 0; height: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); background: white; }
 
 @media (max-width: 600px) {
