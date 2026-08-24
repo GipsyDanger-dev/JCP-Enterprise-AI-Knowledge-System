@@ -35,6 +35,14 @@ _OFF_TOPIC_KEYWORDS = (
     "resep", "masakan", "wisata", "jalan-jalan", "bitcoin", "crypto",
     "ignore previous", "abaikan instruksi", "lupakan instruksi",
 )
+_DOCUMENT_KEYWORDS = (
+    "sop", "kebijakan", "prosedur", "dokumen", "cuti", "izin", "reimbursement",
+    "biaya", "tunjangan", "perjalanan dinas", "karyawan", "hrd", "perusahaan",
+)
+_GENERAL_PERSON_QUERY = re.compile(
+    r"^\s*(?:siapa|siapakah|who\s+is)\s+(?:itu\s+)?[a-z][a-z .'-]{1,80}\??\s*$",
+    re.IGNORECASE,
+)
 
 
 def no_answer_response() -> dict[str, Any]:
@@ -59,8 +67,12 @@ def out_of_scope_response() -> dict[str, Any]:
 
 def is_out_of_scope(query: str) -> bool:
     normalized = query.strip().lower()
-    return bool(_ARITHMETIC_QUERY.match(normalized)) or any(
-        keyword in normalized for keyword in _OFF_TOPIC_KEYWORDS
+    if _ARITHMETIC_QUERY.match(normalized):
+        return True
+    if any(keyword in normalized for keyword in _OFF_TOPIC_KEYWORDS):
+        return True
+    return bool(_GENERAL_PERSON_QUERY.match(normalized)) and not any(
+        keyword in normalized for keyword in _DOCUMENT_KEYWORDS
     )
 
 

@@ -45,6 +45,14 @@ class HttpApiTests(unittest.TestCase):
         self.assertIn("hanya dapat membantu", body["answer"])
         self.assertEqual(body["citations"], [])
 
+    def test_ask_rejects_general_person_question_without_citations(self):
+        response = self.client.post("/ask", json={"query": "siapa itu elon musk"})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertFalse(body["grounded"])
+        self.assertIn("hanya dapat membantu", body["answer"])
+        self.assertEqual(body["citations"], [])
+
     def test_ask_empty_query_is_400(self):
         response = self.client.post("/ask", json={"query": "   "})
         self.assertEqual(response.status_code, 400)
