@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { Check, CheckCheck } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Check, CheckCheck, Check as Save, Pencil, Trash2, X } from 'lucide-react'
 import type { DirectMessage, MessageAttachment } from '@/api/types'
 import { formatFileSize, getFileIcon } from '@/utils/files'
 
@@ -8,6 +8,8 @@ interface MessageListProps {
   currentSender: 'employee' | 'admin'
   isId: boolean
   bottomRef?: React.RefObject<HTMLDivElement | null>
+  onEdit?: (messageId: string, content: string) => Promise<void>
+  onDelete?: (messageId: string) => Promise<void>
 }
 
 interface DateGroup {
@@ -37,7 +39,10 @@ function getDateKey(iso: string): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
 }
 
-export function MessageList({ messages, currentSender, isId, bottomRef }: MessageListProps) {
+export function MessageList({ messages, currentSender, isId, bottomRef, onEdit, onDelete }: MessageListProps) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingText, setEditingText] = useState('')
+  const [busyId, setBusyId] = useState<string | null>(null)
   // Group messages by date
   const dateGroups = useMemo<DateGroup[]>(() => {
     const groups: DateGroup[] = []
@@ -88,13 +93,28 @@ export function MessageList({ messages, currentSender, isId, bottomRef }: Messag
                   {/* Text content */}
                   {msg.content && (
                     <div className="messaging-bubble-content">
-                      <p>{msg.content}</p>
+                      {editingId === msg.id ? (
+                        <div className="message-edit-form">
+                          <textarea value={editingText} onChange={(event) => setEditingText(event.target.value)} autoFocus />
+                          <div className="message-edit-actions">
+                            <button type="button" onClick={() => setEditingId(null)}><X size={13} /> {isId ? 'Batal' : 'Cancel'}</button>
+                            <button type="button" disabled={!editingText.trim() || busyId === msg.id} onClick={async () => { setBusyId(msg.id); await onEdit?.(msg.id, editingText.trim()); setBusyId(null); setEditingId(null) }}><Save size={13} /> {isId ? 'Simpan' : 'Save'}</button>
+                          </div>
+                        </div>
+                      ) : <p>{msg.content}</p>}
                     </div>
                   )}
                   <small className="messaging-bubble-time">
                     {formatTime(msg.createdAt)}
+                    {msg.editedAt && <span>· {isId ? 'diedit' : 'edited'}</span>}
                     {isMine && (msg.read ? <CheckCheck size={13} aria-label="Read" /> : <Check size={13} aria-label="Sent" />)}
                   </small>
+                  {isMine && editingId !== msg.id && (onEdit || onDelete) && (
+                    <div className="message-actions">
+                      {onEdit && msg.content && <button type="button" title={isId ? 'Edit pesan' : 'Edit message'} onClick={() => { setEditingId(msg.id); setEditingText(msg.content) }}><Pencil size={12} /></button>}
+                      {onDelete && <button type="button" title={isId ? 'Hapus pesan' : 'Delete message'} disabled={busyId === msg.id} onClick={async () => { if (!window.confirm(isId ? 'Hapus pesan ini?' : 'Delete this message?')) return; setBusyId(msg.id); await onDelete(msg.id); setBusyId(null) }}><Trash2 size={12} /></button>}
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -116,12 +136,12 @@ function AttachmentPreview({ attachment }: { attachment: MessageAttachment }) {
   }
 
   return (
-    <div className="mc-attachment-file">
+    <a className="mc-attachment-file" href={attachment.dataUrl ?? undefined} download={attachment.name} target="_blank" rel="noreferrer">
       <span className="mc-attachment-file-icon">{getFileIcon(attachment.mimeType)}</span>
       <div className="mc-attachment-file-info">
         <span className="mc-attachment-file-name">{attachment.name}</span>
         <span className="mc-attachment-file-size">{formatFileSize(attachment.size)}</span>
       </div>
-    </div>
+    </a>
   )
 }

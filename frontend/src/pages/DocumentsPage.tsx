@@ -175,6 +175,7 @@ export function DocumentsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initialCollection = searchParams.get('collection') ?? 'All'
   const initialQuery = searchParams.get('q') ?? ''
+  const requestedDocumentId = searchParams.get('doc')
   const [query, setQuery] = useState(initialQuery)
   const [collection, setCollection] = useState(initialCollection)
   const [showCollections, setShowCollections] = useState(false)
@@ -182,6 +183,12 @@ export function DocumentsPage() {
   const [showUpload, setShowUpload] = useState(false)
   const [docChunks, setDocChunks] = useState<DocumentChunk[]>([])
   const [chunksLoading, setChunksLoading] = useState(false)
+
+  useEffect(() => {
+    if (!requestedDocumentId || selectedDoc) return
+    const document = documents.find((item) => item.id === requestedDocumentId)
+    if (document) setSelectedDoc(document)
+  }, [documents, requestedDocumentId, selectedDoc])
 
   const filtered = useMemo(() => {
     return documents.filter((doc) => {

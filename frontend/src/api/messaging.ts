@@ -58,3 +58,15 @@ export function sendAdminMessage(
     headers: authHeaders(token),
   })
 }
+
+export function editDirectMessage(messageId: string, content: string, token?: string): Promise<DirectMessage> {
+  return request<DirectMessage>(`/messaging/messages/${messageId}`, {
+    method: 'PATCH', body: { content }, headers: authHeaders(token),
+  })
+}
+
+export function deleteDirectMessage(messageId: string, token?: string): Promise<{ success: boolean; id: string }> {
+  return request<{ success: boolean; id: string }>(`/messaging/messages/${messageId}`, {
+    method: 'DELETE', headers: authHeaders(token),
+  })
+}

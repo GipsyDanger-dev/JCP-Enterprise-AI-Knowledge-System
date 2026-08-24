@@ -1,4 +1,4 @@
-import { BookOpen, ChevronRight, ExternalLink, FileText, Mail, MessageSquareText, Phone } from 'lucide-react'
+import { BookOpen, ChevronRight, ExternalLink, FileText, Mail, MessageSquareText } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -30,7 +30,7 @@ const FAQ_EN: FaqItem[] = [
 export function HelpPage() {
   const navigate = useNavigate()
   const [openIndex, setOpenIndex] = useState<number | null>(null)
-  const { language } = useWorkspace()
+  const { language, role } = useWorkspace()
   const isId = language === 'id'
   const FAQ = isId ? FAQ_ID : FAQ_EN
   const faqRef = useRef<HTMLDivElement>(null)
@@ -115,14 +115,14 @@ export function HelpPage() {
                 <p>{isId ? 'Respons dalam 24 jam' : 'Response within 24 hours'}</p>
               </div>
             </div>
-            <div className="help-contact-card">
-              <Phone size={18} />
+            <button className="help-contact-card" onClick={() => navigate(role === 'admin' ? '/inbox' : '/messages')}>
+              <MessageSquareText size={18} />
               <div>
-                <strong>{isId ? 'Dukungan telepon' : 'Phone support'}</strong>
-                <small>+62 274 xxx xxxx</small>
+                <strong>{isId ? 'Pesan ke admin' : 'Message an admin'}</strong>
+                <small>{isId ? 'Buka percakapan dukungan' : 'Open a support conversation'}</small>
                 <p>{isId ? 'Sen–Jum, 09:00–17:00 WIB' : 'Mon–Fri, 09:00–17:00 WIB'}</p>
               </div>
-            </div>
+            </button>
           </div>
         </section>
       </div>

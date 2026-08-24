@@ -193,7 +193,9 @@ export function UsersPage() {
                 <tr key={user.id}>
                   <td>
                     <div className="person-cell">
-                      <span className="avatar">{userInitials(user.displayName)}</span>
+                      {user.photoUrl
+                        ? <img className="avatar user-photo-avatar" src={user.photoUrl} alt={`${user.displayName} profile`} />
+                        : <span className="avatar">{userInitials(user.displayName)}</span>}
                       <span>
                         <strong>{user.displayName}</strong>
                         <small>{user.email}</small>

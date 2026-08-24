@@ -190,6 +190,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       question: q,
       answer: '',
       citations: [],
+      suggestions: [],
       error: null,
       timestamp: Date.now(),
     }])
@@ -200,7 +201,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       // Update the existing message with AI response
       setChatHistory((prev) => prev.map((msg) =>
         msg.id === messageId
-          ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, error: null }
+          ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, suggestions: res.suggestions ?? [], error: null }
           : msg
       ))
     } catch (err) {
@@ -274,6 +275,7 @@ function toWorkspaceHistory(conversation: ConversationDetail): ChatMessage[] {
         question: message.content,
         answer: '',
         citations: [],
+        suggestions: [],
         error: null,
         timestamp: new Date(message.createdAt).getTime(),
       })

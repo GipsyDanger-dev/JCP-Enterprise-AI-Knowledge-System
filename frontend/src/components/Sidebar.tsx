@@ -12,7 +12,7 @@ export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: 
     <aside className={[menuOpen ? 'sidebar open' : 'sidebar', collapsed ? 'collapsed' : ''].filter(Boolean).join(' ')}>
       <div className="brand-lockup">
         {!collapsed && <LogoMark size={28} />}
-        {!collapsed && <strong>Enterprise AI</strong>}
+        {!collapsed && <span className="brand-name">Enterprise AI</span>}
         <button className="sidebar-collapse-btn" title={collapsed ? 'Buka sidebar' : 'Tutup sidebar'} onClick={onToggle}>{collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}</button>
       </div>
       <button className="mobile-close" title={isId ? 'Tutup navigasi' : 'Close navigation'} onClick={onClose}><X size={20} /></button>

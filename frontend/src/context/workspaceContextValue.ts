@@ -10,6 +10,7 @@ export interface ChatMessage {
   question: string
   answer: string
   citations: Citation[]
+  suggestions: string[]
   error: string | null
   timestamp: number
 }

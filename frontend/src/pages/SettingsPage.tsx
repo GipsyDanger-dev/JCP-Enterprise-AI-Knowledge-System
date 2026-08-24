@@ -28,6 +28,7 @@ export function SettingsPage() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem(THEME_KEY, theme)
+    window.dispatchEvent(new Event('jcp-theme-change'))
   }, [theme])
 
   // Apply initial theme on mount

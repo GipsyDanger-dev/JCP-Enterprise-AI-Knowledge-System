@@ -66,20 +66,16 @@ export function employeeNavigation(lang: 'en' | 'id' = 'en'): NavigationItem[] {
       ]
 }
 
-export const quickQuestionsEn = [
-  'What is the hotel allowance for managers?',
-  'Summarize our procurement approval flow',
-  'Which security policy applies to contractors?',
-]
-
-export const quickQuestionsId = [
-  'Berapa tunjangan hotel untuk manajer?',
-  'Ringkas alur persetujuan procurement kami',
-  'Kebijakan keamanan mana yang berlaku untuk kontraktor?',
-]
-
-export function quickQuestions(lang: 'en' | 'id' = 'en') {
-  return lang === 'id' ? quickQuestionsId : quickQuestionsEn
+export function quickQuestions(lang: 'en' | 'id' = 'en', documents: Array<{ name: string; status: string }> = []) {
+  const readyDocuments = documents.filter((document) => document.status === 'Ready').slice(0, 3)
+  if (readyDocuments.length > 0) {
+    return readyDocuments.map((document) => lang === 'id'
+      ? `Apa isi utama dokumen ${document.name}?`
+      : `What are the key points in ${document.name}?`)
+  }
+  return lang === 'id'
+    ? ['Tanyakan tentang dokumen perusahaan yang sudah diunggah.']
+    : ['Ask about a company document that has been uploaded.']
 }
 
 export function navigationFor(role: Role, lang: 'en' | 'id' = 'en'): NavigationItem[] {

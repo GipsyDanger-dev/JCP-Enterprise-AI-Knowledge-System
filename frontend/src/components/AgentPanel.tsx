@@ -5,7 +5,7 @@ import { SourceCard } from './SourceCard'
 import { VerifiedBadge } from './VerifiedBadge'
 
 export function AgentPanel() {
-  const { question, setQuestion, chatHistory, isLoadingAnswer, onAsk, askQuestion, language } = useWorkspace()
+  const { question, setQuestion, chatHistory, isLoadingAnswer, onAsk, askQuestion, language, documents } = useWorkspace()
   const latestMessage = chatHistory[chatHistory.length - 1]
   const hasConversation = Boolean(latestMessage) || isLoadingAnswer
   const isId = language === 'id'
@@ -20,7 +20,7 @@ export function AgentPanel() {
         {!hasConversation ? (
           <>
             <div className="agent-intro"><span><Bot size={24} /></span><h2>{isId ? 'Tanyakan pengetahuan perusahaan' : 'Ask company knowledge'}</h2><p>{isId ? 'Jawaban menyertakan bukti dokumen yang digunakan.' : 'Answers include the exact document evidence used.'}</p></div>
-            <div className="question-list">{quickQuestions(language).map((item) => (
+            <div className="question-list">{quickQuestions(language, documents).map((item) => (
               <button key={item} onClick={() => askQuestion(item)}>{item}<ChevronRight size={15} /></button>
             ))}</div>
           </>

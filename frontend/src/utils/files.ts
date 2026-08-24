@@ -13,7 +13,7 @@ export function getAttachmentType(file: File): AttachmentType {
   return isImageFile(file) ? 'image' : 'file'
 }
 
-/** Read a file as data URL (for image preview) */
+/** Read a file as data URL so the attachment can be rendered or downloaded. */
 export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -28,8 +28,7 @@ export async function fileToAttachment(file: File): Promise<MessageAttachment> {
   if (file.size > MAX_FILE_SIZE) {
     throw new Error(`File "${file.name}" melebihi batas maksimal 10 MB.`)
   }
-  const isImage = isImageFile(file)
-  const dataUrl = isImage ? await readFileAsDataUrl(file) : null
+  const dataUrl = await readFileAsDataUrl(file)
   return {
     id: attachSeq++,
     type: getAttachmentType(file),

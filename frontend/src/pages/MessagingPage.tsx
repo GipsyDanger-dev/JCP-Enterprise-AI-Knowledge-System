@@ -3,7 +3,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { getEmployeeConversation, getDirectMessages, sendDirectMessage, onTypingChange } from '@/api/messaging'
+import { getEmployeeConversation, getDirectMessages, sendDirectMessage, editDirectMessage, deleteDirectMessage, onTypingChange } from '@/api/messaging'
 import { errorMessage } from '@/api/client'
 import type { DirectMessage, MessageAttachment } from '@/api/types'
 import { MessageList } from '@/components/MessageList'
@@ -21,6 +21,7 @@ export function MessagingPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [adminPhotoUrl, setAdminPhotoUrl] = useState<string | null>(null)
   const [isTyping, setIsTyping] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -33,6 +34,7 @@ export function MessagingPage() {
       .then((conv) => {
         if (cancelled) return
         setConversationId(conv.id)
+        setAdminPhotoUrl(conv.adminPhotoUrl ?? null)
         return getDirectMessages(conv.id, token)
       })
       .then((msgs) => {
@@ -93,6 +95,18 @@ export function MessagingPage() {
     }
   }
 
+  const handleEdit = async (messageId: string, content: string) => {
+    if (!token) return
+    try { const updated = await editDirectMessage(messageId, content, token); setMessages((prev) => prev.map((msg) => msg.id === messageId ? updated : msg)) }
+    catch (err) { setError(errorMessage(err)); throw err }
+  }
+
+  const handleDelete = async (messageId: string) => {
+    if (!token) return
+    try { await deleteDirectMessage(messageId, token); setMessages((prev) => prev.filter((msg) => msg.id !== messageId)) }
+    catch (err) { setError(errorMessage(err)); throw err }
+  }
+
   return (
     <div className="messaging-page">
       <div className="messaging-header">
@@ -100,7 +114,7 @@ export function MessagingPage() {
           <ArrowLeft size={18} />
         </button>
         <div className="messaging-header-info">
-          <div className="messaging-header-avatar">A</div>
+          {adminPhotoUrl ? <img className="messaging-header-avatar messaging-photo-avatar" src={adminPhotoUrl} alt="Admin profile" /> : <div className="messaging-header-avatar">A</div>}
           <div>
             <strong>{isId ? 'Admin' : 'Admin'}</strong>
             <small>{isId ? 'Biasanya merespons dalam beberapa menit' : 'Usually responds within a few minutes'}</small>
@@ -124,7 +138,7 @@ export function MessagingPage() {
           </div>
         ) : (
           <>
-            <MessageList messages={messages} currentSender="employee" isId={isId} bottomRef={bottomRef} />
+            <MessageList messages={messages} currentSender="employee" isId={isId} bottomRef={bottomRef} onEdit={handleEdit} onDelete={handleDelete} />
             {isTyping && <TypingIndicator name="Admin" />}
           </>
         )}

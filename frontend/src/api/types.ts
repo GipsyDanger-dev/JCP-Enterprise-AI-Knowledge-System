@@ -140,6 +140,7 @@ export interface ChatQueryResponse {
   answer: string | null
   message?: string
   citations: Citation[]
+  suggestions?: string[]
 }
 
 export interface ConversationSummary {
@@ -191,6 +192,7 @@ export interface DirectMessage {
   senderName: string | null
   content: string
   attachments: MessageAttachment[] | null
+  editedAt?: string | null
   /** ISO datetime */
   createdAt: string
   read?: boolean
@@ -201,6 +203,8 @@ export interface DirectConversation {
   employeeId: string
   employeeName: string
   employeeEmail: string
+  employeePhotoUrl?: string | null
+  adminPhotoUrl?: string | null
   lastMessage: string
   lastMessageAt: string
   unreadCount: number
@@ -218,6 +222,7 @@ export interface SendMessageResponse {
   senderName: string | null
   content: string
   attachments: MessageAttachment[] | null
+  editedAt?: string | null
   createdAt: string
   read?: boolean
 }

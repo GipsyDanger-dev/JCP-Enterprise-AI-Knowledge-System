@@ -3,7 +3,7 @@ import { ArrowLeft, Loader2, MessageSquareText } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { listConversations, getAdminMessages, sendAdminMessage, onTypingChange } from '@/api/messaging'
+import { listConversations, getAdminMessages, sendAdminMessage, editDirectMessage, deleteDirectMessage, onTypingChange } from '@/api/messaging'
 import { errorMessage } from '@/api/client'
 import type { DirectConversation, DirectMessage, MessageAttachment } from '@/api/types'
 import { userInitials } from '@/utils/users'
@@ -120,6 +120,18 @@ export function AdminInboxPage() {
     }
   }
 
+  const handleEdit = async (messageId: string, content: string) => {
+    if (!token) return
+    try { const updated = await editDirectMessage(messageId, content, token); setMessages((prev) => prev.map((msg) => msg.id === messageId ? updated : msg)) }
+    catch (err) { setError(errorMessage(err)); throw err }
+  }
+
+  const handleDelete = async (messageId: string) => {
+    if (!token) return
+    try { await deleteDirectMessage(messageId, token); setMessages((prev) => prev.filter((msg) => msg.id !== messageId)) }
+    catch (err) { setError(errorMessage(err)); throw err }
+  }
+
   const formatConversationDate = (iso: string) => {
     const d = new Date(iso)
     const now = new Date()
@@ -163,7 +175,7 @@ export function AdminInboxPage() {
                 className={`inbox-item ${selectedConv?.id === conv.id ? 'active' : ''}`}
                 onClick={() => setSelectedConv(conv)}
               >
-                <span className="inbox-item-avatar">{userInitials(conv.employeeName)}</span>
+                {conv.employeePhotoUrl ? <img className="inbox-item-avatar inbox-photo-avatar" src={conv.employeePhotoUrl} alt={`${conv.employeeName} profile`} /> : <span className="inbox-item-avatar">{userInitials(conv.employeeName)}</span>}
                 <div className="inbox-item-content">
                   <div className="inbox-item-header">
                     <strong>{conv.employeeName}</strong>
@@ -191,7 +203,7 @@ export function AdminInboxPage() {
                 <button className="icon-button inbox-back-btn" onClick={() => setSelectedConv(null)}>
                   <ArrowLeft size={18} />
                 </button>
-                <span className="inbox-item-avatar">{userInitials(selectedConv.employeeName)}</span>
+                {selectedConv.employeePhotoUrl ? <img className="inbox-item-avatar inbox-photo-avatar" src={selectedConv.employeePhotoUrl} alt={`${selectedConv.employeeName} profile`} /> : <span className="inbox-item-avatar">{userInitials(selectedConv.employeeName)}</span>}
                 <div>
                   <strong>{selectedConv.employeeName}</strong>
                   <small>{selectedConv.employeeEmail}</small>
@@ -207,7 +219,7 @@ export function AdminInboxPage() {
                   </div>
                 ) : (
                   <>
-                    <MessageList messages={messages} currentSender="admin" isId={isId} bottomRef={bottomRef} />
+                    <MessageList messages={messages} currentSender="admin" isId={isId} bottomRef={bottomRef} onEdit={handleEdit} onDelete={handleDelete} />
                     {isTyping && <TypingIndicator name={selectedConv.employeeName} />}
                   </>
                 )}
