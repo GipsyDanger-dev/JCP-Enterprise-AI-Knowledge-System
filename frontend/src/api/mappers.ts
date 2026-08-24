@@ -32,7 +32,7 @@ export function toDomainDocument(document: ApiDocument): DocumentItem {
     collection: document.collection || 'Knowledge Base',
     updatedAt: document.updatedAt ? formatRelativeTime(document.updatedAt) : 'Baru saja',
     status: toDomainDocumentStatus(document.status),
-    chunks: null,
+    chunks: version?.chunkCount ?? null,
   }
 }
 

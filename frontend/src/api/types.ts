@@ -70,6 +70,7 @@ export interface ApiDocumentVersion {
   mimeType?: string
   fileSize?: number
   checksum?: string | null
+  chunkCount?: number
 }
 
 export interface ApiProcessingJob {

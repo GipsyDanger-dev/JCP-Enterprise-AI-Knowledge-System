@@ -141,15 +141,23 @@ export class DocumentsService {
             mimeType: true,
             fileSize: true,
             checksum: true,
+            _count: {
+              select: { chunks: true },
+            },
           },
         },
       },
     });
 
-    return documents.map(({ versions, ...document }) => ({
-      ...document,
-      latestVersion: versions[0] ?? null,
-    }));
+    return documents.map(({ versions, ...document }) => {
+      const latestVersion = versions[0];
+      if (!latestVersion) return { ...document, latestVersion: null };
+      const { _count, ...version } = latestVersion;
+      return {
+        ...document,
+        latestVersion: { ...version, chunkCount: _count.chunks },
+      };
+    });
   }
 
   async getStatus(id: string) {
