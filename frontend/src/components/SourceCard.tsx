@@ -1,4 +1,12 @@
 import { ArrowUpRight, FileText, Quote } from 'lucide-react'
+
+const EXCERPT_PREVIEW_LENGTH = 220
+
+function previewExcerpt(excerpt: string) {
+  const normalized = excerpt.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= EXCERPT_PREVIEW_LENGTH) return normalized
+  return `${normalized.slice(0, EXCERPT_PREVIEW_LENGTH).trimEnd()}...`
+}
 import type { ReactNode } from 'react'
 
 interface SourceCardProps {
@@ -23,7 +31,7 @@ export function SourceCard({ title, detail, excerpt, trailing, onOpen }: SourceC
         {excerpt && (
           <div className="source-card-excerpt">
             <Quote size={12} />
-            <p>{excerpt}</p>
+            <p>{previewExcerpt(excerpt)}</p>
           </div>
         )}
       </div>

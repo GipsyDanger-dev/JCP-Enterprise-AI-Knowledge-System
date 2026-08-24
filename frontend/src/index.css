@@ -1228,7 +1228,7 @@ button { cursor: pointer; }
 .source-card-header strong, .source-card-header small { display: block; }
 .source-card-header small { margin-top: 3px; color: var(--muted); }
 .source-card-excerpt { display: flex; gap: 7px; margin-top: 9px; color: var(--muted); }
-.source-card-excerpt p { margin: 0; line-height: 1.5; }
+.source-card-excerpt p { margin: 0; line-height: 1.5; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .source-preview-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgb(15 23 42 / 55%); }
 .source-preview { width: min(760px, 100%); max-height: min(760px, calc(100dvh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius-xl); background: var(--bg-card); color: var(--text-body); padding: 20px; box-shadow: 0 20px 48px rgb(15 23 42 / 28%); }
 .source-preview header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; color: var(--text-secondary); }
