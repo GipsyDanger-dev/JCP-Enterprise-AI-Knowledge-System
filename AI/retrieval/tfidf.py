@@ -14,16 +14,35 @@ from typing import Any
 
 from retrieval.filters import match_metadata
 
+# Small, deliberately transparent normalisation layer for common Indonesian
+# chat phrasing. It improves retrieval without pretending that TF-IDF is a
+# semantic model or relaxing the no-evidence rule.
+QUERY_ALIASES = {
+    "ngajuin": "pengajuan",
+    "ngajukan": "pengajuan",
+    "ajuin": "pengajuan",
+    "ajuan": "pengajuan",
+    "syarat": "dokumen pendukung formulir",
+    "persyaratan": "dokumen pendukung formulir",
+}
+QUERY_FILLER = {"apa", "aja", "sih", "dong", "nih", "ya", "yah"}
+
 TOKEN_RE = re.compile(r"[\wÀ-ÿ]+", re.UNICODE)
 
 
 def tokens(text: str) -> list[str]:
-    return [token.lower() for token in TOKEN_RE.findall(text)]
+    result: list[str] = []
+    for raw_token in TOKEN_RE.findall(text):
+        token = raw_token.lower()
+        if token in QUERY_FILLER:
+            continue
+        result.extend(QUERY_ALIASES.get(token, token).split())
+    return result
 
 
 class TfidfRetriever:
     # Minimum cosine score for a match to count as evidence (no-answer below this).
-    minimum_score = 0.08
+    minimum_score = 0.15
 
     def __init__(self, chunks: list[dict[str, Any]]):
         self.chunks = chunks

@@ -1,6 +1,15 @@
-"""Chunking strategy: fixed word windows with overlap, per page.
+"""Document context strategy.
 
-Every chunk carries the full minimum metadata contract:
+The first version of the project used fixed word windows. That is a poor fit
+for SOPs and policy PDFs because headings, table rows, and exceptions can be
+separated from the text that gives them meaning. The current strategy keeps
+each PDF page intact, and splits a page only at detected section headings.
+
+The function keeps its historical name and metadata shape so existing stores
+and API contracts remain compatible. These records are now page/section
+contexts, not arbitrary fixed-size chunks.
+
+Every context carries the full minimum metadata contract:
 document_id, filename, version, page_number, section_title, chunk_id, text.
 """
 
@@ -18,33 +27,33 @@ def chunk_pages(
     words_per_chunk: int = 120,
     overlap: int = 25,
 ) -> list[dict[str, Any]]:
-    """Split each page into word-based chunks with overlap.
+    """Create one intact context per page or detected section.
 
-    ``sections`` maps page_number -> [(word_index, heading)]; the heading
-    active at the start of a chunk becomes its ``section_title``.
+    ``words_per_chunk`` and ``overlap`` remain accepted for backwards
+    compatibility with the CLI/tests, but are deliberately ignored.
     """
     sections = sections or {}
-    chunks: list[dict[str, Any]] = []
+    contexts: list[dict[str, Any]] = []
     for page_number, page_text in pages:
         words = page_text.split()
         if not words:
             continue
         markers = sections.get(page_number, [])
-        step = max(1, words_per_chunk - overlap)
-        for start in range(0, len(words), step):
-            text = " ".join(words[start:start + words_per_chunk]).strip()
+        boundaries = [(0, "")] + [(index, heading) for index, heading in markers if index > 0]
+        for marker_index, (start, heading) in enumerate(boundaries):
+            end = boundaries[marker_index + 1][0] if marker_index + 1 < len(boundaries) else len(words)
+            text = " ".join(words[start:end]).strip()
             if not text:
                 continue
-            section = next((heading for word_index, heading in reversed(markers) if word_index <= start), "")
-            chunks.append({
+            if not heading:
+                heading = next((title for word_index, title in reversed(markers) if word_index <= start), "")
+            contexts.append({
                 "document_id": document_id,
                 "filename": filename,
                 "version": version,
                 "page_number": page_number,
-                "section_title": section,
-                "chunk_id": f"{document_id}-{len(chunks) + 1}",
+                "section_title": heading,
+                "chunk_id": f"{document_id}-{len(contexts) + 1}",
                 "text": text,
             })
-            if start + words_per_chunk >= len(words):
-                break
-    return chunks
+    return contexts

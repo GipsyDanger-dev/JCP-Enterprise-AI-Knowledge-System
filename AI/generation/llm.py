@@ -18,7 +18,7 @@ from generation.prompts import build_messages
 
 def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
                     model: str = DEFAULT_MODEL, api_key: str | None = None) -> str:
-    """Ask a SumoPod LLM to answer `query` grounded only on the given chunks."""
+    """Ask DeepSeek to answer using intact page/section contexts only."""
     key = api_key or os.environ.get(SUMOPOD_API_KEY_ENV)
     if not key:
         raise RuntimeError(

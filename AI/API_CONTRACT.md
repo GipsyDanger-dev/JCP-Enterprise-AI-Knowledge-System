@@ -23,7 +23,7 @@ Request:
   "top_k": 5,
   "filters": { "filename": "sop_perjalanan.pdf", "section_title": "KETENTUAN UMUM" },
   "use_llm": true,
-  "model": "gpt-5-nano",
+  "model": "deepseek-v4-pro",
   "retriever": "auto"
 }
 ```
@@ -67,7 +67,12 @@ Error `400`: `{"detail": "query must not be empty"}`
 - `filters` opsional; key yang didukung: `filename`, `section_title`
   (case-insensitive substring).
 - `retriever` hanya berlaku untuk JSON store (`auto`/`tfidf`/`vector`);
-  saat `DATABASE_URL` diset (pgvector) retrieval selalu vector.
+  saat `DATABASE_URL` diset (pgvector) retrieval selalu vector. Jika nilainya
+  `auto`, service memakai `AI_RETRIEVER` (default `tfidf`) supaya API key baru
+  tidak otomatis mengaktifkan vector index yang belum di-embed ulang.
+- `AI_USE_LLM=true` membuat AI service memakai model chat untuk request dari
+  Backend. API key tetap hanya disimpan di environment AI service, tidak di
+  Frontend atau Backend.
 
 ## 2. `POST /ingest` — indeks dokumen
 

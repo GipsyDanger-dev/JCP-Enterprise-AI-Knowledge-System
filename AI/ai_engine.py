@@ -1,9 +1,9 @@
 """Standalone retrieval engine CLI + public API for the AI engineer milestone.
 
 Commands:
-    ingest  <dir>     parse -> chunk -> (--embed embeddings) -> index
-    ask     <query>   retrieval -> answer + citation (--llm via SumoPod)
-    delete  <file>    remove a document and its chunks/embeddings
+    ingest  <dir>     parse -> page/section context -> (--embed embeddings) -> index
+    ask     <query>   page/section retrieval -> answer + citation (--llm via SumoPod)
+    delete  <file>    remove a document and its contexts/embeddings
     docs              list indexed documents with their versions
 
 The module re-exports the public API used by tests and other programmers:

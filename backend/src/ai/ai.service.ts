@@ -24,7 +24,14 @@ export class AiService {
       const response = await fetch(`${this.baseUrl}/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, top_k: 5, use_llm: Boolean(process.env.SUMOPOD_API_KEY) }),
+        // The AI service owns the provider key. These flags only choose the
+        // grounded response path and retrieval strategy.
+        body: JSON.stringify({
+          query,
+          top_k: 5,
+          use_llm: process.env.AI_USE_LLM === 'true',
+          retriever: process.env.AI_RETRIEVER ?? 'tfidf',
+        }),
       });
       if (!response.ok) throw new Error(`AI service returned ${response.status}`);
       return (await response.json()) as AiAskResult;

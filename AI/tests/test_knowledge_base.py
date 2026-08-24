@@ -205,5 +205,16 @@ class VectorRetrieverTests(unittest.TestCase):
         self.assertTrue(result["grounded"])
 
 
+class IndonesianQueryNormalizationTests(unittest.TestCase):
+    def test_informal_leave_requirements_query_finds_formal_sop_wording(self):
+        chunks = chunk_pages(
+            [(3, "Karyawan mengisi formulir pengajuan cuti dan melampirkan dokumen pendukung sesuai jenis cuti.")],
+            "sop_cuti.txt", "doc-cuti", 1,
+        )
+        result = KnowledgeBase(chunks).ask("persyaratan ngajuin cuti apa aja")
+        self.assertTrue(result["grounded"])
+        self.assertEqual(result["citations"][0]["chunk_id"], "doc-cuti-1")
+
+
 if __name__ == "__main__":
     unittest.main()

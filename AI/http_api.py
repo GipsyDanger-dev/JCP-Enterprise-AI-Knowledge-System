@@ -36,6 +36,22 @@ from store import PgVectorStore, default_dsn, ingest_to_pg
 PROJECT_DIR = Path(__file__).resolve().parent
 DEFAULT_INDEX = PROJECT_DIR / "knowledge_base.json"
 
+
+def _env_enabled(name: str) -> bool:
+    """Return True only for an explicit, operator-provided opt-in."""
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _default_retriever() -> str:
+    """Keep retrieval deterministic unless vector search is explicitly selected.
+
+    A JSON index can contain vectors from a different embedding run.  Selecting
+    vector search merely because an API key exists can therefore yield no
+    evidence.  TF-IDF is the safe default for the local development index.
+    """
+    configured = os.environ.get("AI_RETRIEVER", "tfidf").strip().lower()
+    return configured if configured in {"tfidf", "vector", "auto"} else "tfidf"
+
 app = FastAPI(
     title="Enterprise AI — AI Service",
     description="Grounded retrieval engine: ingest, ask, citations. "
@@ -50,7 +66,7 @@ class AskRequest(BaseModel):
     filters: dict[str, str] | None = None
     use_llm: bool = False
     model: str | None = None
-    retriever: str = "auto"  # auto | tfidf | vector (JSON store only; pg selalu vector)
+    retriever: str = "auto"  # auto = value from AI_RETRIEVER; tfidf | vector override it
 
 
 class AskResponse(BaseModel):
@@ -101,14 +117,18 @@ def ask(request: AskRequest) -> dict[str, Any]:
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="query must not be empty")
     store = current_store()
+    # The AI process owns the provider key, so callers (including the backend)
+    # only need to opt into LLM generation through this non-secret setting.
+    use_llm = request.use_llm or _env_enabled("AI_USE_LLM")
     if isinstance(store, PgVectorStore):
         return store.ask(
-            request.query, top_k=request.top_k, use_llm=request.use_llm,
+            request.query, top_k=request.top_k, use_llm=use_llm,
             model=request.model or DEFAULT_MODEL, filters=request.filters,
         )
+    retriever = _default_retriever() if request.retriever == "auto" else request.retriever
     return store.ask(
-        request.query, top_k=request.top_k, use_llm=request.use_llm,
-        model=request.model or DEFAULT_MODEL, retriever=request.retriever,
+        request.query, top_k=request.top_k, use_llm=use_llm,
+        model=request.model or DEFAULT_MODEL, retriever=retriever,
         filters=request.filters,
     )
 

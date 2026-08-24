@@ -59,7 +59,7 @@ di-retrieval. Retrieval tetap lokal; LLM hanya menulis jawaban.
 
 ```powershell
 $env:SUMOPOD_API_KEY="sk-xxxx"
-python ai_engine.py ask "Berapa maksimal biaya hotel Manager?" --index knowledge_base.json --llm --model gpt-5-nano
+python ai_engine.py ask "Berapa maksimal biaya hotel Manager?" --index knowledge_base.json --llm --model deepseek-v4-pro
 ```
 
 API key dibaca dari environment variable `SUMOPOD_API_KEY`; jangan pernah
@@ -117,10 +117,11 @@ python ai_engine.py ingest sample_docs --embed                    # simpan embed
 python ai_engine.py ask "Berapa maksimal biaya hotel Manager?" --retriever vector
 ```
 
-`--retriever auto` memakai vector bila embeddings tersimpan DAN
-`SUMOPOD_API_KEY` tersedia; tanpa itu otomatis fallback ke TF-IDF (tetap bisa
-dipakai offline). Catatan: no-answer paling ketat dengan TF-IDF; vector search
-bersifat semantik sehingga threshold-nya lebih tinggi (0.45).
+Untuk HTTP API, mode `auto` memakai `AI_RETRIEVER` (default `tfidf`) agar
+penambahan `SUMOPOD_API_KEY` tidak diam-diam mengaktifkan vector index yang
+belum dibuat ulang. Pilih `vector` secara eksplisit setelah embedding selesai
+dibuat dan dievaluasi. Catatan: no-answer paling ketat dengan TF-IDF; vector
+search bersifat semantik sehingga threshold-nya lebih tinggi (0.45).
 
 ## Filtering metadata (slide 6: top-k + filtering metadata)
 

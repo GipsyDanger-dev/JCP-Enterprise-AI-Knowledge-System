@@ -1,6 +1,6 @@
 """Knowledge base: the store and orchestrator of the AI pipeline.
 
-Holds the chunk index (with the full metadata contract), a document
+Holds the page/section context index (with the full metadata contract), a document
 registry used for versioning, and optionally stored embedding vectors.
 
 Versioning rules (slide 17 of the briefing):
@@ -22,6 +22,7 @@ from ingestion.parsers import read_document
 from ingestion.sections import extract_sections
 from retrieval.search import build_retriever
 from generation.citations import citations_from_matches
+from generation.extractive import extractive_answer
 from generation.guardrails import no_answer_response
 from generation.llm import DEFAULT_MODEL, generate_answer
 from config import EMBEDDING_MODEL
@@ -111,18 +112,21 @@ class KnowledgeBase:
             use_llm: bool = False, model: str = DEFAULT_MODEL,
             retriever: str = "auto", api_key: str | None = None,
             filters: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Answer ``query``, optionally narrowed to chunks matching ``filters``
+        """Answer ``query``, optionally narrowed to document contexts matching ``filters``
         (e.g. {"filename": "sop.pdf"} or {"section_title": "KETENTUAN UMUM"})."""
         engine = build_retriever(self, mode=retriever, api_key=api_key)
         threshold = engine.minimum_score if minimum_score is None else minimum_score
         matches = [(score, chunk) for score, chunk in engine.search(query, top_k, filters=filters) if score >= threshold]
         if not matches:
             return no_answer_response()
-        citations = citations_from_matches(matches)
         if use_llm:
             answer = generate_answer(query, matches, model=model, api_key=api_key)
+            citations = citations_from_matches(matches)
         else:
-            answer = matches[0][1]["text"]
+            answer = extractive_answer(query, matches[0][1]["text"])
+            if not answer:
+                return no_answer_response()
+            citations = citations_from_matches([matches[0]])
         return {
             "answer": answer,
             "citations": citations,
