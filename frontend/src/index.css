@@ -1236,6 +1236,12 @@ button { cursor: pointer; }
 .source-preview > strong { flex: 0 0 auto; display: block; color: var(--text-strong); font-size: var(--fs-xl); line-height: 1.35; overflow-wrap: anywhere; }
 .source-preview > small { flex: 0 0 auto; display: block; margin-top: 5px; color: var(--text-muted); font-size: var(--fs-xs); }
 .source-preview blockquote { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 18px 0 0; border-left: 3px solid var(--brand-500); padding: 10px 14px; color: var(--text-body); font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.source-preview-loading { margin-top: 18px; color: var(--text-muted); font-size: var(--fs-sm); }
+.source-preview-pdf { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; flex: 1 1 auto; min-height: 0; margin-top: 18px; }
+.source-preview-evidence { border-left: 3px solid var(--brand-500); padding: 9px 12px; background: var(--bg-subtle); color: var(--text-body); font-size: var(--fs-sm); line-height: 1.55; }
+.source-preview-evidence span { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: var(--fw-heavy); text-transform: uppercase; }
+.source-preview-evidence mark { padding: 0 2px; color: inherit; background: color-mix(in srgb, var(--brand-300) 45%, transparent); }
+.source-preview-pdf iframe { width: 100%; min-height: 0; height: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); background: white; }
 
 @media (max-width: 600px) {
   .source-preview-backdrop { padding: 12px; }

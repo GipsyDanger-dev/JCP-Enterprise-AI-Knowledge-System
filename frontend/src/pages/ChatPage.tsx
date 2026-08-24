@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowUpRight, FileText, Loader2, MessageSquareText, Send
 import { PageHeading } from '@/components/PageHeading'
 import { SourceCard } from '@/components/SourceCard'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
-import { getDocumentChunks } from '@/api/documents'
+import { getDocumentBlob, getDocumentChunks } from '@/api/documents'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
@@ -87,17 +87,39 @@ export function ChatPage() {
   const [selectedSource, setSelectedSource] = useState<Citation | null>(null)
   const [sourcePreviewText, setSourcePreviewText] = useState<string | null>(null)
   const [sourcePreviewLoading, setSourcePreviewLoading] = useState(false)
+  const [sourcePdfUrl, setSourcePdfUrl] = useState<string | null>(null)
+  const [sourcePdfLoading, setSourcePdfLoading] = useState(false)
 
   useEffect(() => {
     if (!selectedSource) {
       setSourcePreviewText(null)
-      return
-    }
-    if (selectedSource.excerpt) {
-      setSourcePreviewText(selectedSource.excerpt)
+      setSourcePdfUrl(null)
       return
     }
     let cancelled = false
+    let objectUrl: string | null = null
+    const isPdf = selectedSource.filename.toLowerCase().endsWith('.pdf')
+
+    setSourcePdfUrl(null)
+    setSourcePreviewText(selectedSource.excerpt ?? null)
+
+    if (isPdf) {
+      setSourcePdfLoading(true)
+      getDocumentBlob(selectedSource.documentId, token ?? undefined)
+        .then((blob) => {
+          objectUrl = URL.createObjectURL(blob)
+          if (!cancelled) setSourcePdfUrl(`${objectUrl}#page=${selectedSource.pageNumber ?? 1}`)
+        })
+        .catch(() => { if (!cancelled) setSourcePdfUrl(null) })
+        .finally(() => { if (!cancelled) setSourcePdfLoading(false) })
+    }
+
+    if (selectedSource.excerpt) {
+      return () => {
+        cancelled = true
+        if (objectUrl) URL.revokeObjectURL(objectUrl)
+      }
+    }
     setSourcePreviewLoading(true)
     getDocumentChunks(selectedSource.documentId, token ?? undefined)
       .then((result) => {
@@ -107,7 +129,10 @@ export function ChatPage() {
       })
       .catch(() => { if (!cancelled) setSourcePreviewText(null) })
       .finally(() => { if (!cancelled) setSourcePreviewLoading(false) })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
   }, [selectedSource, token])
 
   useEffect(() => {
@@ -163,7 +188,18 @@ export function ChatPage() {
             </header>
             <strong>{selectedSource.filename}</strong>
             <small>{[selectedSource.sectionTitle, selectedSource.pageNumber ? `Page ${selectedSource.pageNumber}` : null, selectedSource.version].filter(Boolean).join(' · ')}</small>
-            <blockquote>{sourcePreviewLoading ? (isId ? 'Memuat cuplikan...' : 'Loading excerpt...') : sourcePreviewText || (isId ? 'Cuplikan tidak tersedia untuk sumber ini.' : 'No excerpt is available for this source.')}</blockquote>
+            {sourcePdfLoading && <div className="source-preview-loading">{isId ? 'Memuat PDF asli...' : 'Loading original PDF...'}</div>}
+            {sourcePdfUrl ? (
+              <div className="source-preview-pdf">
+                <div className="source-preview-evidence">
+                  <span>{isId ? 'Bukti yang digunakan untuk jawaban' : 'Evidence used for this answer'}</span>
+                  <mark>{sourcePreviewText || (isId ? 'Cuplikan citation tidak tersedia.' : 'Citation excerpt is unavailable.')}</mark>
+                </div>
+                <iframe title={`${selectedSource.filename} page ${selectedSource.pageNumber ?? 1}`} src={sourcePdfUrl} />
+              </div>
+            ) : (
+              <blockquote>{sourcePreviewLoading ? (isId ? 'Memuat cuplikan...' : 'Loading excerpt...') : sourcePreviewText || (isId ? 'Cuplikan tidak tersedia untuk sumber ini.' : 'No excerpt is available for this source.')}</blockquote>
+            )}
           </section>
         </div>
       )}
