@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { MessageRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
@@ -11,12 +11,14 @@ interface AiCitation {
   section_title?: string | null;
   chunk_id: string;
   document_version_id?: string;
+  excerpt?: string;
 }
 
 interface AiAskResult {
   answer: string;
   citations: AiCitation[];
   grounded: boolean;
+  suggestions?: string[];
 }
 
 export interface ChatCitation {
@@ -27,7 +29,15 @@ export interface ChatCitation {
   pageNumber: number | null;
   sectionTitle: string | null;
   chunkId: string;
+  excerpt?: string;
 }
+
+const QUICK_SUGGESTIONS = [
+  'Apa persyaratan cuti tahunan?',
+  'Berapa batas pengajuan cuti sebelum tanggal cuti?',
+  'Dokumen apa yang diperlukan untuk cuti sakit?',
+  'Bagaimana alur persetujuan cuti?',
+];
 
 @Injectable()
 export class ChatService {
@@ -78,11 +88,18 @@ export class ChatService {
         conversationId: conversation.id,
         answer: result.answer,
         citations,
+        suggestions: result.suggestions ?? [],
       };
     } catch (error) {
-      throw new ServiceUnavailableException(
-        `AI service tidak tersedia: ${error instanceof Error ? error.message : 'unknown error'}`,
-      );
+      const answer = 'Maaf, pertanyaan belum dapat diproses sekarang. Coba salah satu pertanyaan berikut tentang dokumen perusahaan:';
+      const citations: ChatCitation[] = [];
+      await this.persistAssistantMessage(conversation.id, answer, citations);
+      return {
+        conversationId: conversation.id,
+        answer,
+        citations,
+        suggestions: QUICK_SUGGESTIONS,
+      };
     }
   }
 
@@ -115,6 +132,7 @@ export class ChatService {
       pageNumber: citation.page_number ?? null,
       sectionTitle: citation.section_title ?? null,
       chunkId: citation.chunk_id,
+      excerpt: citation.excerpt,
     }));
   }
 
@@ -152,6 +170,7 @@ export class ChatService {
               chunkId: citation.chunkId,
               pageNumber: citation.pageNumber,
               sectionTitle: citation.sectionTitle,
+              excerpt: citation.excerpt,
               sortOrder,
             })),
           },

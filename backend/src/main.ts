@@ -7,8 +7,9 @@ const { json, urlencoded } = require('express');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
-  app.use(json({ limit: '256kb' }));
-  app.use(urlencoded({ extended: true, limit: '256kb' }));
+  // Attachments are sent as base64 JSON; allow the 10 MB client limit plus encoding overhead.
+  app.use(json({ limit: '20mb' }));
+  app.use(urlencoded({ extended: true, limit: '20mb' }));
   app.enableCors();
   app.useGlobalPipes(
     new ValidationPipe({

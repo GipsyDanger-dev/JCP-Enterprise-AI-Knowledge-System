@@ -20,12 +20,12 @@ export class MessagingService {
           take: 50,
         },
         employee: {
-          select: { id: true, displayName: true, email: true },
+          select: { id: true, displayName: true, email: true, photoUrl: true },
         },
       },
     });
 
-    if (conv) return conv;
+    if (conv) return { ...conv, adminPhotoUrl: await this.getAdminPhotoUrl() };
 
     // Create new conversation
     return this.prisma.directConversation.create({
@@ -33,7 +33,7 @@ export class MessagingService {
       include: {
         messages: true,
         employee: {
-          select: { id: true, displayName: true, email: true },
+          select: { id: true, displayName: true, email: true, photoUrl: true },
         },
       },
     });
@@ -45,7 +45,7 @@ export class MessagingService {
       orderBy: { updatedAt: 'desc' },
       include: {
         employee: {
-          select: { id: true, displayName: true, email: true },
+          select: { id: true, displayName: true, email: true, photoUrl: true },
         },
       },
     });
@@ -55,6 +55,7 @@ export class MessagingService {
       employeeId: conv.employeeId,
       employeeName: conv.employee.displayName,
       employeeEmail: conv.employee.email,
+      employeePhotoUrl: conv.employee.photoUrl,
       lastMessage: conv.lastMessage ?? '',
       lastMessageAt: conv.lastMessageAt?.toISOString() ?? conv.updatedAt.toISOString(),
       unreadCount: conv.unreadCount,
@@ -76,6 +77,7 @@ export class MessagingService {
       senderName: msg.senderName,
       content: msg.content,
       attachments: msg.attachments,
+      editedAt: msg.editedAt?.toISOString() ?? null,
       createdAt: msg.createdAt.toISOString(),
     }));
   }
@@ -106,7 +108,7 @@ export class MessagingService {
     await this.prisma.directConversation.update({
       where: { id: convId },
       data: {
-        lastMessage: content,
+        lastMessage: content || this.attachmentLabel(attachments),
         lastMessageAt: new Date(),
         unreadCount: isEmployee ? { increment: 1 } : 0,
       },
@@ -119,6 +121,7 @@ export class MessagingService {
       senderName: msg.senderName,
       content: msg.content,
       attachments: msg.attachments,
+      editedAt: msg.editedAt?.toISOString() ?? null,
       createdAt: msg.createdAt.toISOString(),
     };
   }
@@ -133,6 +136,22 @@ export class MessagingService {
     return { success: true };
   }
 
+  async editMessage(messageId: string, content: string, actor: AuthenticatedUser) {
+    const message = await this.getOwnedMessage(messageId, actor);
+    const updated = await this.prisma.directMessage.update({
+      where: { id: message.id }, data: { content, editedAt: new Date() },
+    }).then(async (created) => ({ ...created, adminPhotoUrl: await this.getAdminPhotoUrl() }));
+    await this.refreshConversationPreview(message.conversationId);
+    return this.serializeMessage(updated);
+  }
+
+  async deleteMessage(messageId: string, actor: AuthenticatedUser) {
+    const message = await this.getOwnedMessage(messageId, actor);
+    await this.prisma.directMessage.delete({ where: { id: message.id } });
+    await this.refreshConversationPreview(message.conversationId);
+    return { success: true, id: message.id };
+  }
+
   private async assertConversationAccess(conversationId: string, actor: AuthenticatedUser) {
     const conversation = await this.prisma.directConversation.findUnique({
       where: { id: conversationId },
@@ -143,5 +162,41 @@ export class MessagingService {
       throw new ForbiddenException('You can only access your own conversation');
     }
     return conversation;
+  }
+
+  private async getOwnedMessage(messageId: string, actor: AuthenticatedUser) {
+    const message = await this.prisma.directMessage.findUnique({ where: { id: messageId } });
+    if (!message) throw new NotFoundException('Message not found');
+    await this.assertConversationAccess(message.conversationId, actor);
+    const expectedSender = actor.role === UserRole.ADMIN ? 'admin' : 'employee';
+    if (message.sender !== expectedSender) throw new ForbiddenException('You can only change your own messages');
+    return message;
+  }
+
+  private async refreshConversationPreview(conversationId: string) {
+    const latest = await this.prisma.directMessage.findFirst({
+      where: { conversationId }, orderBy: { createdAt: 'desc' },
+      select: { content: true, attachments: true, createdAt: true },
+    }).then(async (created) => ({ ...created, adminPhotoUrl: await this.getAdminPhotoUrl() }));
+    await this.prisma.directConversation.update({ where: { id: conversationId }, data: latest ? {
+      lastMessage: latest.content || this.attachmentLabel(latest.attachments), lastMessageAt: latest.createdAt,
+    } : { lastMessage: null, lastMessageAt: null } });
+  }
+
+  private attachmentLabel(attachments: unknown) {
+    return Array.isArray(attachments) && attachments.length > 0 ? '(attachment)' : '';
+  }
+
+  private async getAdminPhotoUrl() {
+    const admin = await this.prisma.user.findFirst({ where: { role: UserRole.ADMIN, isActive: true }, select: { photoUrl: true } });
+    return admin?.photoUrl ?? null;
+  }
+
+  private serializeMessage(msg: any) {
+    return {
+      id: msg.id, conversationId: msg.conversationId, sender: msg.sender, senderName: msg.senderName,
+      content: msg.content, attachments: msg.attachments, editedAt: msg.editedAt?.toISOString() ?? null,
+      createdAt: msg.createdAt.toISOString(),
+    };
   }
 }

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -47,8 +47,8 @@ export class MessagingController {
     @Body() body: { content: string; attachments?: unknown },
     @CurrentUser() actor: AuthenticatedUser,
   ) {
-    const content = body.content?.trim();
-    if (!content) throw new BadRequestException('content must not be empty');
+    const content = body.content?.trim() ?? '';
+    if (!content && (!Array.isArray(body.attachments) || body.attachments.length === 0)) throw new BadRequestException('content or attachment is required');
     if (content.length > 8000) throw new BadRequestException('content must not exceed 8000 characters');
     const sender = actor.role === UserRole.ADMIN ? 'admin' : 'employee';
     const senderName = actor.displayName ?? (actor.role === UserRole.ADMIN ? 'Admin' : 'Employee');
@@ -60,6 +60,19 @@ export class MessagingController {
       body.attachments,
       actor,
     );
+  }
+
+  @Patch('messages/:messageId')
+  editMessage(@Param('messageId', new ParseUUIDPipe({ version: '4' })) messageId: string, @Body() body: { content: string }, @CurrentUser() actor: AuthenticatedUser) {
+    const content = body.content?.trim();
+    if (!content) throw new BadRequestException('content must not be empty');
+    if (content.length > 8000) throw new BadRequestException('content must not exceed 8000 characters');
+    return this.messagingService.editMessage(messageId, content, actor);
+  }
+
+  @Delete('messages/:messageId')
+  deleteMessage(@Param('messageId', new ParseUUIDPipe({ version: '4' })) messageId: string, @CurrentUser() actor: AuthenticatedUser) {
+    return this.messagingService.deleteMessage(messageId, actor);
   }
 
   /** Reset unread count */
