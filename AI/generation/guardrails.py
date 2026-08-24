@@ -16,6 +16,13 @@ OUT_OF_SCOPE = (
     "seperti SOP, kebijakan, prosedur, dan informasi internal."
 )
 
+QUICK_SUGGESTIONS = [
+    "Apa persyaratan cuti tahunan?",
+    "Berapa batas pengajuan cuti sebelum tanggal cuti?",
+    "Dokumen apa yang diperlukan untuk cuti sakit?",
+    "Bagaimana alur persetujuan cuti?",
+]
+
 _ARITHMETIC_QUERY = re.compile(
     r"^\s*(?:berapa\s+|hitung(?:kan)?\s+)?\d+(?:[.,]\d+)?\s*"
     r"(?:[+\-*/x×÷]\s*\d+(?:[.,]\d+)?)+\s*(?:berapa|hasil(?:nya)?|=)?\s*\??\s*$",
@@ -31,11 +38,23 @@ _OFF_TOPIC_KEYWORDS = (
 
 
 def no_answer_response() -> dict[str, Any]:
-    return {"answer": NO_ANSWER, "citations": [], "grounded": False}
+    return {
+        "answer": NO_ANSWER,
+        "citations": [],
+        "grounded": False,
+        "retrieval": [],
+        "suggestions": QUICK_SUGGESTIONS,
+    }
 
 
 def out_of_scope_response() -> dict[str, Any]:
-    return {"answer": OUT_OF_SCOPE, "citations": [], "grounded": False, "retrieval": []}
+    return {
+        "answer": OUT_OF_SCOPE,
+        "citations": [],
+        "grounded": False,
+        "retrieval": [],
+        "suggestions": QUICK_SUGGESTIONS,
+    }
 
 
 def is_out_of_scope(query: str) -> bool:

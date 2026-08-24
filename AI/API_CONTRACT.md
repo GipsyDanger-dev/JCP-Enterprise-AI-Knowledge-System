@@ -48,7 +48,7 @@ Response `200`:
 {
   "status": "ok",
   "store": "json",
-  "chat_model": "gpt-5-nano",
+  "chat_model": "deepseek-v4-pro",
   "embedding_model": "text-embedding-3-small"
 }
 ```
@@ -71,7 +71,7 @@ Request:
     "section_title": "KETENTUAN UMUM"
   },
   "use_llm": true,
-  "model": "gpt-5-nano",
+  "model": "deepseek-v4-pro",
   "retriever": "auto"
 }
 ```

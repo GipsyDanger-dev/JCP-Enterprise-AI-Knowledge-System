@@ -1,6 +1,6 @@
 """Knowledge base: the store and orchestrator of the AI pipeline.
 
-Holds the chunk index (with the full metadata contract), a document
+Holds the page/section context index (with the full metadata contract), a document
 registry used for versioning, and optionally stored embedding vectors.
 
 Versioning rules (slide 17 of the briefing):
@@ -111,7 +111,7 @@ class KnowledgeBase:
             use_llm: bool = False, model: str = DEFAULT_MODEL,
             retriever: str = "auto", api_key: str | None = None,
             filters: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Answer ``query``, optionally narrowed to chunks matching ``filters``
+        """Answer ``query``, optionally narrowed to page/section contexts matching ``filters``
         (e.g. {"filename": "sop.pdf"} or {"section_title": "KETENTUAN UMUM"})."""
         engine = build_retriever(self, mode=retriever, api_key=api_key)
         threshold = engine.minimum_score if minimum_score is None else minimum_score

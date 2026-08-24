@@ -49,6 +49,23 @@ def make_docx(path: Path, paragraphs: list[tuple[str, str | None]]) -> None:
 
 
 class SectionExtractionTests(unittest.TestCase):
+    def test_page_context_is_not_split_by_fixed_word_window(self):
+        text = " ".join(f"aturan{i}" for i in range(240))
+        contexts = chunk_pages([(2, text)], "policy.pdf", "doc-page", 1, words_per_chunk=40)
+        self.assertEqual(len(contexts), 1)
+        self.assertEqual(contexts[0]["page_number"], 2)
+        self.assertEqual(contexts[0]["text"], text)
+
+    def test_page_context_splits_only_at_detected_sections(self):
+        text = "BAB I Umum isi aturan umum BAB II Cuti isi aturan cuti"
+        contexts = chunk_pages(
+            [(1, text)], "policy.pdf", "doc-section", 1,
+            sections={1: [(0, "BAB I Umum"), (6, "BAB II Cuti")]},
+        )
+        self.assertEqual([context["section_title"] for context in contexts], ["BAB I Umum", "BAB II Cuti"])
+        self.assertIn("isi aturan umum", contexts[0]["text"])
+        self.assertIn("isi aturan cuti", contexts[1]["text"])
+
     def test_text_headings_detected(self):
         text = (
             "SOP Perjalanan Dinas 2026\n\n"

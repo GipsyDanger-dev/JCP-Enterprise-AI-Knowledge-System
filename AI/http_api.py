@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover - optional dependency
     ) from None
 
 from config import DEFAULT_MODEL, EMBEDDING_MODEL
-from generation.guardrails import is_out_of_scope, out_of_scope_response
+from generation.guardrails import QUICK_SUGGESTIONS, is_out_of_scope, out_of_scope_response
 from knowledge_base import KnowledgeBase
 from store import PgVectorStore, default_dsn, ingest_to_pg
 
@@ -41,7 +41,7 @@ DEFAULT_INDEX = PROJECT_DIR / "knowledge_base.json"
 app = FastAPI(
     title="Enterprise AI — AI Service",
     description="Grounded retrieval engine: ingest, ask, citations. "
-                "Citation selalu berasal dari metadata chunk, bukan dari LLM.",
+                "Citation selalu berasal dari metadata halaman/section, bukan dari LLM.",
     version="0.1.0",
 )
 
@@ -60,6 +60,7 @@ class AskResponse(BaseModel):
     citations: list[dict[str, Any]]
     grounded: bool
     retrieval: list[dict[str, Any]] = []
+    suggestions: list[str] = []
 
 
 class IngestRequest(BaseModel):
@@ -179,6 +180,7 @@ def general_chat_response(query: str, model: str) -> dict[str, Any]:
                 "citations": [],
                 "grounded": False,
                 "retrieval": [],
+                "suggestions": QUICK_SUGGESTIONS,
             }
     
     return {
@@ -186,12 +188,13 @@ def general_chat_response(query: str, model: str) -> dict[str, Any]:
         "citations": [],
         "grounded": False,
         "retrieval": [],
+        "suggestions": QUICK_SUGGESTIONS,
     }
 
 
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> dict[str, Any]:
-    """Retrieval -> (optional LLM) -> answer + citations."""
+    """Page/section retrieval -> (optional LLM) -> answer + citations."""
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="query must not be empty")
     
@@ -215,7 +218,7 @@ def ask(request: AskRequest) -> dict[str, Any]:
 
 @app.post("/ingest", response_model=IngestResponse)
 def ingest_documents(request: IngestRequest) -> dict[str, Any]:
-    """Parse -> chunk -> (embed) -> index a directory of documents."""
+    """Parse -> page/section context -> (embed) -> index a directory of documents."""
     input_dir = Path(request.input_dir)
     if not input_dir.is_dir():
         raise HTTPException(status_code=400, detail=f"input_dir not found: {input_dir}")

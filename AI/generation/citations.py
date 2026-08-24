@@ -14,6 +14,11 @@ CITATION_FIELDS = ("document_id", "filename", "version", "page_number", "section
 
 def citation_from_chunk(chunk: dict[str, Any]) -> dict[str, Any]:
     citation = {key: chunk[key] for key in CITATION_FIELDS}
+    # Keep a bounded, verbatim preview for the evidence viewer. Retrieval still
+    # uses the intact page/section context; this is only presentation metadata.
+    text = str(chunk.get("text", "")).strip()
+    if text:
+        citation["excerpt"] = text[:2400]
     if "document_version_id" in chunk:
         citation["document_version_id"] = chunk["document_version_id"]
     return citation

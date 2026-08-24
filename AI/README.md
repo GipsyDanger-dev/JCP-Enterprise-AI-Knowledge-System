@@ -1,14 +1,14 @@
 # Enterprise AI Knowledge System — AI Service
 
-Service Python/FastAPI untuk pipeline RAG: dokumen diparse, dibagi menjadi
-chunk, diretrieval, lalu digunakan sebagai bukti jawaban dan citation.
+Service Python/FastAPI untuk pipeline RAG: dokumen diparse menjadi konteks
+halaman/section utuh, diretrieval, lalu digunakan sebagai bukti jawaban dan citation.
 
 ## Status
 
 Pipeline standalone sudah menyediakan:
 
 ```text
-ingestion/      parser TXT/MD/DOCX/PDF, section detection, dan chunking
+ingestion/      parser TXT/MD/DOCX/PDF, section detection, dan page/section context
 retrieval/      TF-IDF dan embedding/vector search
 generation/     prompt, grounded answer, citation, dan guardrail
 knowledge_base.py
@@ -41,18 +41,18 @@ Yang masih perlu diselesaikan:
 
 ## Aturan utama
 
-- Citation selalu disalin dari metadata chunk yang benar-benar diretrieval.
+- Citation selalu disalin dari metadata konteks halaman/section yang benar-benar diretrieval.
 - LLM tidak boleh membuat citation sendiri.
 - Re-ingest file yang tidak berubah harus menjadi no-op.
-- File yang berubah menaikkan version dan mengganti chunk lama.
-- Delete membersihkan dokumen, chunk, dan embedding terkait.
+- File yang berubah menaikkan version dan mengganti konteks lama.
+- Delete membersihkan dokumen, konteks, dan embedding terkait.
 - Jika bukti tidak cukup, response harus `grounded: false` dengan jawaban:
 
 ```text
 Informasi tidak ditemukan pada dokumen yang tersedia.
 ```
 
-Metadata minimum chunk:
+Metadata minimum konteks:
 
 ```text
 document_id
@@ -153,7 +153,7 @@ Contoh:
 ```powershell
 python ai_engine.py ingest sample_docs --embed
 python ai_engine.py ask "Berapa biaya hotel Manager?" --retriever vector
-python ai_engine.py ask "Berapa biaya hotel Manager?" --llm --model gpt-5-nano
+python ai_engine.py ask "Berapa biaya hotel Manager?" --llm --model deepseek-v4-pro
 ```
 
 `--retriever auto` memilih vector jika embedding dan API key tersedia; jika
