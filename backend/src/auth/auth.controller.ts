@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Ip, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -25,8 +25,21 @@ export class AuthController {
   @ApiOperation({ summary: 'Login as an active admin or user' })
   @ApiOkResponse({ description: 'JWT access token and safe user profile' })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials or inactive user' })
-  login(@Body() input: LoginDto) {
-    return this.authService.login(input);
+  login(
+    @Body() input: LoginDto,
+    @Ip() ip?: string,
+    @Headers('user-agent') userAgent?: string
+  ) {
+    return this.authService.login(input, ip, userAgent);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Logout and revoke the current session' })
+  async logout(@CurrentUser() user: AuthenticatedUser) {
+    await this.authService.logout(user.sid, user.sub);
   }
 
   @Get('me')

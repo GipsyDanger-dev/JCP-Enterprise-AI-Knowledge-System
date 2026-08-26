@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { login as apiLogin, me as apiMe } from '@/api/auth'
+import { login as apiLogin, me as apiMe, logout as apiLogout } from '@/api/auth'
 import type { ApiUser } from '@/api/types'
 import { AuthContext } from './authContextValue'
 
@@ -51,7 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user)
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const currentToken = localStorage.getItem(TOKEN_KEY)
+    if (currentToken) {
+      try {
+        await apiLogout(currentToken)
+      } catch (error) {
+        // Best-effort logout, ignore errors to prevent getting stuck
+        console.warn('Failed to logout from server:', error)
+      }
+    }
     localStorage.removeItem(TOKEN_KEY)
     setToken(null)
     setUser(null)
