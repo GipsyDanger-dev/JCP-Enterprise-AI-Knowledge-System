@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getConversation, queryChat } from '@/api/chat'
@@ -35,14 +35,30 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   })
   const [unreadMessages, setUnreadMessages] = useState(0)
   const prevUnreadRef = useRef(0)
+  const prevUserIdRef = useRef<string | null>(user?.id ?? null)
   const uploadRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Role mengikuti akun yang login; reset saat logout
+  // Role mengikuti akun yang login
   useEffect(() => {
     setRole(user ? toDomainRole(user.role) : 'admin')
   }, [user])
+
+  // Reset seluruh workspace & riwayat chat saat logout atau berganti akun
+  useEffect(() => {
+    if (user?.id !== prevUserIdRef.current) {
+      prevUserIdRef.current = user?.id ?? null
+      setChatHistory([])
+      setConversationId(null)
+      setQuestion('')
+      setUploadError(null)
+      setIsLoadingAnswer(false)
+      setIsUploading(false)
+      setUnreadMessages(0)
+      prevUnreadRef.current = 0
+    }
+  }, [user?.id])
 
   useEffect(() => {
     const requestedConversationId = new URLSearchParams(location.search).get('conversation')
@@ -225,6 +241,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     sendQuestion(value)
   }
 
+  const clearChat = useCallback(() => {
+    setChatHistory([])
+    setConversationId(null)
+    setQuestion('')
+    setIsLoadingAnswer(false)
+  }, [])
+
   const triggerUpload = () => uploadRef.current?.click()
 
   const setLanguage = (lang: Language) => {
@@ -246,6 +269,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       question,
       setQuestion,
       chatHistory,
+      clearChat,
       isLoadingAnswer,
       onAsk,
       askQuestion,

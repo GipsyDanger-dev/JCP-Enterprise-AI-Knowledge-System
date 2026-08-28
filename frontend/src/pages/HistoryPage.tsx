@@ -10,7 +10,7 @@ import type { ConversationSummary } from '@/api/types'
 export function HistoryPage() {
   const navigate = useNavigate()
   const { token } = useAuth()
-  const { language } = useWorkspace()
+  const { language, clearChat } = useWorkspace()
   const isId = language === 'id'
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -22,6 +22,11 @@ export function HistoryPage() {
       .finally(() => setLoading(false))
   }, [token])
 
+  const handleStartNewChat = () => {
+    clearChat()
+    navigate('/chat')
+  }
+
   return (
     <div className="standard-page">
       <PageHeading
@@ -29,7 +34,7 @@ export function HistoryPage() {
         title={isId ? 'Riwayat percakapan' : 'Conversation history'}
         detail={isId ? 'Pertanyaan dan jawaban masa lalu Anda dari Enterprise AI.' : 'Your past questions and answers from Enterprise AI.'}
         action={
-          <button className="primary-button" onClick={() => navigate('/chat')}>
+          <button className="primary-button" onClick={handleStartNewChat}>
             <MessageSquareText size={17} /> {isId ? 'Pertanyaan baru' : 'New question'}
           </button>
         }
@@ -41,7 +46,7 @@ export function HistoryPage() {
         <div className="empty-row">
           <Sparkles size={32} style={{ margin: '0 auto 12px', color: 'var(--text-muted)' }} />
           <p>{isId ? 'Belum ada riwayat percakapan.' : 'No conversation history yet.'}</p>
-          <button className="primary-button" style={{ marginTop: 12 }} onClick={() => navigate('/chat')}>
+          <button className="primary-button" style={{ marginTop: 12 }} onClick={handleStartNewChat}>
             {isId ? 'Mulai bertanya' : 'Start asking'}
           </button>
         </div>

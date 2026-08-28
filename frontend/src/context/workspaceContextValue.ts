@@ -24,6 +24,7 @@ export interface WorkspaceContextValue {
   question: string
   setQuestion: (value: string) => void
   chatHistory: ChatMessage[]
+  clearChat: () => void
   isLoadingAnswer: boolean
   onAsk: (event: FormEvent) => void
   askQuestion: (value: string) => void

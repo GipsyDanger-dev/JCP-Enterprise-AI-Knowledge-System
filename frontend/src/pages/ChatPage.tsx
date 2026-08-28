@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ArrowUpRight, FileText, Loader2, MessageSquareText, Send, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, ArrowUpRight, FileText, Loader2, MessageSquareText, Plus, Send, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { SourceCard } from '@/components/SourceCard'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
@@ -106,7 +106,7 @@ function SuggestionList({ suggestions, onSelect }: { suggestions: string[]; onSe
 
 export function ChatPage() {
   const { token } = useAuth()
-  const { question, setQuestion, chatHistory, isLoadingAnswer, onAsk, askQuestion, language, documents } = useWorkspace()
+  const { question, setQuestion, chatHistory, clearChat, isLoadingAnswer, onAsk, askQuestion, language, documents } = useWorkspace()
   const hasConversation = chatHistory.length > 0 || isLoadingAnswer
   const isId = language === 'id'
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -172,7 +172,21 @@ export function ChatPage() {
   return (
     <div className="chat-page">
       <div className="chat-workspace-header">
-        <PageHeading eyebrow={isId ? 'Asisten AI' : 'AI assistant'} title={isId ? 'Knowledge workspace' : 'Knowledge workspace'} detail={isId ? 'Jawaban berbasis dokumen perusahaan.' : 'Answers grounded in company documents.'} />
+        <PageHeading
+          eyebrow={isId ? 'Asisten AI' : 'AI assistant'}
+          title={isId ? 'Knowledge workspace' : 'Knowledge workspace'}
+          detail={isId ? 'Jawaban berbasis dokumen perusahaan.' : 'Answers grounded in company documents.'}
+          action={hasConversation ? (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={clearChat}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <Plus size={15} /> {isId ? 'Chat baru' : 'New chat'}
+            </button>
+          ) : undefined}
+        />
         <div className="chat-trust-status">
           <ShieldCheck size={16} />
           <span>{isId ? 'Sumber terverifikasi' : 'Verified sources'}</span>
