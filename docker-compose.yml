@@ -54,6 +54,7 @@ services:
     working_dir: /app
     volumes:
       - ./AI:/app
+      - ./backend/tmp:/app/tmp
     environment:
       SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
       # Tetap memakai database yang sama, tetapi tanpa query parameter Prisma

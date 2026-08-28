@@ -19,9 +19,10 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
-RUN npm ci --omit=dev \
+RUN npm ci --include=dev \
     && npm run prisma:generate \
-    && npm cache clean --force
+    && npm cache clean --force \
+    && chown -R node:node /app/node_modules
 
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node tsconfig.json ./tsconfig.json

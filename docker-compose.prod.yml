@@ -9,9 +9,6 @@ services:
   ai-api:
     volumes: !reset []
 
-  ai-worker:
-    volumes: !reset []
-
   frontend:
     build:
       context: ./frontend
