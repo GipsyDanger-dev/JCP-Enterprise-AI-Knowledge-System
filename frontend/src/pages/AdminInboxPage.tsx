@@ -80,6 +80,8 @@ export function AdminInboxPage() {
     return () => { cancelled = true }
   }, [selectedConv, token])
 
+  const prevMsgCountRef = useRef(0)
+
   // Refresh the selected thread so employee replies appear without a reload.
   useEffect(() => {
     if (!selectedConv || !token) return
@@ -88,7 +90,12 @@ export function AdminInboxPage() {
       getAdminMessages(selectedConv.id, token)
         .then((msgs) => {
           if (!cancelled) {
-            setMessages(msgs)
+            setMessages((prev) => {
+              if (prev.length === msgs.length && prev[prev.length - 1]?.id === msgs[msgs.length - 1]?.id) {
+                return prev
+              }
+              return msgs
+            })
             markConversationAsRead(selectedConv.id, token).catch(() => {})
             setConversations((prev) =>
               prev.map((c) => (c.id === selectedConv.id ? { ...c, unreadCount: 0 } : c))
@@ -104,6 +111,11 @@ export function AdminInboxPage() {
     }
   }, [selectedConv, token])
 
+  // Reset message count ref when changing conversation
+  useEffect(() => {
+    prevMsgCountRef.current = 0
+  }, [selectedConv?.id])
+
   // Subscribe to typing state
   useEffect(() => {
     if (!selectedConv) return
@@ -111,10 +123,13 @@ export function AdminInboxPage() {
     return onTypingChange(selectedConv.id, setIsTyping)
   }, [selectedConv])
 
-  // Auto scroll
+  // Auto scroll only when new messages are added or on initial conversation load
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isTyping])
+    if (messages.length > prevMsgCountRef.current || isTyping) {
+      bottomRef.current?.scrollIntoView({ behavior: prevMsgCountRef.current === 0 ? 'auto' : 'smooth' })
+    }
+    prevMsgCountRef.current = messages.length
+  }, [messages.length, isTyping])
 
   const handleSend = async (content: string, attachments: MessageAttachment[]) => {
     if ((!content && attachments.length === 0) || !selectedConv || !token) return

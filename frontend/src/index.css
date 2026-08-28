@@ -1257,3 +1257,25 @@ button { cursor: pointer; }
 }
 .messaging-bubble-time { display: inline-flex; align-items: center; gap: 4px; }
 .messaging-bubble.sent .messaging-bubble-time svg { color: var(--accent); }
+
+/* ============ Custom Scrollbar Styling ============ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong, rgba(255, 255, 255, 0.15));
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted, rgba(255, 255, 255, 0.3));
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong, rgba(255, 255, 255, 0.15)) transparent;
+}
+

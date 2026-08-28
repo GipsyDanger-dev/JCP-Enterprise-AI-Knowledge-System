@@ -51,6 +51,8 @@ export function MessagingPage() {
     return () => { cancelled = true }
   }, [user, token, setUnreadMessages])
 
+  const prevMsgCountRef = useRef(0)
+
   // Keep the employee conversation current without requiring a browser refresh.
   useEffect(() => {
     if (!conversationId || !token) return
@@ -59,7 +61,12 @@ export function MessagingPage() {
       getDirectMessages(conversationId, token)
         .then((msgs) => {
           if (!cancelled) {
-            setMessages(msgs)
+            setMessages((prev) => {
+              if (prev.length === msgs.length && prev[prev.length - 1]?.id === msgs[msgs.length - 1]?.id) {
+                return prev
+              }
+              return msgs
+            })
             markConversationAsRead(conversationId, token).catch(() => {})
             setUnreadMessages(0)
           }
@@ -84,10 +91,13 @@ export function MessagingPage() {
     return onTypingChange(conversationId, setIsTyping)
   }, [conversationId])
 
-  // Auto scroll
+  // Auto scroll only when new messages are added or on first load
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isTyping])
+    if (messages.length > prevMsgCountRef.current || isTyping) {
+      bottomRef.current?.scrollIntoView({ behavior: prevMsgCountRef.current === 0 ? 'auto' : 'smooth' })
+    }
+    prevMsgCountRef.current = messages.length
+  }, [messages.length, isTyping])
 
   const handleSend = async (content: string, attachments: MessageAttachment[]) => {
     if ((!content && attachments.length === 0) || !conversationId || !token) return
