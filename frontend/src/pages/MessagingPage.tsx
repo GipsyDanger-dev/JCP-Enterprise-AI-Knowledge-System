@@ -3,7 +3,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { getEmployeeConversation, getDirectMessages, sendDirectMessage, editDirectMessage, deleteDirectMessage, onTypingChange } from '@/api/messaging'
+import { getEmployeeConversation, getDirectMessages, sendDirectMessage, editDirectMessage, deleteDirectMessage, onTypingChange, markConversationAsRead } from '@/api/messaging'
 import { errorMessage } from '@/api/client'
 import type { DirectMessage, MessageAttachment } from '@/api/types'
 import { MessageList } from '@/components/MessageList'
@@ -35,6 +35,8 @@ export function MessagingPage() {
         if (cancelled) return
         setConversationId(conv.id)
         setAdminPhotoUrl(conv.adminPhotoUrl ?? null)
+        markConversationAsRead(conv.id, token).catch(() => {})
+        setUnreadMessages(0)
         return getDirectMessages(conv.id, token)
       })
       .then((msgs) => {
@@ -47,7 +49,7 @@ export function MessagingPage() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [user, token])
+  }, [user, token, setUnreadMessages])
 
   // Keep the employee conversation current without requiring a browser refresh.
   useEffect(() => {
@@ -55,7 +57,13 @@ export function MessagingPage() {
     let cancelled = false
     const refreshMessages = () => {
       getDirectMessages(conversationId, token)
-        .then((msgs) => { if (!cancelled) setMessages(msgs) })
+        .then((msgs) => {
+          if (!cancelled) {
+            setMessages(msgs)
+            markConversationAsRead(conversationId, token).catch(() => {})
+            setUnreadMessages(0)
+          }
+        })
         .catch((err) => { if (!cancelled) setError(errorMessage(err)) })
     }
     const interval = window.setInterval(refreshMessages, 2_000)
@@ -63,7 +71,7 @@ export function MessagingPage() {
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [conversationId, token])
+  }, [conversationId, token, setUnreadMessages])
 
   // Reset unread count when opening messages
   useEffect(() => {

@@ -3,7 +3,7 @@ import { ArrowLeft, Loader2, MessageSquareText } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { listConversations, getAdminMessages, sendAdminMessage, editDirectMessage, deleteDirectMessage, onTypingChange } from '@/api/messaging'
+import { listConversations, getAdminMessages, sendAdminMessage, editDirectMessage, deleteDirectMessage, onTypingChange, markConversationAsRead } from '@/api/messaging'
 import { errorMessage } from '@/api/client'
 import type { DirectConversation, DirectMessage, MessageAttachment } from '@/api/types'
 import { userInitials } from '@/utils/users'
@@ -52,17 +52,27 @@ export function AdminInboxPage() {
     if (!token) return
     const interval = window.setInterval(() => {
       listConversations(token)
-        .then(setConversations)
+        .then((data) => {
+          if (selectedConv) {
+            setConversations(data.map((c) => (c.id === selectedConv.id ? { ...c, unreadCount: 0 } : c)))
+          } else {
+            setConversations(data)
+          }
+        })
         .catch((err) => setError(errorMessage(err)))
     }, 2_000)
     return () => window.clearInterval(interval)
-  }, [token])
+  }, [token, selectedConv])
 
-  // Load messages when conversation selected
+  // Load messages when conversation selected & mark as read
   useEffect(() => {
     if (!selectedConv || !token) return
     let cancelled = false
     setLoadingMessages(true)
+    markConversationAsRead(selectedConv.id, token).catch(() => {})
+    setConversations((prev) =>
+      prev.map((c) => (c.id === selectedConv.id ? { ...c, unreadCount: 0 } : c))
+    )
     getAdminMessages(selectedConv.id, token)
       .then((msgs) => { if (!cancelled) setMessages(msgs) })
       .catch((err) => { if (!cancelled) setError(errorMessage(err)) })
@@ -76,7 +86,15 @@ export function AdminInboxPage() {
     let cancelled = false
     const refreshMessages = () => {
       getAdminMessages(selectedConv.id, token)
-        .then((msgs) => { if (!cancelled) setMessages(msgs) })
+        .then((msgs) => {
+          if (!cancelled) {
+            setMessages(msgs)
+            markConversationAsRead(selectedConv.id, token).catch(() => {})
+            setConversations((prev) =>
+              prev.map((c) => (c.id === selectedConv.id ? { ...c, unreadCount: 0 } : c))
+            )
+          }
+        })
         .catch((err) => { if (!cancelled) setError(errorMessage(err)) })
     }
     const interval = window.setInterval(refreshMessages, 2_000)

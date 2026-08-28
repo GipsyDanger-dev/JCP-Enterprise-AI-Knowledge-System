@@ -43,7 +43,7 @@ export function getAdminMessages(conversationId: string, token?: string): Promis
 export function onTypingChange(conversationId: string, listener: (typing: boolean) => void): () => void {
   void conversationId
   void listener
-  return () => {}
+  return () => { }
 }
 
 /** Admin: send a message — sender determined by backend from JWT */
@@ -70,3 +70,12 @@ export function deleteDirectMessage(messageId: string, token?: string): Promise<
     method: 'DELETE', headers: authHeaders(token),
   })
 }
+
+/** Reset unread count for conversation */
+export function markConversationAsRead(conversationId: string, token?: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/messaging/${conversationId}/read`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+  })
+}
+

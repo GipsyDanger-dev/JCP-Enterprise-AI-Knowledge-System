@@ -5,14 +5,14 @@ import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
 export class MessagingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /** Get or create a direct conversation between employee and admin */
   async getEmployeeConversation(employeeId: string, actor: AuthenticatedUser) {
     if (actor.role !== UserRole.ADMIN && actor.sub !== employeeId) {
       throw new ForbiddenException('You can only access your own conversation');
     }
-    const conv = await this.prisma.directConversation.findUnique({
+    let conv = await this.prisma.directConversation.findUnique({
       where: { employeeId },
       include: {
         messages: {
@@ -25,18 +25,23 @@ export class MessagingService {
       },
     });
 
-    if (conv) return { ...conv, adminPhotoUrl: await this.getAdminPhotoUrl() };
-
-    // Create new conversation
-    return this.prisma.directConversation.create({
-      data: { employeeId },
-      include: {
-        messages: true,
-        employee: {
-          select: { id: true, displayName: true, email: true, photoUrl: true },
+    if (!conv) {
+      conv = await this.prisma.directConversation.create({
+        data: { employeeId },
+        include: {
+          messages: true,
+          employee: {
+            select: { id: true, displayName: true, email: true, photoUrl: true },
+          },
         },
-      },
-    });
+      });
+    }
+
+    return {
+      ...conv,
+      unreadCount: conv.unreadCount < 0 ? Math.abs(conv.unreadCount) : 0,
+      adminPhotoUrl: await this.getAdminPhotoUrl(),
+    };
   }
 
   /** Admin: list all direct conversations */
@@ -58,7 +63,7 @@ export class MessagingService {
       employeePhotoUrl: conv.employee.photoUrl,
       lastMessage: conv.lastMessage ?? '',
       lastMessageAt: conv.lastMessageAt?.toISOString() ?? conv.updatedAt.toISOString(),
-      unreadCount: conv.unreadCount,
+      unreadCount: conv.unreadCount > 0 ? conv.unreadCount : 0,
     }));
   }
 
@@ -103,14 +108,27 @@ export class MessagingService {
       },
     });
 
-    // Update conversation
-    const isEmployee = sender === 'employee';
+    // Update conversation and recipient unread count
+    const existing = await this.prisma.directConversation.findUnique({
+      where: { id: convId },
+      select: { unreadCount: true },
+    });
+    const currentUnread = existing?.unreadCount ?? 0;
+    let nextUnread = 0;
+    if (sender === 'employee') {
+      // Message from employee: increases unread for admin (> 0)
+      nextUnread = currentUnread < 0 ? 1 : currentUnread + 1;
+    } else {
+      // Message from admin: increases unread for employee (< 0)
+      nextUnread = currentUnread > 0 ? -1 : currentUnread - 1;
+    }
+
     await this.prisma.directConversation.update({
       where: { id: convId },
       data: {
         lastMessage: content || this.attachmentLabel(attachments),
         lastMessageAt: new Date(),
-        unreadCount: isEmployee ? { increment: 1 } : 0,
+        unreadCount: nextUnread,
       },
     });
 
@@ -126,13 +144,27 @@ export class MessagingService {
     };
   }
 
-  /** Reset unread count */
+  /** Reset unread count for current actor */
   async markAsRead(conversationId: string, actor: AuthenticatedUser) {
     await this.assertConversationAccess(conversationId, actor);
-    await this.prisma.directConversation.update({
+    const conv = await this.prisma.directConversation.findUnique({
       where: { id: conversationId },
-      data: { unreadCount: 0 },
+      select: { unreadCount: true },
     });
+    if (!conv) return { success: true };
+
+    // Admin clears employee's unread messages (> 0); Employee clears admin's unread messages (< 0)
+    if (actor.role === UserRole.ADMIN && conv.unreadCount > 0) {
+      await this.prisma.directConversation.update({
+        where: { id: conversationId },
+        data: { unreadCount: 0 },
+      });
+    } else if (actor.role !== UserRole.ADMIN && conv.unreadCount < 0) {
+      await this.prisma.directConversation.update({
+        where: { id: conversationId },
+        data: { unreadCount: 0 },
+      });
+    }
     return { success: true };
   }
 
@@ -178,9 +210,11 @@ export class MessagingService {
       where: { conversationId }, orderBy: { createdAt: 'desc' },
       select: { content: true, attachments: true, createdAt: true },
     }).then(async (created) => ({ ...created, adminPhotoUrl: await this.getAdminPhotoUrl() }));
-    await this.prisma.directConversation.update({ where: { id: conversationId }, data: latest ? {
-      lastMessage: latest.content || this.attachmentLabel(latest.attachments), lastMessageAt: latest.createdAt,
-    } : { lastMessage: null, lastMessageAt: null } });
+    await this.prisma.directConversation.update({
+      where: { id: conversationId }, data: latest ? {
+        lastMessage: latest.content || this.attachmentLabel(latest.attachments), lastMessageAt: latest.createdAt,
+      } : { lastMessage: null, lastMessageAt: null }
+    });
   }
 
   private attachmentLabel(attachments: unknown) {
