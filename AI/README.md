@@ -108,20 +108,32 @@ Copy-Item .env.example .env
 docker compose up -d postgres ai-api
 ```
 
-Alamat dari host:
-
-| Endpoint | URL |
-| --- | --- |
-| Health | http://localhost:8001/health |
-| Swagger | http://localhost:8001/docs |
-
-Di dalam jaringan Docker, Backend mengakses AI melalui:
+Service `ai-api` sengaja tidak mempublikasikan port ke host. Di dalam jaringan
+Docker, Backend mengakses AI melalui:
 
 ```text
 http://ai-api:8000
 ```
 
-Port `8001` hanya merupakan port yang diekspos ke host.
+Pemeriksaan manual dilakukan dari dalam container:
+
+```powershell
+docker compose exec ai-api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health').read())"
+```
+
+Menjalankan AI langsung tanpa Docker (`scripts/start-local.ps1`) tetap memakai
+host port `8001`.
+
+## Autentikasi
+
+Semua endpoint kecuali `/health` membutuhkan header `X-Worker-Token` yang cocok
+dengan environment variable `WORKER_TOKEN` — shared secret yang sama dengan
+kontrak worker Backend. Token salah/absen menghasilkan `401`; `WORKER_TOKEN` yang
+belum di-set menghasilkan `503` (fail closed).
+
+```powershell
+curl.exe -H "X-Worker-Token: $env:WORKER_TOKEN" http://localhost:8001/documents
+```
 
 ## Endpoint
 

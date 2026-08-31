@@ -83,7 +83,7 @@ menyajikannya melalui Nginx. Karena nilainya masuk saat build, perubahan
 | Backend | http://localhost:8000 |
 | Backend health | http://localhost:8000/health |
 | Backend Swagger | http://localhost:8000/api/docs |
-| AI Service | http://localhost:8001 |
+| AI Service | http://localhost:8001 (hanya mode lokal `start-local.ps1`) |
 | AI health | http://localhost:8001/health |
 | AI Swagger | http://localhost:8001/docs |
 | PostgreSQL | Neon (sesuai `DATABASE_URL`) |
@@ -105,7 +105,8 @@ Salin `.env.example` menjadi `.env`. Jangan commit `.env` atau credential asli.
 | --- | --- |
 | `DATABASE_URL` | Koneksi PostgreSQL bersama |
 | `JWT_SECRET` | Penandatanganan JWT Backend |
-| `AI_SERVICE_URL` | URL AI dari Backend; lokal `http://127.0.0.1:8001` |
+| `AI_SERVICE_URL` | URL AI dari Backend; lokal `http://127.0.0.1:8001`, Docker `http://ai-api:8000` |
+| `WORKER_TOKEN` | Shared secret Backend <-> AI Service (header `X-Worker-Token`) |
 | `SUMOPOD_API_KEY` | Akses embedding/LLM AI Service |
 | `VITE_API_BASE_URL` | Base URL Backend dari browser lokal |
 
@@ -170,6 +171,18 @@ Semua endpoint berikut membutuhkan header `X-Worker-Token` yang nilainya sama de
 - `PATCH /internal/processing-jobs/:id/result` — menerima hasil `COMPLETED` atau `FAILED` dan memperbarui status dokumen menjadi `READY` atau `FAILED` secara transaksional.
 
 Nilai `WORKER_TOKEN` harus berbeda dari `JWT_SECRET` dan tidak boleh dikirim ke frontend atau disimpan di Git.
+
+## Akses AI Service
+
+AI Service memakai shared secret yang sama ke arah sebaliknya: semua endpoint
+(`/ask`, `/ingest`, `/documents`, `DELETE /documents/{filename}`) menolak request
+tanpa header `X-Worker-Token` yang cocok dengan `WORKER_TOKEN` — `401` jika token
+salah/absen, `503` jika `WORKER_TOKEN` belum di-set di AI Service. Hanya `/health`
+yang dibiarkan terbuka untuk healthcheck container.
+
+Di Docker Compose, `ai-api` tidak lagi mempublikasikan port ke host. Satu-satunya
+jalur masuk adalah Backend lewat jaringan internal Docker (`http://ai-api:8000`).
+Untuk pemeriksaan manual gunakan `docker compose exec ai-api ...`.
 
 ## Persistence percakapan
 

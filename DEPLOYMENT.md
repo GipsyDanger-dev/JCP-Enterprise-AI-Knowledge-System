@@ -27,7 +27,7 @@ Panduan lengkap untuk menjalankan dan mendeplai seluruh service.
        │ SQL                          │ HTTP
 ┌──────▼──────────────┐    ┌──────────▼───────────────────┐
 │    PostgreSQL       │    │       AI ENGINE (FastAPI)     │
-│   (Neon Cloud)      │    │      http://localhost:8001    │
+│   (Neon Cloud)      │    │   internal http://ai-api:8000 │
 │  + pgvector         │    │  ┌──────────┬──────────┐     │
 └─────────────────────┘    │  │ Ingest   │ RAG Ask  │     │
                            │  └──────────┴──────────┘     │
@@ -47,7 +47,7 @@ Panduan lengkap untuk menjalankan dan mendeplai seluruh service.
 |---------|-----------|------|-------------|
 | **Frontend** | React + Vite + TypeScript | 5173 | Single Page Application |
 | **Backend** | NestJS + Prisma | 8000 | REST API + Auth + CRUD |
-| **AI Engine** | Python + FastAPI | 8001 | RAG pipeline + LLM |
+| **AI Engine** | Python + FastAPI | 8000 (internal only, no host port) | RAG pipeline + LLM |
 | **Database** | PostgreSQL + pgvector | 5432 | Neon Cloud (managed) |
 
 ---
@@ -118,14 +118,19 @@ npm run start:dev
 ```
 
 **Terminal 2 — AI Engine:**
+
+`WORKER_TOKEN` must match the backend value; without it every endpoint except
+`/health` answers `503`.
+
 ```bash
 cd AI
 # Windows PowerShell:
 $env:SUMOPOD_API_KEY="sk-your-key-here"
-python -m uvicorn http_api:app --host 0.0.0.0 --port 8001
+$env:WORKER_TOKEN="same-token-as-backend"
+python -m uvicorn http_api:app --host 127.0.0.1 --port 8001
 
 # Linux/Mac:
-SUMOPOD_API_KEY=sk-your-key-here python -m uvicorn http_api:app --host 0.0.0.0 --port 8001
+SUMOPOD_API_KEY=sk-your-key-here WORKER_TOKEN=same-token-as-backend python -m uvicorn http_api:app --host 127.0.0.1 --port 8001
 # → http://localhost:8001
 ```
 
@@ -142,6 +147,9 @@ npm run dev
 # Health checks
 curl http://localhost:8000/health    # → OK
 curl http://localhost:8001/health    # → {"status":"ok"}
+
+# Every other AI endpoint needs the shared secret
+curl -H "X-Worker-Token: $WORKER_TOKEN" http://localhost:8001/documents
 ```
 
 ---
@@ -175,8 +183,8 @@ docker compose up --build
 | Frontend | http://localhost:5173 |
 | Backend API | http://localhost:8000 |
 | Backend Swagger | http://localhost:8000/api/docs |
-| AI Engine | http://localhost:8001 |
-| AI Swagger | http://localhost:8001/docs |
+| AI Engine | not published to the host (internal `http://ai-api:8000`) |
+| AI Swagger | via `docker compose exec ai-api ...` |
 
 ### 4. Stop
 
@@ -196,6 +204,7 @@ docker compose down
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db` |
 | `JWT_SECRET` | Secret key for JWT signing | `your-random-secret-min-32-chars` |
+| `WORKER_TOKEN` | Shared secret backend ↔ AI service (`X-Worker-Token` header) | `long-random-string` |
 | `SUMOPOD_API_KEY` | SumoPod API key for LLM/embeddings | `sk-xxxxxxxxxxxx` |
 
 ### Optional Variables
@@ -204,8 +213,7 @@ docker compose down
 |----------|---------|-------------|
 | `BACKEND_PORT` | `8000` | Backend listen port |
 | `JWT_EXPIRES_IN` | `24h` | JWT token expiration |
-| `AI_SERVICE_URL` | `http://localhost:8001` | AI engine URL from backend |
-| `WORKER_TOKEN` | `jcp-worker-token` | Internal worker auth token |
+| `AI_SERVICE_URL` | `http://localhost:8001` | AI engine URL from backend (Docker: `http://ai-api:8000`) |
 | `VITE_API_BASE_URL` | `http://localhost:8000` | Backend URL from frontend |
 | `VITE_USE_MOCK_AUTH` | `false` | Enable mock API (dev only) |
 
@@ -338,7 +346,8 @@ cd backend && npx prisma migrate deploy && cd ..
 # 6. Start with PM2 (recommended)
 npm install -g pm2
 pm2 start backend/dist/main.js --name backend
-pm2 start "python -m uvicorn http_api:app --host 0.0.0.0 --port 8001" --name ai-engine --cwd AI
+# Bind ke loopback: AI engine hanya boleh dipanggil backend di server yang sama.
+WORKER_TOKEN=same-token-as-backend pm2 start "python -m uvicorn http_api:app --host 127.0.0.1 --port 8001" --name ai-engine --cwd AI
 pm2 save
 pm2 startup
 ```
@@ -393,11 +402,8 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
 
-    # AI Engine
-    location /ai/ {
-        proxy_pass http://localhost:8001/;
-        proxy_set_header Host $host;
-    }
+    # AI Engine sengaja TIDAK di-proxy. Service ini internal: satu-satunya
+    # pemanggil yang sah adalah backend, lewat AI_SERVICE_URL.
 }
 ```
 
@@ -418,7 +424,8 @@ sudo certbot --nginx -d your-domain.com
 # Backend
 curl http://localhost:8000/health
 
-# AI Engine
+# AI Engine (host-run). Under Docker the service has no host port; check it with:
+#   docker compose exec -T ai-api python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
 curl http://localhost:8001/health
 
 # Database
@@ -460,7 +467,9 @@ Access via API: `GET /audit-logs` (Admin only)
 |-------|----------|
 | `401 Unauthorized` | Check JWT token, ensure user is active |
 | `403 Forbidden` | User role doesn't have access |
-| `503 AI service unavailable` | Start AI engine on port 8001 |
+| `503 AI service unavailable` | Start AI engine (host-run: port 8001) |
+| `503 WORKER_TOKEN is not configured` | Set `WORKER_TOKEN` on the AI service |
+| `401 Valid worker token required` | Backend `WORKER_TOKEN` differs from the AI service value |
 | `Document stuck at QUEUED` | Check AI engine is running |
 | `Cannot connect to database` | Verify DATABASE_URL in .env |
 | `CORS error` | Ensure frontend URL is allowed |
@@ -486,7 +495,7 @@ npx prisma db execute --stdin <<< "UPDATE processing_jobs SET status='FAILED' WH
 
 1. **Never commit `.env` files** — add to `.gitignore`
 2. **Change default passwords** before production
-3. **Use strong JWT_SECRET** — minimum 32 characters
+3. **Use strong JWT_SECRET** — minimum 32 characters, and a separate random `WORKER_TOKEN`
 4. **Enable HTTPS** in production
 5. **Restrict CORS** to your domain
 6. **Regular backups** of PostgreSQL database
@@ -498,7 +507,7 @@ npx prisma db execute --stdin <<< "UPDATE processing_jobs SET status='FAILED' WH
 
 - **Documentation:** See `README.md` for project overview
 - **API Docs:** http://localhost:8000/api/docs (Swagger)
-- **AI Docs:** http://localhost:8001/docs (FastAPI)
+- **AI Docs:** http://localhost:8001/docs (FastAPI, host-run only — not exposed under Docker)
 
 ---
 
