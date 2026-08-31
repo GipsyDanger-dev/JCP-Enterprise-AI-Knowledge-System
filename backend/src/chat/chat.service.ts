@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { MessageRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
+import { aiServiceUrl } from '../config/env.util';
 
 interface AiCitation {
   document_id: string;
@@ -41,7 +42,7 @@ const QUICK_SUGGESTIONS = [
 
 @Injectable()
 export class ChatService {
-  private readonly aiBaseUrl = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
+  private readonly aiBaseUrl = aiServiceUrl();
 
   constructor(private readonly prisma: PrismaService) {}
 
