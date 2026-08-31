@@ -1,4 +1,4 @@
-import { authHeaders, request } from './client'
+import { API_BASE_URL, authHeaders, request } from './client'
 import type { ApiDocument, DeleteDocumentResponse, DocumentStatusResponse } from './types'
 
 export function listDocuments(token?: string): Promise<ApiDocument[]> {
@@ -39,15 +39,20 @@ export function getDocumentChunks(id: string, token?: string): Promise<DocumentC
   return request<DocumentChunksResponse>(`/documents/${id}/chunks`, { headers: authHeaders(token) })
 }
 
+/** URL download memakai base URL yang sama dengan request() agar konsisten di LAN/VPS */
+function downloadUrl(id: string): string {
+  return `${API_BASE_URL}/documents/${id}/download`
+}
+
 export async function getDocumentBlob(id: string, token?: string): Promise<Blob> {
-  const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/documents/${id}/download`
+  const url = downloadUrl(id)
   const response = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
   if (!response.ok) throw new Error('Unable to load document')
   return response.blob()
 }
 
 export function downloadDocument(id: string, filename: string, token?: string): void {
-  const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/documents/${id}/download`
+  const url = downloadUrl(id)
   const a = document.createElement('a')
   a.href = url
   a.setAttribute('download', filename)
