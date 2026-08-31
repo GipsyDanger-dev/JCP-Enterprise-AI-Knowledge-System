@@ -35,14 +35,15 @@ def strip_internal_chunk_references(answer: str) -> str:
 
 
 def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
-                    model: str = DEFAULT_MODEL, api_key: str | None = None) -> str:
+                    model: str = DEFAULT_MODEL, api_key: str | None = None,
+                    documents: list[dict[str, Any]] | None = None) -> str:
     """Ask a SumoPod LLM to answer using intact page/section contexts only."""
     key = api_key or os.environ.get(SUMOPOD_API_KEY_ENV)
     if not key:
         raise ProviderConfigurationError(SUMOPOD_API_KEY_ENV)
     payload = json.dumps({
         "model": model,
-        "messages": build_messages(query, matches),
+        "messages": build_messages(query, matches, documents),
         "temperature": 0.2,
     }).encode("utf-8")
     request = urllib.request.Request(

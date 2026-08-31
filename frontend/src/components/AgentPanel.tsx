@@ -51,7 +51,9 @@ export function AgentPanel() {
                     detail={[c.sectionTitle, c.pageNumber ? `Page ${c.pageNumber}` : null, c.version].filter(Boolean).join(' · ')}
                   />
                 ))}
-                <VerifiedBadge />
+                {/* Ikut syarat kartu sumber di atas: tanpa kutipan tidak ada
+                    bukti yang bisa diklaim terverifikasi. */}
+                {latestMessage.citations.length > 0 && <VerifiedBadge />}
               </>
             )}
           </div>

@@ -73,7 +73,9 @@ function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: {
               ))}
             </div>
           )}
-          <VerifiedBadge />
+          {/* Ikut syarat kartu sumber di atas: tanpa kutipan tidak ada bukti
+              yang bisa diklaim terverifikasi. */}
+          {msg.citations.length > 0 && <VerifiedBadge />}
         </div>
       )}
     </>

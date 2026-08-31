@@ -110,6 +110,17 @@ export class DocumentProcessorService implements OnModuleInit {
       const result = await ingestResponse.json();
       this.logger.log(`Ingested ${filename}: ${JSON.stringify(result)}`);
 
+      // Jumlah halaman hanya diketahui AI service saat file dibuka, jadi
+      // disimpan di sini. Dibiarkan null kalau balasan tidak memuatnya
+      // (mis. format yang parser-nya tidak melaporkan halaman).
+      const pageCount = Number(result?.documents?.[0]?.page_count);
+      if (Number.isInteger(pageCount) && pageCount > 0) {
+        await this.prisma.documentVersion.update({
+          where: { id: versionId },
+          data: { pageCount },
+        });
+      }
+
       // Mark as COMPLETED
       const completedAt = new Date();
       await this.prisma.processingJob.update({

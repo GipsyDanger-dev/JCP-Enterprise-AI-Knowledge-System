@@ -92,10 +92,45 @@ class PgVectorStore:
             for row in rows
         ]
 
+    def document_metadata(self) -> list[dict[str, Any]]:
+        """Sifat dokumen yang bisa dicari: halaman, ukuran, tanggal unggah.
+
+        Penyaringnya sengaja sama dengan ``search`` supaya pertanyaan metadata
+        tidak pernah menyebut dokumen yang tidak bisa ditanyakan isinya.
+        """
+        sql = """
+            SELECT dv.original_filename, dv.page_count, dv.file_size,
+                   dv.created_at, COUNT(c.chunk_id)::int
+            FROM document_versions AS dv
+            JOIN documents AS d ON d.id = dv.document_id
+            LEFT JOIN chunks AS c ON c.document_version_id = dv.id
+            WHERE d.deleted_at IS NULL
+              AND d.status = 'READY'
+              AND dv.version_number = (
+                  SELECT MAX(v.version_number) FROM document_versions AS v
+                  WHERE v.document_id = d.id
+              )
+            GROUP BY dv.original_filename, dv.page_count, dv.file_size, dv.created_at
+            ORDER BY dv.original_filename
+        """
+        with psycopg.connect(self.dsn) as conn:
+            rows = conn.execute(sql).fetchall()
+        return [
+            {
+                "filename": row[0],
+                "page_count": row[1],
+                "file_size": row[2],
+                "created_at": row[3],
+                "chunks": row[4],
+            }
+            for row in rows
+        ]
+
     def get_document_version(self, document_version_id: str) -> dict[str, Any] | None:
         sql = """
             SELECT d.id, dv.id, dv.original_filename, dv.version_number,
-                   dv.checksum, COUNT(c.chunk_id)::int, COUNT(c.embedding)::int
+                   dv.checksum, COUNT(c.chunk_id)::int, COUNT(c.embedding)::int,
+                   MAX(c.page_number)::int
             FROM document_versions AS dv
             JOIN documents AS d ON d.id = dv.document_id
             LEFT JOIN chunks AS c ON c.document_version_id = dv.id
@@ -114,6 +149,9 @@ class PgVectorStore:
             "content_hash": row[4],
             "num_chunks": row[5],
             "embedding_count": row[6],
+            # Halaman tertinggi yang punya chunk. Dipakai saat ingest dilewati
+            # (status "unchanged"), karena file-nya tidak dibuka ulang.
+            "page_count": row[7],
         }
 
     def replace_document_version(
@@ -304,7 +342,12 @@ class PgVectorStore:
                 return no_answer_response()
             citations = citations_from_matches(matches)
             answer = (
-                generate_answer(query, matches, model=model, api_key=api_key)
+                generate_answer(
+                    query, matches, model=model, api_key=api_key,
+                    # Sifat berkas (halaman, ukuran, tanggal) tidak ada di dalam
+                    # teks dokumen, jadi ikut dikirim sebagai konteks.
+                    documents=self.document_metadata(),
+                )
                 if use_llm
                 else matches[0][1]["text"]
             )
@@ -355,7 +398,12 @@ class PgVectorStore:
                 return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key)
             citations = citations_from_matches(matches)
             answer = (
-                generate_answer(query, matches, model=model, api_key=api_key)
+                generate_answer(
+                    query, matches, model=model, api_key=api_key,
+                    # Sifat berkas (halaman, ukuran, tanggal) tidak ada di dalam
+                    # teks dokumen, jadi ikut dikirim sebagai konteks.
+                    documents=self.document_metadata(),
+                )
                 if use_llm
                 else matches[0][1]["text"]
             )
@@ -425,6 +473,7 @@ def ingest_to_pg(
             "document_version_id": metadata["document_version_id"],
             "version": metadata["version"],
             "num_chunks": metadata["num_chunks"],
+            "page_count": metadata["page_count"],
             "status": "unchanged",
         }]
 
@@ -456,5 +505,8 @@ def ingest_to_pg(
         "document_version_id": metadata["document_version_id"],
         "version": metadata["version"],
         "num_chunks": len(chunks),
+        # Dihitung dari parser, bukan dari chunk: halaman kosong tetap ikut
+        # terhitung meskipun chunk_pages melewatinya.
+        "page_count": len(pages),
         "status": "indexed",
     }]
