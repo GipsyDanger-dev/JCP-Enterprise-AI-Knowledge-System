@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { MessageRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
-import { aiServiceUrl } from '../config/env.util';
+import { aiServiceHeaders, aiServiceUrl } from '../config/env.util';
 
 interface AiCitation {
   document_id: string;
@@ -71,7 +71,7 @@ export class ChatService {
     try {
       const response = await fetch(`${this.aiBaseUrl}/ask`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: aiServiceHeaders(),
         body: JSON.stringify({
           query: question,
           // Only opaque chunk ids cross to the AI service. Previous user/assistant text stays in the database.

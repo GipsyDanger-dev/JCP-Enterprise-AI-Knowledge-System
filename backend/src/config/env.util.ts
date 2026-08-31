@@ -20,3 +20,25 @@ export function envOrDefault(name: string, fallback: string): string {
 export function aiServiceUrl(): string {
   return envOrDefault('AI_SERVICE_URL', 'http://localhost:8001').replace(/\/+$/, '');
 }
+
+/**
+ * Shared secret antara backend dan AI service. Sama seperti WorkerTokenGuard,
+ * token yang kosong dianggap salah konfigurasi — lebih baik gagal keras daripada
+ * memanggil AI service tanpa identitas.
+ */
+export function workerToken(): string {
+  const token = process.env.WORKER_TOKEN?.trim();
+  if (!token) throw new Error('WORKER_TOKEN is required');
+  return token;
+}
+
+/**
+ * Header standar untuk setiap panggilan backend -> AI service. Endpoint AI
+ * (selain /health) menolak permintaan tanpa `X-Worker-Token` yang cocok.
+ */
+export function aiServiceHeaders(): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    'X-Worker-Token': workerToken(),
+  };
+}

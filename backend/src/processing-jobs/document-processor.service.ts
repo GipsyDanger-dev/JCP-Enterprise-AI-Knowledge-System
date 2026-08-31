@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { DocumentStorage, DOCUMENT_STORAGE } from '../documents/document-storage.interface';
-import { aiServiceUrl } from '../config/env.util';
+import { aiServiceHeaders, aiServiceUrl } from '../config/env.util';
 import { Inject } from '@nestjs/common';
 
 const POLL_INTERVAL_MS = 3000;
@@ -91,7 +91,7 @@ export class DocumentProcessorService implements OnModuleInit {
       // Call AI engine /ingest
       const ingestResponse = await fetch(`${this.aiBaseUrl}/ingest`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: aiServiceHeaders(),
         body: JSON.stringify({
           input_dir: tmpDir,
           document_version_id: versionId,
