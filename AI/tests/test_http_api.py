@@ -10,11 +10,19 @@ except ImportError:  # pragma: no cover - optional dependencies
     HAS_DEPS = False
 
 
+WORKER_TOKEN = "test-worker-token"
+
+
 @unittest.skipUnless(HAS_DEPS, "fastapi/httpx not installed (pip install -r requirements.txt)")
 class HttpApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(http_api.app)
+        # Semua endpoint selain /health butuh X-Worker-Token, jadi client default
+        # membawanya; autentikasi diuji terpisah di WorkerTokenTests.
+        token_env = mock.patch.dict("os.environ", {"WORKER_TOKEN": WORKER_TOKEN})
+        token_env.start()
+        cls.addClassCleanup(token_env.stop)
+        cls.client = TestClient(http_api.app, headers={"X-Worker-Token": WORKER_TOKEN})
 
     def test_health(self):
         response = self.client.get("/health")
@@ -100,6 +108,40 @@ class HttpApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json(), {"detail": "AI provider is not configured"})
+
+
+@unittest.skipUnless(HAS_DEPS, "fastapi/httpx not installed (pip install -r requirements.txt)")
+class WorkerTokenTests(unittest.TestCase):
+    """AI service hanya boleh dipanggil pemegang WORKER_TOKEN (backend)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(http_api.app)
+
+    def test_health_stays_public(self):
+        with mock.patch.dict("os.environ", {"WORKER_TOKEN": WORKER_TOKEN}):
+            response = self.client.get("/health")
+        self.assertEqual(response.status_code, 200)
+
+    def test_request_without_token_is_401(self):
+        with mock.patch.dict("os.environ", {"WORKER_TOKEN": WORKER_TOKEN}):
+            response = self.client.post("/ask", json={"query": "policy"})
+        self.assertEqual(response.status_code, 401)
+
+    def test_request_with_wrong_token_is_401(self):
+        with mock.patch.dict("os.environ", {"WORKER_TOKEN": WORKER_TOKEN}):
+            response = self.client.get("/documents", headers={"X-Worker-Token": "salah"})
+        self.assertEqual(response.status_code, 401)
+
+    def test_delete_without_token_is_401(self):
+        with mock.patch.dict("os.environ", {"WORKER_TOKEN": WORKER_TOKEN}):
+            response = self.client.delete("/documents/sop_perjalanan.txt")
+        self.assertEqual(response.status_code, 401)
+
+    def test_unconfigured_token_fails_closed(self):
+        with mock.patch.dict("os.environ", {"WORKER_TOKEN": "  "}):
+            response = self.client.get("/documents", headers={"X-Worker-Token": WORKER_TOKEN})
+        self.assertEqual(response.status_code, 503)
 
 
 if __name__ == "__main__":

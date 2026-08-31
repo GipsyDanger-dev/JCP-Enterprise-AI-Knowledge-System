@@ -13,18 +13,27 @@ Endpoints (full OpenAPI docs at /docs):
     GET    /documents     list indexed documents
     DELETE /documents/{filename}
     GET    /health
+
+Authentication:
+    Every endpoint except /health requires the header ``X-Worker-Token`` whose
+    value matches the ``WORKER_TOKEN`` environment variable — the same shared
+    secret the NestJS backend uses for its own worker endpoints. The check is
+    registered as an application-wide dependency, so a new endpoint is protected
+    by default; add its path to PUBLIC_PATHS to opt out deliberately.
 """
 
 from __future__ import annotations
 
+import hmac
 import os
 import re
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 try:
-    from fastapi import FastAPI, HTTPException
+    from fastapi import Depends, FastAPI, Header, HTTPException, Request
     from pydantic import BaseModel
 except ImportError:  # pragma: no cover - optional dependency
     raise RuntimeError(
@@ -40,11 +49,44 @@ from store import PgVectorStore, default_dsn, ingest_to_pg
 PROJECT_DIR = Path(__file__).resolve().parent
 DEFAULT_INDEX = PROJECT_DIR / "knowledge_base.json"
 
+WORKER_TOKEN_HEADER = "X-Worker-Token"
+
+# Hanya endpoint di daftar ini yang boleh diakses tanpa token. /health dibiarkan
+# terbuka supaya healthcheck container tetap bisa jalan tanpa menyimpan rahasia.
+PUBLIC_PATHS = frozenset({"/health"})
+
+
+def token_digest(value: str) -> bytes:
+    """Hash dulu supaya perbandingan selalu memakai panjang byte yang sama."""
+    return sha256(value.encode("utf-8")).digest()
+
+
+def require_worker_token(
+    request: Request,
+    x_worker_token: str | None = Header(default=None, alias=WORKER_TOKEN_HEADER),
+) -> None:
+    """Shared-secret guard, sepadan dengan WorkerTokenGuard di backend NestJS."""
+    if request.url.path in PUBLIC_PATHS:
+        return
+
+    expected = (os.environ.get("WORKER_TOKEN") or "").strip()
+    if not expected:
+        # Fail closed: tanpa token terkonfigurasi, service tidak bisa membedakan
+        # pemanggil sah dari sembarang klien, jadi jangan layani permintaan.
+        raise HTTPException(status_code=503, detail="WORKER_TOKEN is not configured")
+
+    supplied = (x_worker_token or "").strip()
+    if not supplied or not hmac.compare_digest(token_digest(supplied), token_digest(expected)):
+        raise HTTPException(status_code=401, detail="Valid worker token required")
+
+
 app = FastAPI(
     title="Enterprise AI — AI Service",
     description="Grounded retrieval engine: ingest, ask, citations. "
-                "Citation selalu berasal dari metadata halaman/section, bukan dari LLM.",
+                "Citation selalu berasal dari metadata halaman/section, bukan dari LLM. "
+                f"Semua endpoint selain /health butuh header {WORKER_TOKEN_HEADER}.",
     version="0.1.0",
+    dependencies=[Depends(require_worker_token)],
 )
 
 
