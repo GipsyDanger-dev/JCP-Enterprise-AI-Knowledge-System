@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { DocumentStorage, DOCUMENT_STORAGE } from '../documents/document-storage.interface';
+import { aiServiceUrl } from '../config/env.util';
 import { Inject } from '@nestjs/common';
 
 const POLL_INTERVAL_MS = 3000;
@@ -8,7 +9,7 @@ const POLL_INTERVAL_MS = 3000;
 @Injectable()
 export class DocumentProcessorService implements OnModuleInit {
   private readonly logger = new Logger(DocumentProcessorService.name);
-  private readonly aiBaseUrl = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
+  private readonly aiBaseUrl = aiServiceUrl();
   private processing = false;
 
   constructor(
@@ -24,6 +25,11 @@ export class DocumentProcessorService implements OnModuleInit {
   private async processNext() {
     if (this.processing) return;
     this.processing = true;
+
+    // Dipegang di luar try: blok catch harus menandai FAILED pada job yang sedang
+    // diproses di iterasi ini, bukan sembarang job berstatus PROCESSING.
+    let activeJobId: string | null = null;
+    let activeDocId: string | null = null;
 
     try {
       // Find oldest QUEUED job
@@ -54,6 +60,9 @@ export class DocumentProcessorService implements OnModuleInit {
       const filename = job.documentVersion.originalFilename;
       const docTitle = job.documentVersion.document.title;
       const docId = job.documentVersion.document.id;
+
+      activeJobId = job.id;
+      activeDocId = docId;
 
       this.logger.log(`Processing: ${filename} (job ${job.id})`);
 
@@ -116,15 +125,12 @@ export class DocumentProcessorService implements OnModuleInit {
     } catch (error) {
       this.logger.error(`❌ Processing failed: ${error instanceof Error ? error.message : error}`);
 
-      // Try to mark as FAILED
-      try {
-        const jobId = await this.prisma.processingJob.findFirst({
-          where: { status: 'PROCESSING' },
-          select: { id: true, documentVersion: { select: { document: { select: { id: true } } } } },
-        });
-        if (jobId) {
+      // Tandai FAILED hanya pada job milik iterasi ini. Kalau kegagalan terjadi
+      // sebelum job terpilih (mis. query error), tidak ada yang perlu ditandai.
+      if (activeJobId && activeDocId) {
+        try {
           await this.prisma.processingJob.update({
-            where: { id: jobId.id },
+            where: { id: activeJobId },
             data: {
               status: 'FAILED',
               errorMessage: error instanceof Error ? error.message : 'Unknown error',
@@ -132,11 +138,11 @@ export class DocumentProcessorService implements OnModuleInit {
             },
           });
           await this.prisma.document.update({
-            where: { id: jobId.documentVersion.document.id },
+            where: { id: activeDocId },
             data: { status: 'FAILED' },
           });
-        }
-      } catch { /* ignore cleanup errors */ }
+        } catch { /* ignore cleanup errors */ }
+      }
     } finally {
       this.processing = false;
     }
