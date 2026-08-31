@@ -284,7 +284,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       unreadMessages,
       setUnreadMessages,
     }}>
-      <input ref={uploadRef} className="visually-hidden" type="file" accept=".pdf,.docx" onChange={onUpload} />
+      <input ref={uploadRef} className="visually-hidden" type="file" accept=".pdf,.docx,.txt,.md" onChange={onUpload} />
       {children}
     </WorkspaceContext.Provider>
   )
