@@ -11,7 +11,9 @@ function requiredJwtSecret(): string {
   return secret;
 }
 
-const expiresIn = (process.env.JWT_EXPIRES_IN ?? '1h') as JwtSignOptions['expiresIn'];
+// Default 24 jam, sama dengan .env.example dan DEPLOYMENT.md. Belum ada refresh
+// token, jadi masa berlaku yang lebih pendek memutus sesi pengguna di tengah kerja.
+const expiresIn = (process.env.JWT_EXPIRES_IN ?? '24h') as JwtSignOptions['expiresIn'];
 
 @Global()
 @Module({
