@@ -211,8 +211,11 @@ docker compose down
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BACKEND_PORT` | `8000` | Backend listen port |
+| `BACKEND_PORT` | `8000` | Backend listen port (dibaca `main.ts`; Docker memetakan port host yang sama) |
+| `FRONTEND_PORT` | `5173` | Vite dev server port (dibaca `vite.config.ts`) |
 | `JWT_EXPIRES_IN` | `24h` | JWT token expiration |
+| `SUMOPOD_BASE_URL` | `https://ai.sumopod.com/v1` | Endpoint provider LLM/embedding |
+| `AI_CHAT_MODEL` | `deepseek-v4-pro` | Model chat default AI service |
 | `AI_SERVICE_URL` | `http://localhost:8001` | AI engine URL from backend (Docker: `http://ai-api:8000`) |
 | `VITE_API_BASE_URL` | `http://localhost:8000` | Backend URL from frontend |
 | `VITE_USE_MOCK_AUTH` | `false` | Enable mock API (dev only) |

@@ -29,7 +29,8 @@ async function bootstrap() {
     )
     .build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
-  await app.listen(process.env.PORT ?? 8000, '0.0.0.0');
+  // BACKEND_PORT adalah satu-satunya nama port backend (.env, docker-compose, script lokal).
+  await app.listen(process.env.BACKEND_PORT ?? 8000, '0.0.0.0');
 }
 void bootstrap();
 
