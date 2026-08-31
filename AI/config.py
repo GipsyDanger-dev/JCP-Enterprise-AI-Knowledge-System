@@ -7,7 +7,10 @@ strings between themselves.
 
 import os
 
-SUMOPOD_BASE_URL = "https://ai.sumopod.com/v1"
+# Endpoint provider dibaca dari env supaya ganti server/proxy tidak perlu edit source.
+# rstrip("/") menjaga hasil f"{SUMOPOD_BASE_URL}/chat/completions" tetap benar meski
+# nilai di .env ditulis dengan trailing slash.
+SUMOPOD_BASE_URL = os.environ.get("SUMOPOD_BASE_URL", "https://ai.sumopod.com/v1").rstrip("/")
 SUMOPOD_API_KEY_ENV = "SUMOPOD_API_KEY"
 
 # Chat model used for --llm grounded answers through SumoPod.
