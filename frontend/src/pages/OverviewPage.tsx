@@ -13,6 +13,9 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
 import { listConversations } from '@/api/chat'
 import { useAuth } from '@/hooks/useAuth'
+import { listMyRequiredReadings, requiredReadingReport, type RequiredReading, type RequiredReadingReport } from '@/api/requiredReadings'
+
+const dueLabel = (dueAt: string, isId: boolean) => `${isId ? 'Tenggat' : 'Due'} ${new Date(dueAt).toLocaleDateString(isId ? 'id-ID' : 'en-US', { day: 'numeric', month: 'short' })}`
 
 export function OverviewPage() {
   const { role, language } = useWorkspace()
@@ -26,7 +29,9 @@ function AdminOverview({ isId }: { isId: boolean }) {
   const { documents, uploadError, registerUploadedDocument } = useWorkspace()
   const [showUpload, setShowUpload] = useState(false)
   const [conversationCount, setConversationCount] = useState(0)
+  const [readingReport, setReadingReport] = useState<RequiredReadingReport[]>([])
   useEffect(() => { if (token) listConversations(token).then((items) => setConversationCount(items.length)).catch(() => setConversationCount(0)) }, [token])
+  useEffect(() => { if (token) requiredReadingReport(token).then(setReadingReport).catch(() => setReadingReport([])) }, [token])
   const readyCount = documents.filter((document) => document.status === 'Ready').length
   const totalChunks = documents.reduce((sum, document) => sum + (document.chunks ?? 0), 0)
   const docsLabel = isId ? 'dokumen' : 'documents'
@@ -57,6 +62,7 @@ function AdminOverview({ isId }: { isId: boolean }) {
             })}
           </div>
         </section>
+        {readingReport.length > 0 && <section className="required-section"><SectionHeading title={isId ? 'Laporan wajib baca' : 'Required reading report'} detail={isId ? 'Progres karyawan per dokumen' : 'Employee progress by document'} /><div className="required-list">{readingReport.map((item) => <div key={item.documentId} className="required-report"><RequiredRead title={item.title} category={`${item.completed}/${item.total} ${isId ? 'selesai' : 'completed'}`} due={item.overdue ? `${item.overdue} ${isId ? 'terlambat' : 'overdue'}` : `${item.progress}%`} progress={item.progress} overdue={item.overdue > 0} /><div className="reading-report-people">{item.readers.map((reader) => <div key={reader.employeeNumber} className="reading-report-person"><span><strong>{reader.displayName}</strong><small>{reader.employeeNumber} · {reader.division} · {reader.jobTitle} · {dueLabel(reader.dueAt, isId)}</small></span><b>{reader.progress === 100 ? (isId ? 'Sudah membaca' : 'Read') : reader.isOverdue ? (isId ? `Terlambat · ${reader.progress}%` : `Overdue · ${reader.progress}%`) : `${reader.progress}%`}</b></div>)}</div></div>)}</div></section>}
       </section>
 
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
@@ -69,7 +75,9 @@ function EmployeeOverview({ isId }: { isId: boolean }) {
   const { user, token } = useAuth()
   const { question, setQuestion, onAsk, askQuestion, language, chatHistory, documents } = useWorkspace()
   const [conversationCount, setConversationCount] = useState(0)
+  const [requiredReadings, setRequiredReadings] = useState<RequiredReading[]>([])
   useEffect(() => { if (token) listConversations(token).then((items) => setConversationCount(items.length)).catch(() => setConversationCount(0)) }, [token])
+  useEffect(() => { if (token) listMyRequiredReadings(token).then(setRequiredReadings).catch(() => setRequiredReadings([])) }, [token])
   const answer = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].answer : ''
   const latestCitation = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].citations[0] : null
   const docsLabel = isId ? 'dokumen' : 'documents'
@@ -98,13 +106,13 @@ function EmployeeOverview({ isId }: { isId: boolean }) {
           <section className="required-section">
             <SectionHeading title={isId ? 'Wajib baca' : 'Required reading'} detail={isId ? 'Kebijakan yang ditugaskan untuk Anda' : 'Policies assigned to you'} />
             <div className="required-list">
-              {documents.slice(0, 2).map((document) => <RequiredRead key={document.id} title={document.name} category={document.collection} due={document.status} progress={document.status === 'Ready' ? 100 : 0} onClick={() => navigate('/documents')} />)}
+              {requiredReadings.length === 0 ? <p className="empty-row">{isId ? 'Tidak ada dokumen wajib baca.' : 'No required reading assigned.'}</p> : requiredReadings.map((reading) => <RequiredRead key={reading.id} title={reading.document.title} category={reading.document.collection ?? 'Operations'} due={reading.progress === 100 ? (isId ? 'Selesai' : 'Complete') : reading.isOverdue ? (isId ? 'Terlambat' : 'Overdue') : dueLabel(reading.dueAt, isId)} progress={reading.progress} overdue={reading.isOverdue} onClick={() => navigate(`/documents?doc=${encodeURIComponent(reading.documentId)}&reading=${encodeURIComponent(reading.id)}`)} />)}
             </div>
           </section>
         </div>
 
         <aside className="employee-sidebar">
-          <section className="employee-summary"><div className="summary-head"><span className="avatar employee-avatar">{user?.displayName?.slice(0, 2).toUpperCase() ?? 'US'}</span><div><strong>{user?.displayName ?? (isId ? 'Pengguna' : 'User')}</strong><small>{user?.email ?? ''}</small></div></div><div className="summary-stats"><div><strong>{conversationCount}</strong><span>{isId ? 'Percakapan' : 'Conversations'}</span></div><div><strong>{new Set(documents.map((document) => document.collection)).size}</strong><span>{isId ? 'Koleksi' : 'Collections'}</span></div></div></section>
+          <section className="employee-summary"><div className="summary-head"><span className="avatar employee-avatar">{user?.displayName?.slice(0, 2).toUpperCase() ?? 'US'}</span><div><strong>{user?.displayName ?? (isId ? 'Pengguna' : 'User')}</strong><small>{user?.username ? `@${user.username}` : ''}</small></div></div><div className="summary-stats"><div><strong>{conversationCount}</strong><span>{isId ? 'Percakapan' : 'Conversations'}</span></div><div><strong>{new Set(documents.map((document) => document.collection)).size}</strong><span>{isId ? 'Koleksi' : 'Collections'}</span></div></div></section>
           <section className="quick-library"><SectionHeading title={isId ? 'Akses cepat' : 'Quick access'} detail={isId ? 'Koleksi yang tersedia untuk Anda' : 'Your available collections'} />{Array.from(new Set(documents.map((document) => document.collection))).slice(0, 3).map((collection, index) => { const count = documents.filter((document) => document.collection === collection).length; return <button key={collection} onClick={() => navigate(`/documents?collection=${encodeURIComponent(collection)}`)}><span className={`collection-icon ${(['orange', 'mint', 'violet'] as const)[index]}`}><BookOpen size={17} /></span><div><strong>{collection}</strong><small>{count} {docsLabel}</small></div><ChevronRight size={16} /></button> })}</section>
         </aside>
       </div>

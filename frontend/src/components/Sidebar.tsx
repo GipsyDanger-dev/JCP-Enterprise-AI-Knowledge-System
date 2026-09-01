@@ -32,7 +32,7 @@ export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: 
           <NavLink key={id} to={id === 'overview' ? '/' : `/${id}`} end={id === 'overview'} onClick={onClose}
             title={collapsed ? label : undefined}
             className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
-            {({ isActive }) => (<><Icon size={18} />{!collapsed && <span>{label}</span>}{isActive && <i />}</>)}
+            <><Icon size={18} />{!collapsed && <span>{label}</span>}</>
           </NavLink>
         ))}
         {!collapsed && <p style={{ marginTop: 16 }}>{isId ? 'Riwayat' : 'History'}</p>}

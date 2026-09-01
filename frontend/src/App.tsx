@@ -22,6 +22,8 @@ function ThemeInitializer() {
     if (stored === 'dark' || stored === 'light') {
       document.documentElement.setAttribute('data-theme', stored)
     }
+    const fontSize = localStorage.getItem('jcp-font-size')
+    document.documentElement.setAttribute('data-font-size', fontSize === 'medium' || fontSize === 'large' ? fontSize : 'small')
   }, [])
   return null
 }

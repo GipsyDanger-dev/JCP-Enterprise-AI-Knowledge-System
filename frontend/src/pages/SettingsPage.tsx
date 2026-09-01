@@ -8,6 +8,8 @@ import { userRoleLabel } from '@/utils/users'
 import { isNotificationsEnabled, setNotificationsEnabled, isBrowserNotificationsEnabled, setBrowserNotificationsEnabled, requestNotificationPermission } from '@/utils/notifications'
 
 const THEME_KEY = 'jcp-theme'
+const FONT_SIZE_KEY = 'jcp-font-size'
+type FontSize = 'small' | 'medium' | 'large'
 
 function getStoredTheme(): 'light' | 'dark' {
   const v = localStorage.getItem(THEME_KEY)
@@ -15,11 +17,16 @@ function getStoredTheme(): 'light' | 'dark' {
   return 'light'
 }
 
+function getStoredFontSize(): FontSize {
+  const value = localStorage.getItem(FONT_SIZE_KEY)
+  return value === 'medium' || value === 'large' ? value : 'small'
+}
+
 export function SettingsPage() {
   const { user } = useAuth()
   const { role, language, setLanguage } = useWorkspace()
   const [theme, setTheme] = useState<'light' | 'dark'>(getStoredTheme)
-  const [compact, setCompact] = useState(false)
+  const [fontSize, setFontSize] = useState<FontSize>(getStoredFontSize)
   const [notifications, setNotifications] = useState(isNotificationsEnabled)
   const [browserNotif, setBrowserNotif] = useState(isBrowserNotificationsEnabled)
   const [emailDigest, setEmailDigest] = useState(false)
@@ -30,6 +37,11 @@ export function SettingsPage() {
     localStorage.setItem(THEME_KEY, theme)
     window.dispatchEvent(new Event('jcp-theme-change'))
   }, [theme])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-font-size', fontSize)
+    localStorage.setItem(FONT_SIZE_KEY, fontSize)
+  }, [fontSize])
 
   // Apply initial theme on mount
   useEffect(() => {
@@ -76,7 +88,7 @@ export function SettingsPage() {
               )}
               <div className="settings-profile-info">
                 <strong>{user?.displayName}</strong>
-                <small>{user?.email}</small>
+                <small>{user?.username ? `@${user.username}` : ''}</small>
               </div>
             </div>
             <div className="settings-field">
@@ -90,14 +102,26 @@ export function SettingsPage() {
               <small>{isId ? 'Dikelola oleh administrator.' : 'Managed by administrator.'}</small>
             </div>
             <div className="settings-field">
-              <label>Email address</label>
+              <label>{isId ? 'Username' : 'Username'}</label>
               <input
-                type="email"
-                value={user?.email ?? ''}
+                type="text"
+                value={user?.username ?? ''}
                 disabled
                 className="disabled-input"
               />
               <small>{isId ? 'Dikelola oleh administrator.' : 'Managed by administrator.'}</small>
+            </div>
+            <div className="settings-field">
+              <label>{isId ? 'Nomor karyawan' : 'Employee number'}</label>
+              <input type="text" value={user?.employeeNumber ?? ''} disabled className="disabled-input" />
+            </div>
+            <div className="settings-field">
+              <label>{isId ? 'Divisi' : 'Division'}</label>
+              <input type="text" value={user?.division ?? ''} disabled className="disabled-input" />
+            </div>
+            <div className="settings-field">
+              <label>{isId ? 'Jabatan' : 'Job title'}</label>
+              <input type="text" value={user?.jobTitle ?? ''} disabled className="disabled-input" />
             </div>
             <div className="settings-field">
               <label>Role</label>
@@ -187,6 +211,28 @@ export function SettingsPage() {
               </div>
             </div>
 
+            <div className="settings-field">
+              <label>{isId ? 'Ukuran font' : 'Font size'}</label>
+              <div className="settings-font-options" role="group" aria-label={isId ? 'Pilih ukuran font' : 'Choose font size'}>
+                {([
+                  ['small', isId ? 'Kecil' : 'Small', 'A'],
+                  ['medium', isId ? 'Sedang' : 'Medium', 'A'],
+                  ['large', isId ? 'Besar' : 'Large', 'A'],
+                ] as const).map(([value, label, sample]) => (
+                  <button
+                    key={value}
+                    className={`font-size-option ${fontSize === value ? 'active' : ''}`}
+                    onClick={() => setFontSize(value)}
+                    type="button"
+                    aria-pressed={fontSize === value}
+                  >
+                    <span className={`font-size-sample ${value}`}>{sample}</span>
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Language */}
             <div className="settings-field">
               <label><Globe size={14} style={{ marginRight: 6, verticalAlign: -2 }} />{isId ? 'Bahasa' : 'Language'}</label>
@@ -218,16 +264,6 @@ export function SettingsPage() {
               </div>
             </div>
 
-            {/* Compact mode */}
-            <div className="settings-switch-row">
-              <div className="settings-switch-info">
-                <label>{isId ? 'Mode compact' : 'Compact mode'}</label>
-                <small>{compact ? (isId ? 'Tata letak lebih rapat' : 'Denser layout with less spacing') : (isId ? 'Tata letak standar' : 'Standard layout with comfortable spacing')}</small>
-              </div>
-              <button className={`toggle-switch ${compact ? 'on' : ''}`} onClick={() => setCompact(!compact)} type="button">
-                <span className="toggle-knob" />
-              </button>
-            </div>
 
             <div className="settings-divider" />
 

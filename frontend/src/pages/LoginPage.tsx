@@ -1,46 +1,46 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Eye, EyeOff, LoaderCircle, Lock, Mail, ShieldAlert } from 'lucide-react'
+import { Eye, EyeOff, LoaderCircle, Lock, ShieldAlert, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { errorMessage } from '@/api/client'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import loginDocuments from '@/assets/login-documents.png'
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const USERNAME_PATTERN = /^[a-zA-Z0-9._-]{3,50}$/
 
 export function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
   const { language } = useWorkspace()
   const isId = language === 'id'
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [touched, setTouched] = useState({ email: false, password: false })
+  const [touched, setTouched] = useState({ username: false, password: false })
 
-  const emailInvalid = touched.email && email.trim() !== '' && !EMAIL_PATTERN.test(email.trim())
+  const usernameInvalid = touched.username && username.trim() !== '' && !USERNAME_PATTERN.test(username.trim())
   const passwordInvalid = touched.password && password.length > 0 && password.length < 6
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
-    setTouched({ email: true, password: true })
+    setTouched({ username: true, password: true })
 
-    if (!email.trim() || !password) {
-      setError('Email dan password wajib diisi.')
+    if (!username.trim() || !password) {
+      setError('Username dan password wajib diisi.')
       return
     }
-    if (!EMAIL_PATTERN.test(email.trim())) {
-      setError('Format email tidak valid.')
+    if (!USERNAME_PATTERN.test(username.trim())) {
+      setError('Username hanya boleh berisi huruf, angka, titik, strip, atau garis bawah.')
       return
     }
 
     setSubmitting(true)
     try {
-      await login(email.trim(), password)
+      await login(username.trim(), password)
       navigate('/', { replace: true })
     } catch (err) {
       setError(errorMessage(err))
@@ -65,22 +65,22 @@ export function LoginPage() {
           )}
 
           <form className="login-form-centered" onSubmit={handleSubmit} noValidate>
-            <div className={`login-field ${emailInvalid ? 'invalid' : ''}`}>
-              <label htmlFor="login-email">{isId ? 'Alamat email' : 'Email address'}</label>
+            <div className={`login-field ${usernameInvalid ? 'invalid' : ''}`}>
+              <label htmlFor="login-username">{isId ? 'Username' : 'Username'}</label>
               <div className="login-input-wrap">
-                <Mail size={16} className="login-input-icon" />
+                <UserRound size={16} className="login-input-icon" />
                 <input
-                  id="login-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onBlur={() => setTouched((t) => ({ ...t, email: true }))}
-                  placeholder={isId ? 'anda@perusahaan.com' : 'you@company.com'}
-                  autoComplete="email"
+                  id="login-username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  onBlur={() => setTouched((t) => ({ ...t, username: true }))}
+                  placeholder={isId ? 'Masukkan username Anda' : 'Enter your username'}
+                  autoComplete="username"
                   disabled={submitting}
                 />
               </div>
-              {emailInvalid && <span className="login-field-error">{isId ? 'Masukkan alamat email yang valid.' : 'Please enter a valid email address.'}</span>}
+              {usernameInvalid && <span className="login-field-error">{isId ? 'Gunakan 3-50 karakter: huruf, angka, titik, strip, atau garis bawah.' : 'Use 3-50 letters, numbers, periods, hyphens, or underscores.'}</span>}
             </div>
 
             <div className={`login-field ${passwordInvalid ? 'invalid' : ''}`}>
@@ -125,7 +125,7 @@ export function LoginPage() {
           <img src={loginDocuments} alt="" />
           <div className="login-visual-copy">
             <span>{isId ? 'ENTERPRISE AI KNOWLEDGE SYSTEM' : 'ENTERPRISE AI KNOWLEDGE SYSTEM'}</span>
-            <p>{isId ? 'SOP, kebijakan, dan prosedur perusahaan yang selalu dapat ditelusuri ke sumbernya.' : 'Company SOPs, policies, and procedures that remain traceable to their source.'}</p>
+            <p>{isId ? 'SOP, peraturan, dan kebijakan dalam satu genggaman.' : 'SOPs, regulations, and policies in one place.'}</p>
           </div>
         </aside>
       </section>

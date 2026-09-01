@@ -1,8 +1,37 @@
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 
 export class UpdateUserDto {
+  @ApiPropertyOptional({ example: 'john.doe', minLength: 3, maxLength: 50 })
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(50)
+  @Matches(/^[a-zA-Z0-9._-]+$/)
+  username?: string;
+
+  @ApiPropertyOptional({ example: 'EMP-0001', minLength: 2, maxLength: 50 })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(50)
+  employeeNumber?: string;
+
+  @ApiPropertyOptional({ example: 'Human Resources', minLength: 2, maxLength: 100 })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  division?: string;
+
+  @ApiPropertyOptional({ example: 'HR Specialist', minLength: 2, maxLength: 100 })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  jobTitle?: string;
+
   @ApiPropertyOptional({ example: 'John Doe' })
   @IsOptional()
   @IsString()
