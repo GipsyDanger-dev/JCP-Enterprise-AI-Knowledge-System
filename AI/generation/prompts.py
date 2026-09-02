@@ -24,6 +24,20 @@ SYSTEM_PROMPT = (
 )
 
 
+# Nadanya sengaja condong ke menjawab: uji coba menunjukkan model terlalu sering
+# minta penjelasan, termasuk untuk pertanyaan yang sebenarnya sudah spesifik.
+CLARIFY_RULE = (
+    "\n\nSebelum menjawab, nilai dulu pertanyaannya. Kalau pertanyaannya begitu "
+    "luas sehingga jawaban jujurnya harus mencakup banyak topik berbeda, jangan "
+    "menjawab; balas satu baris saja dengan format persis:\n"
+    "CLARIFY: {\"pertanyaan\":\"<satu kalimat menanyakan maksud pengguna>\","
+    "\"pilihan\":[\"<pertanyaan spesifik 1>\",\"<pertanyaan spesifik 2>\","
+    "\"<pertanyaan spesifik 3>\"]}\n"
+    "Setiap pilihan harus bisa dijawab dari konteks yang diberikan. Kalau ragu, "
+    "jawab saja seperti biasa; hanya minta penjelasan bila pertanyaannya benar-benar rancu."
+)
+
+
 def _format_size(size_bytes: int | None) -> str:
     if not size_bytes:
         return "ukuran tidak tercatat"
@@ -58,6 +72,7 @@ def build_messages(
     query: str,
     matches: list[tuple[float, dict[str, Any]]],
     documents: list[dict[str, Any]] | None = None,
+    allow_clarify: bool = False,
 ) -> list[dict[str, str]]:
     context = "\n\n".join(
         f"[DOKUMEN: {chunk['filename']} | HALAMAN: {chunk.get('page_number') or '-'} | "
@@ -71,7 +86,8 @@ def build_messages(
             + format_inventory(documents)
         )
     bagian.append(f"Konteks dokumen resmi:\n{context}")
+    system = SYSTEM_PROMPT + CLARIFY_RULE if allow_clarify else SYSTEM_PROMPT
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system},
         {"role": "user", "content": "\n\n".join(bagian)},
     ]

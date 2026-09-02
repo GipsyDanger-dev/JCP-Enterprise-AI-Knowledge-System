@@ -30,7 +30,12 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from config import EMBEDDING_MODEL
 from generation.citations import citations_from_matches
-from generation.guardrails import is_no_answer, no_answer_response
+from generation.guardrails import (
+    clarify_response,
+    is_no_answer,
+    no_answer_response,
+    parse_clarify,
+)
 from generation.llm import DEFAULT_MODEL, generate_answer
 from ingestion.chunking import chunk_pages
 from ingestion.parsers import read_document
@@ -304,7 +309,7 @@ class PgVectorStore:
         }
         return [(1.0, chunks[chunk_id]) for chunk_id in ids if chunk_id in chunks]
 
-    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None) -> dict[str, Any]:
+    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False) -> dict[str, Any]:
         """TF-IDF fallback when vector search fails or finds nothing."""
         try:
             import psycopg as _psycopg
@@ -347,10 +352,14 @@ class PgVectorStore:
                     # Sifat berkas (halaman, ukuran, tanggal) tidak ada di dalam
                     # teks dokumen, jadi ikut dikirim sebagai konteks.
                     documents=self.document_metadata(),
+                    allow_clarify=allow_clarify,
                 )
                 if use_llm
                 else matches[0][1]["text"]
             )
+            clarify = parse_clarify(answer)
+            if clarify:
+                return clarify_response(clarify, query)
             if is_no_answer(answer):
                 return no_answer_response()
             return {
@@ -378,6 +387,7 @@ class PgVectorStore:
         api_key: str | None = None,
         filters: dict[str, Any] | None = None,
         context_chunk_ids: list[str] | None = None,
+        allow_clarify: bool = False,
     ) -> dict[str, Any]:
         try:
             context_matches = self.context_chunks(context_chunk_ids or [])
@@ -395,7 +405,7 @@ class PgVectorStore:
             if not matches:
                 # Vector search found nothing above threshold, try TF-IDF fallback
                 print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
-                return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key)
+                return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify)
             citations = citations_from_matches(matches)
             answer = (
                 generate_answer(
@@ -403,10 +413,14 @@ class PgVectorStore:
                     # Sifat berkas (halaman, ukuran, tanggal) tidak ada di dalam
                     # teks dokumen, jadi ikut dikirim sebagai konteks.
                     documents=self.document_metadata(),
+                    allow_clarify=allow_clarify,
                 )
                 if use_llm
                 else matches[0][1]["text"]
             )
+            clarify = parse_clarify(answer)
+            if clarify:
+                return clarify_response(clarify, query)
             if is_no_answer(answer):
                 return no_answer_response()
             return {
@@ -420,7 +434,7 @@ class PgVectorStore:
             }
         except Exception as exc:
             print(f"[AI] Vector search failed ({exc}), falling back to TF-IDF")
-            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key)
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify)
 
 
 def content_hash(path: Path) -> str:

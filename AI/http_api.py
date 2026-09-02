@@ -99,6 +99,9 @@ class AskRequest(BaseModel):
     use_llm: bool = False
     model: str | None = None
     retriever: str = "auto"  # auto | tfidf | vector (JSON store only; pg selalu vector)
+    # Dimatikan untuk pertanyaan yang datang dari klik tombol: aplikasi tidak
+    # boleh balik bertanya atas saran yang ia usulkan sendiri.
+    allow_clarify: bool = False
 
 
 class AskResponse(BaseModel):
@@ -107,6 +110,7 @@ class AskResponse(BaseModel):
     grounded: bool
     retrieval: list[dict[str, Any]] = []
     suggestions: list[str] = []
+    awaiting_choice: bool = False
 
 
 class IngestRequest(BaseModel):
@@ -269,6 +273,7 @@ def ask(request: AskRequest) -> dict[str, Any]:
                 retrieval_query, top_k=request.top_k, use_llm=request.use_llm,
                 model=request.model or DEFAULT_MODEL, filters=request.filters,
                 context_chunk_ids=request.context_chunk_ids,
+                allow_clarify=request.allow_clarify,
             )
         return store.ask(
             retrieval_query, top_k=request.top_k, use_llm=request.use_llm,
