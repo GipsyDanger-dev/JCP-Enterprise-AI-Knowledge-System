@@ -28,7 +28,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { AdminOnly, Roles } from '../auth/decorators/roles.decorator';
+import { AdminOnly } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import {
@@ -82,7 +82,6 @@ export class DocumentsController {
   }
 
   @Get('categories')
-  @Roles('admin', 'user')
   @ApiOperation({ summary: 'List document categories' })
   listCategories() {
     return this.documentsService.listCategories();
