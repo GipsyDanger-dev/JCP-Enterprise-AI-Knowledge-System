@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Eye, EyeOff, LoaderCircle, Lock, ShieldAlert, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { errorMessage } from '@/api/client'
+import { ApiError, errorMessage } from '@/api/client'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import loginDocuments from '@/assets/login-documents.png'
@@ -43,7 +43,7 @@ export function LoginPage() {
       await login(username.trim(), password)
       navigate('/', { replace: true })
     } catch (err) {
-      setError(errorMessage(err))
+      setError(err instanceof ApiError && err.status === 401 ? (isId ? 'Username atau password salah.' : 'Invalid username or password.') : errorMessage(err))
     } finally {
       setSubmitting(false)
     }

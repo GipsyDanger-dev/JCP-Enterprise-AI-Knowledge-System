@@ -50,7 +50,7 @@ type ErrorBody = {
 /** Pesan error yang ramah pengguna (401/403/network) */
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 401) return 'Email atau password salah.'
+    if (error.status === 401) return 'Sesi login tidak valid. Silakan masuk kembali.'
     if (error.status === 403) return 'Akun Anda tidak memiliki akses.'
     return error.message
   }

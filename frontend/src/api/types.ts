@@ -162,6 +162,12 @@ export interface ChatQueryResponse {
   awaitingChoice?: boolean
 }
 
+export interface ApiDocumentCategory {
+  id: string
+  name: string
+  createdAt: string
+}
+
 export interface ConversationSummary {
   id: string
   title: string | null

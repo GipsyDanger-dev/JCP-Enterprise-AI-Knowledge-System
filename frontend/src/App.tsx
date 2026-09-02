@@ -15,6 +15,7 @@ import { MessagingPage } from '@/pages/MessagingPage'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { UsersPage } from '@/pages/UsersPage'
+import { AnnouncementsPage } from '@/pages/AnnouncementsPage'
 
 function ThemeInitializer() {
   useEffect(() => {
@@ -40,6 +41,7 @@ export default function App() {
               <Route index element={<OverviewPage />} />
               <Route path="documents" element={<DocumentsPage />} />
               <Route path="chat" element={<ChatPage />} />
+              <Route path="announcements" element={<AnnouncementsPage />} />
               <Route path="users" element={<RequireRole role="admin"><UsersPage /></RequireRole>} />
               <Route path="inbox" element={<RequireRole role="admin"><AdminInboxPage /></RequireRole>} />
               <Route path="messages" element={<MessagingPage />} />

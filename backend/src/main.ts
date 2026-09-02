@@ -1,9 +1,13 @@
+import { config as loadEnvironment } from 'dotenv';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { resolve } from 'node:path';
 import { AppModule } from './app.module';
 
 const { json, urlencoded } = require('express');
+
+loadEnvironment({ path: resolve(__dirname, '../.env'), override: true, quiet: true });
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });

@@ -11,6 +11,7 @@ import { ProcessingJobsModule } from './processing-jobs/processing-jobs.module';
 import { UsersModule } from './users/users.module';
 import { RequiredReadingsModule } from './required-readings/required-readings.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AnnouncementsModule } from './announcements/announcements.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     AiModule,
     RequiredReadingsModule,
     NotificationsModule,
+    AnnouncementsModule,
   ],
   controllers: [HealthController],
 })

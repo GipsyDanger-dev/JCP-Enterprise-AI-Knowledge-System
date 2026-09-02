@@ -31,15 +31,12 @@ export class RequiredReadingsService {
     const existing = await this.prisma.requiredReading.findMany({ where: { documentId, userId: { in: users.map((user) => user.id) } }, select: { userId: true } });
     const existingIds = new Set(existing.map((item) => item.userId));
     const newUsers = users.filter((user) => !existingIds.has(user.id));
+    if (newUsers.length === 0) throw new BadRequestException('Every selected employee has already been assigned this document');
 
-    await this.prisma.$transaction([
-      this.prisma.requiredReading.createMany({ data: newUsers.map((user) => ({ documentId, userId: user.id, dueAt })), skipDuplicates: true }),
-      this.prisma.requiredReading.updateMany({ where: { documentId, userId: { in: existing.map((item) => item.userId) }, completedAt: null }, data: { dueAt } }),
-    ]);
+    await this.prisma.requiredReading.createMany({ data: newUsers.map((user) => ({ documentId, userId: user.id, dueAt })), skipDuplicates: true });
 
-    const dueLabel = dueAt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-    await this.notifications.createMany(newUsers.map((user) => ({ userId: user.id, type: NotificationType.REQUIRED_READING_ASSIGNED, title: 'Dokumen wajib baca baru', body: `${doc.title} harus dibaca sebelum ${dueLabel}.`, href: `/documents?doc=${doc.id}` })));
-    return { assigned: newUsers.length, updated: existing.length, users, dueAt };
+    await this.notifications.createMany(newUsers.map((user) => ({ userId: user.id, type: NotificationType.REQUIRED_READING_ASSIGNED, title: 'Dokumen wajib baca baru', body: `${doc.title} telah ditetapkan sebagai dokumen wajib baca.`, href: `/documents?doc=${doc.id}` })));
+    return { assigned: newUsers.length, skipped: existing.length, users: newUsers, dueAt };
   }
 
   async mine(userId: string) {
@@ -70,7 +67,7 @@ export class RequiredReadingsService {
 
   async report() {
     const now = new Date();
-    const items = await this.prisma.requiredReading.findMany({ select: { progress: true, dueAt: true, completedAt: true, user: { select: { displayName: true, employeeNumber: true, division: true, jobTitle: true } }, document: { select: { id: true, title: true } } } });
+    const items = await this.prisma.requiredReading.findMany({ select: { userId: true, progress: true, dueAt: true, completedAt: true, user: { select: { displayName: true, employeeNumber: true, division: true, jobTitle: true } }, document: { select: { id: true, title: true } } } });
     const map = new Map<string, { documentId: string; title: string; total: number; completed: number; overdue: number; readers: Array<Record<string, unknown>> }>();
     for (const item of items) {
       const row = map.get(item.document.id) ?? { documentId: item.document.id, title: item.document.title, total: 0, completed: 0, overdue: 0, readers: [] };
@@ -78,7 +75,7 @@ export class RequiredReadingsService {
       row.total += 1;
       if (item.progress === 100) row.completed += 1;
       if (isOverdue) row.overdue += 1;
-      row.readers.push({ ...item.user, progress: item.progress, dueAt: item.dueAt, completedAt: item.completedAt, isOverdue });
+      row.readers.push({ userId: item.userId, ...item.user, progress: item.progress, dueAt: item.dueAt, completedAt: item.completedAt, isOverdue });
       map.set(item.document.id, row);
     }
     return [...map.values()].map((row) => ({ ...row, progress: row.total ? Math.round(row.completed / row.total * 100) : 0 }));

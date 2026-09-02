@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowUpRight, BookOpenCheck, ChevronDown, Download, FileText, FolderOpen, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { ArrowUpRight, BookOpenCheck, CheckCircle2, ChevronDown, Download, FileText, FolderOpen, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { UploadModal } from '@/components/UploadModal'
@@ -66,18 +66,30 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
   const [readerLoading, setReaderLoading] = useState(false)
   const [readerError, setReaderError] = useState(false)
   const viewerRef = useRef<HTMLDivElement>(null)
-  const [readingProgress, setReadingProgress] = useState(0)
   const [canComplete, setCanComplete] = useState(false)
-  const trackReading = () => { const el = viewerRef.current; if (!el || !requiredReadingId || !token) return; const progress = Math.min(99, Math.round((el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight)) * 100)); setReadingProgress(progress); if (progress >= 95) setCanComplete(true); updateRequiredReadingProgress(requiredReadingId, progress, token).catch(() => {}) }
-  const completeReading = async () => { if (!requiredReadingId || !token || !canComplete) return; await updateRequiredReadingProgress(requiredReadingId, 99, token); await completeRequiredReading(requiredReadingId, token); setReadingProgress(100); setCanComplete(false) }
+  const [completionConfirmed, setCompletionConfirmed] = useState(false)
+  const [completionSaving, setCompletionSaving] = useState(false)
+  const trackReading = () => { const el = viewerRef.current; if (!el || !requiredReadingId || !token) return; const progress = Math.min(99, Math.round((el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight)) * 100)); setCanComplete(progress >= 95); updateRequiredReadingProgress(requiredReadingId, progress, token).catch(() => {}) }
+  const completeReading = async () => {
+    if (!requiredReadingId || !token || !canComplete || completionSaving) return
+    setCompletionSaving(true)
+    try {
+      await updateRequiredReadingProgress(requiredReadingId, 99, token)
+      await completeRequiredReading(requiredReadingId, token)
+      setCanComplete(false)
+      setCompletionConfirmed(true)
+    } finally {
+      setCompletionSaving(false)
+    }
+  }
 
   useEffect(() => {
     if (!requiredReadingId || !token) return
     listMyRequiredReadings(token).then((items) => {
       const reading = items.find((item) => item.id === requiredReadingId)
       if (!reading) return
-      setReadingProgress(reading.progress)
       setCanComplete(reading.progress >= 95 && reading.progress < 100)
+      setCompletionConfirmed(reading.progress >= 100)
     }).catch(() => {})
   }, [requiredReadingId, token])
 
@@ -141,11 +153,12 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
                 <StatusBadge status={doc.status} />
                 <span>{doc.collection}</span>
                 <span>{doc.updatedAt}</span>
+                {completionConfirmed && <span className="reading-verification-badge" role="status"><CheckCircle2 size={14} /> {isId ? 'Pembacaan terverifikasi' : 'Reading verified'}</span>}
               </span>
             </div>
           </div>
           <div className="doc-viewer-actions">
-            {requiredReadingId && <button className="primary-button" disabled={!canComplete || readingProgress >= 100} onClick={completeReading}>{readingProgress >= 100 ? (isId ? 'Selesai' : 'Complete') : (isId ? 'Tandai selesai' : 'Mark complete')}</button>}
+            {requiredReadingId && <button className={completionConfirmed ? 'reading-complete-button' : 'primary-button'} disabled={completionSaving || completionConfirmed || !canComplete} onClick={completeReading}>{completionConfirmed ? <><CheckCircle2 size={17} /> {isId ? 'Terverifikasi selesai' : 'Verified complete'}</> : (completionSaving ? (isId ? 'Memverifikasi...' : 'Verifying...') : (isId ? 'Tandai selesai' : 'Mark complete'))}</button>}
             {doc.status === 'Ready' && (
               <button className="secondary-button" onClick={() => downloadDocument(doc.id, doc.name, token ?? undefined)}>
                 <Download size={15} /> {isId ? 'Unduh' : 'Download'}
@@ -228,6 +241,7 @@ export function DocumentsPage() {
   const initialCollection = searchParams.get('collection') ?? (userCollection ?? 'All')
   const initialQuery = searchParams.get('q') ?? ''
   const requestedDocumentId = searchParams.get('doc')
+  const requestedAssignmentDocumentId = searchParams.get('assign')
   const requiredReadingId = searchParams.get('reading')
   const [query, setQuery] = useState(initialQuery)
   const [collection, setCollection] = useState(initialCollection)
@@ -243,7 +257,7 @@ export function DocumentsPage() {
   const [assignmentView, setAssignmentView] = useState<'assign' | 'progress'>('assign')
   const [readingReport, setReadingReport] = useState<RequiredReadingReport[]>([])
   const [selectedDivision, setSelectedDivision] = useState('')
-  const [assignmentDueDate, setAssignmentDueDate] = useState(defaultDueDate)
+  const [assignmentError, setAssignmentError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!requestedDocumentId || selectedDoc) return
@@ -252,13 +266,28 @@ export function DocumentsPage() {
   }, [documents, requestedDocumentId, selectedDoc])
 
   useEffect(() => {
+    if (!requestedAssignmentDocumentId || assignmentDoc) return
+    const document = documents.find((item) => item.id === requestedAssignmentDocumentId)
+    if (!document) return
+    setSelectedDivision('')
+    setAssignmentError(null)
+    setSelectedEmployeeIds([])
+    setAssignmentView('progress')
+    setAssignmentDoc(document)
+  }, [assignmentDoc, documents, requestedAssignmentDocumentId])
+
+  useEffect(() => {
     if (!assignmentDoc || !token) return
-    listUsers(token).then((users) => {
-      const activeEmployees = users.filter((user) => user.role === 'USER' && user.isActive !== false)
+    let active = true
+    Promise.all([listUsers(token), requiredReadingReport(token)]).then(([users, report]) => {
+      if (!active) return
+      const activeEmployees = users.filter((user) => user.isActive !== false && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')
+      const assignedIds = new Set((report.find((item) => item.documentId === assignmentDoc.id)?.readers ?? []).map((reader) => reader.userId))
       setEmployees(activeEmployees)
-      setSelectedEmployeeIds(activeEmployees.map((user) => user.id))
-    }).catch(() => { setEmployees([]); setSelectedEmployeeIds([]) })
-    requiredReadingReport(token).then(setReadingReport).catch(() => setReadingReport([]))
+      setReadingReport(report)
+      setSelectedEmployeeIds(activeEmployees.filter((employee) => !assignedIds.has(employee.id)).map((employee) => employee.id))
+    }).catch(() => { if (active) { setEmployees([]); setSelectedEmployeeIds([]); setReadingReport([]) } })
+    return () => { active = false }
   }, [assignmentDoc, token])
 
   const filtered = useMemo(() => {
@@ -273,6 +302,9 @@ export function DocumentsPage() {
   }, [documents, query, collection, canManage, userCollection])
   const divisions = useMemo(() => Array.from(new Set(employees.map((employee) => employee.division))).sort(), [employees])
   const visibleEmployees = selectedDivision ? employees.filter((employee) => employee.division === selectedDivision) : employees
+  const assignedEmployeeIds = useMemo(() => new Set((readingReport.find((item) => item.documentId === assignmentDoc?.id)?.readers ?? []).map((reader) => reader.userId)), [assignmentDoc?.id, readingReport])
+  const visibleAssignableEmployees = useMemo(() => visibleEmployees.filter((employee) => !assignedEmployeeIds.has(employee.id)), [assignedEmployeeIds, visibleEmployees])
+  const selectedAssignableEmployeeIds = useMemo(() => selectedEmployeeIds.filter((id) => !assignedEmployeeIds.has(id)), [assignedEmployeeIds, selectedEmployeeIds])
 
   const handleCollectionChange = (c: string) => {
     setCollection(c)
@@ -294,6 +326,13 @@ export function DocumentsPage() {
     setSearchParams(nextSearchParams)
   }
 
+  const handleCloseAssignment = () => {
+    setAssignmentDoc(null)
+    const nextSearchParams = new URLSearchParams(searchParams)
+    nextSearchParams.delete('assign')
+    setSearchParams(nextSearchParams)
+  }
+
   const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Hapus dokumen "${name}"?`)) {
       await removeDocument(id)
@@ -301,9 +340,20 @@ export function DocumentsPage() {
     }
   }
   const assignReading = async () => {
-    if (!token || !assignmentDoc || selectedEmployeeIds.length === 0) return
+    if (!token || !assignmentDoc || selectedAssignableEmployeeIds.length === 0) return
     setAssigning(true)
-    try { await assignRequiredReading(assignmentDoc.id, selectedEmployeeIds, assignmentDueDate, token); const report = await requiredReadingReport(token); setReadingReport(report); setAssignmentView('progress') } finally { setAssigning(false) }
+    setAssignmentError(null)
+    try {
+      await assignRequiredReading(assignmentDoc.id, selectedAssignableEmployeeIds, token)
+      const report = await requiredReadingReport(token)
+      setReadingReport(report)
+      setSelectedEmployeeIds([])
+      setAssignmentView('progress')
+    } catch (error) {
+      setAssignmentError(error instanceof Error ? error.message : (isId ? 'Penugasan gagal disimpan.' : 'Assignment could not be saved.'))
+    } finally {
+      setAssigning(false)
+    }
   }
 
   const action = canManage ? (
@@ -350,7 +400,7 @@ export function DocumentsPage() {
               <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>
                 {canManage
-                  ? <>{document.status === 'Ready' && <button className="icon-button" title={isId ? 'Jadikan wajib baca' : 'Assign required reading'} onClick={(e) => { e.stopPropagation(); setSelectedDivision(''); setAssignmentDueDate(defaultDueDate()); setAssignmentView('assign'); setAssignmentDoc(document) }}><BookOpenCheck size={16} /></button>}<button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
+                  ? <>{document.status === 'Ready' && <button className="icon-button" title={isId ? 'Jadikan wajib baca' : 'Assign required reading'} onClick={(e) => { e.stopPropagation(); setSelectedDivision(''); setAssignmentError(null); setSelectedEmployeeIds([]); setAssignmentView('assign'); setAssignmentDoc(document) }}><BookOpenCheck size={16} /></button>}<button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
                   : <button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button>}
               </td>
             </tr>
@@ -365,11 +415,11 @@ export function DocumentsPage() {
 
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
       {assignmentDoc && (
-        <div className="modal-overlay" onClick={() => setAssignmentDoc(null)}>
+        <div className="modal-overlay" onClick={handleCloseAssignment}>
           <div className="modal-card assignment-modal" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <div><h2>{isId ? 'Wajib baca' : 'Required reading'}</h2><p className="modal-copy">{assignmentDoc.name}</p></div>
-              <button className="icon-button" onClick={() => setAssignmentDoc(null)}><X size={18} /></button>
+              <button className="icon-button" onClick={handleCloseAssignment}><X size={18} /></button>
             </div>
             <div className="assignment-tabs">
               <button className={assignmentView === 'assign' ? 'active' : ''} onClick={() => setAssignmentView('assign')}>{isId ? 'Tetapkan' : 'Assign'}</button>
@@ -382,37 +432,38 @@ export function DocumentsPage() {
                   <select id="assignment-division" value={selectedDivision} onChange={(event) => {
                     const division = event.target.value
                     setSelectedDivision(division)
-                    setSelectedEmployeeIds(division ? employees.filter((employee) => employee.division === division).map((employee) => employee.id) : employees.map((employee) => employee.id))
+                    setSelectedEmployeeIds((division ? employees.filter((employee) => employee.division === division) : employees).filter((employee) => !assignedEmployeeIds.has(employee.id)).map((employee) => employee.id))
                   }}>
                     <option value="">{isId ? 'Semua divisi' : 'All divisions'}</option>
                     {divisions.map((division) => <option key={division} value={division}>{division}</option>)}
                   </select>
                 </div>
-                <div className="assignment-target">
-                  <label htmlFor="assignment-due-date">{isId ? 'Tenggat baca' : 'Reading due date'}</label>
-                  <input id="assignment-due-date" type="date" min={new Date().toISOString().slice(0, 10)} value={assignmentDueDate} onChange={(event) => setAssignmentDueDate(event.target.value)} />
-                </div>
                 <label className="assignment-select-all">
-                  <input type="checkbox" checked={visibleEmployees.length > 0 && visibleEmployees.every((employee) => selectedEmployeeIds.includes(employee.id))} onChange={() => setSelectedEmployeeIds((ids) => visibleEmployees.every((employee) => ids.includes(employee.id)) ? ids.filter((id) => !visibleEmployees.some((employee) => employee.id === id)) : Array.from(new Set([...ids, ...visibleEmployees.map((employee) => employee.id)])))} />
+                  <input type="checkbox" disabled={visibleAssignableEmployees.length === 0} checked={visibleAssignableEmployees.length > 0 && visibleAssignableEmployees.every((employee) => selectedEmployeeIds.includes(employee.id))} onChange={() => setSelectedEmployeeIds((ids) => visibleAssignableEmployees.every((employee) => ids.includes(employee.id)) ? ids.filter((id) => !visibleAssignableEmployees.some((employee) => employee.id === id)) : Array.from(new Set([...ids, ...visibleAssignableEmployees.map((employee) => employee.id)])))} />
                   {isId ? 'Pilih semua karyawan yang tampil' : 'Select all visible employees'}
                 </label>
                 <div className="assignment-table">
-                  {visibleEmployees.map((employee) => <label key={employee.id} className="assignment-person">
-                    <input type="checkbox" checked={selectedEmployeeIds.includes(employee.id)} onChange={() => setSelectedEmployeeIds((ids) => ids.includes(employee.id) ? ids.filter((id) => id !== employee.id) : [...ids, employee.id])} />
-                    <span><strong>{employee.displayName}</strong><small>{employee.employeeNumber} · {employee.division} · {employee.jobTitle}</small></span>
-                  </label>)}
+                  {visibleEmployees.map((employee) => {
+                    const alreadyAssigned = assignedEmployeeIds.has(employee.id)
+                    return <label key={employee.id} className={`assignment-person${alreadyAssigned ? ' is-assigned' : ''}`}>
+                      <input type="checkbox" disabled={alreadyAssigned} checked={alreadyAssigned || selectedEmployeeIds.includes(employee.id)} onChange={() => setSelectedEmployeeIds((ids) => ids.includes(employee.id) ? ids.filter((id) => id !== employee.id) : [...ids, employee.id])} />
+                      <span><strong>{employee.displayName}</strong><small>{employee.employeeNumber} · {employee.division} · {employee.jobTitle}{alreadyAssigned && <> · <em>{isId ? 'Sudah ditugaskan' : 'Already assigned'}</em></>}</small></span>
+                      {alreadyAssigned && <CheckCircle2 className="assignment-person-status" size={18} aria-label={isId ? 'Sudah ditugaskan' : 'Already assigned'} />}
+                    </label>
+                  })}
                 </div>
               </> : <div className="assignment-progress-list">
                 {(readingReport.find((item) => item.documentId === assignmentDoc.id)?.readers ?? []).map((reader) => <div className="reading-report-person" key={reader.employeeNumber}>
-                  <span><strong>{reader.displayName}</strong><small>{reader.employeeNumber} · {reader.division} · {reader.jobTitle} · {isId ? 'Tenggat' : 'Due'} {new Date(reader.dueAt).toLocaleDateString(isId ? 'id-ID' : 'en-US')}</small></span>
-                  <b>{reader.progress === 100 ? (isId ? 'Selesai' : 'Complete') : reader.isOverdue ? (isId ? `Terlambat · ${reader.progress}%` : `Overdue · ${reader.progress}%`) : `${reader.progress}%`}</b>
+                  <span><strong>{reader.displayName}</strong><small>{reader.employeeNumber} · {reader.division} · {reader.jobTitle}</small></span>
+                  <b>{reader.progress === 100 ? (isId ? 'Selesai' : 'Complete') : `${reader.progress}%`}</b>
                 </div>)}
                 {!(readingReport.find((item) => item.documentId === assignmentDoc.id)?.readers.length) && <p className="empty-row">{isId ? 'Belum ada karyawan yang ditugaskan.' : 'No employees assigned yet.'}</p>}
               </div>}
             </div>
             <div className="modal-actions">
-              <button className="secondary-button" onClick={() => setAssignmentDoc(null)}>{isId ? 'Tutup' : 'Close'}</button>
-              {assignmentView === 'assign' && <button className="primary-button" disabled={assigning || selectedEmployeeIds.length === 0 || !assignmentDueDate} onClick={assignReading}>{assigning ? (isId ? 'Menyimpan...' : 'Saving...') : (isId ? `Tetapkan (${selectedEmployeeIds.length})` : `Assign (${selectedEmployeeIds.length})`)}</button>}
+              {assignmentError && <p className="assignment-error" role="alert">{assignmentError}</p>}
+              <button className="secondary-button" onClick={handleCloseAssignment}>{isId ? 'Tutup' : 'Close'}</button>
+              {assignmentView === 'assign' && <button className="primary-button" disabled={assigning || selectedAssignableEmployeeIds.length === 0} onClick={assignReading}>{assigning ? (isId ? 'Menyimpan...' : 'Saving...') : (selectedAssignableEmployeeIds.length === 0 ? (isId ? 'Semua sudah ditugaskan' : 'All already assigned') : (isId ? `Tetapkan (${selectedAssignableEmployeeIds.length})` : `Assign (${selectedAssignableEmployeeIds.length})`))}</button>}
             </div>
           </div>
         </div>

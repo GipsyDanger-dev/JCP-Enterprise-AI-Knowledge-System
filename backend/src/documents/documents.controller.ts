@@ -37,6 +37,7 @@ import {
 } from './document-file.validator';
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
 
 @ApiTags('documents')
 @ApiBearerAuth()
@@ -78,6 +79,22 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'ADMIN sees active documents; USER sees only READY documents' })
   findAll(@CurrentUser() actor: AuthenticatedUser) {
     return this.documentsService.findAll(actor);
+  }
+
+  @Get('categories')
+  @Roles('admin', 'user')
+  @ApiOperation({ summary: 'List document categories' })
+  listCategories() {
+    return this.documentsService.listCategories();
+  }
+
+  @Post('categories')
+  @AdminOnly()
+  @ApiOperation({ summary: 'Create a document category' })
+  @ApiCreatedResponse({ description: 'Document category created' })
+  @ApiForbiddenResponse({ description: 'Only ADMIN can create document categories' })
+  createCategory(@Body() input: CreateDocumentCategoryDto) {
+    return this.documentsService.createCategory(input);
   }
 
   @Get(':id/status')

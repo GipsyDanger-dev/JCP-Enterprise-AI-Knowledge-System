@@ -15,8 +15,6 @@ import { listConversations } from '@/api/chat'
 import { useAuth } from '@/hooks/useAuth'
 import { listMyRequiredReadings, requiredReadingReport, type RequiredReading, type RequiredReadingReport } from '@/api/requiredReadings'
 
-const dueLabel = (dueAt: string, isId: boolean) => `${isId ? 'Tenggat' : 'Due'} ${new Date(dueAt).toLocaleDateString(isId ? 'id-ID' : 'en-US', { day: 'numeric', month: 'short' })}`
-
 export function OverviewPage() {
   const { role, language } = useWorkspace()
   const isId = language === 'id'
@@ -34,6 +32,7 @@ function AdminOverview({ isId }: { isId: boolean }) {
   useEffect(() => { if (token) requiredReadingReport(token).then(setReadingReport).catch(() => setReadingReport([])) }, [token])
   const readyCount = documents.filter((document) => document.status === 'Ready').length
   const totalChunks = documents.reduce((sum, document) => sum + (document.chunks ?? 0), 0)
+  const documentCollections = Array.from(new Set(documents.map((document) => document.collection).filter(Boolean))).sort()
   const docsLabel = isId ? 'dokumen' : 'documents'
   return (
     <div className="overview-layout">
@@ -42,7 +41,7 @@ function AdminOverview({ isId }: { isId: boolean }) {
         {uploadError && <div className="inline-alert" role="alert"><ShieldAlert size={15} /> {uploadError}</div>}
         <div className="metrics-grid">
           <Metric icon={FileText} value={readyCount} label={isId ? 'Dokumen siap' : 'Ready documents'} note={isId ? '+2 minggu ini' : '+2 this week'} />
-          <Metric icon={Database} value={totalChunks} label={isId ? 'Chunk terindeks' : 'Indexed chunks'} note={isId ? 'Di 4 koleksi' : 'Across 4 collections'} />
+          <Metric icon={Database} value={totalChunks} label={isId ? 'Chunk terindeks' : 'Indexed chunks'} note={isId ? `Di ${documentCollections.length} koleksi` : `Across ${documentCollections.length} collections`} />
           <Metric icon={MessageSquareText} value={conversationCount} label={isId ? 'Percakapan AI' : 'AI conversations'} note={isId ? 'Dari riwayat Anda' : 'From your history'} />
         </div>
 
@@ -56,13 +55,13 @@ function AdminOverview({ isId }: { isId: boolean }) {
         <section className="collection-section">
           <SectionHeading title={isId ? 'Koleksi' : 'Collections'} detail={isId ? 'Sumber terorganisir yang tersedia untuk tim Anda' : 'Organized sources available to your team'} />
           <div className="collection-grid">
-            {['Operations', 'IT & Security', 'Finance', 'People'].map((collection, index) => {
+            {documentCollections.slice(0, 4).map((collection, index) => {
               const count = documents.filter((document) => document.collection === collection).length
               return <Collection key={collection} name={collection} count={`${count} ${docsLabel}`} color={(['orange', 'mint', 'violet', 'orange'] as const)[index]} onClick={() => navigate(`/documents?collection=${encodeURIComponent(collection)}`)} />
             })}
           </div>
         </section>
-        {readingReport.length > 0 && <section className="required-section"><SectionHeading title={isId ? 'Laporan wajib baca' : 'Required reading report'} detail={isId ? 'Progres karyawan per dokumen' : 'Employee progress by document'} /><div className="required-list">{readingReport.map((item) => <div key={item.documentId} className="required-report"><RequiredRead title={item.title} category={`${item.completed}/${item.total} ${isId ? 'selesai' : 'completed'}`} due={item.overdue ? `${item.overdue} ${isId ? 'terlambat' : 'overdue'}` : `${item.progress}%`} progress={item.progress} overdue={item.overdue > 0} /><div className="reading-report-people">{item.readers.map((reader) => <div key={reader.employeeNumber} className="reading-report-person"><span><strong>{reader.displayName}</strong><small>{reader.employeeNumber} · {reader.division} · {reader.jobTitle} · {dueLabel(reader.dueAt, isId)}</small></span><b>{reader.progress === 100 ? (isId ? 'Sudah membaca' : 'Read') : reader.isOverdue ? (isId ? `Terlambat · ${reader.progress}%` : `Overdue · ${reader.progress}%`) : `${reader.progress}%`}</b></div>)}</div></div>)}</div></section>}
+        {readingReport.length > 0 && <section className="required-section"><SectionHeading title={isId ? 'Laporan wajib baca' : 'Required reading report'} detail={isId ? 'Progres karyawan per dokumen' : 'Employee progress by document'} /><div className="required-list">{readingReport.map((item) => <div key={item.documentId} className="required-report"><RequiredRead title={item.title} category={`${item.completed}/${item.total} ${isId ? 'selesai' : 'completed'}`} status={`${item.progress}%`} progress={item.progress} onClick={() => navigate(`/documents?assign=${encodeURIComponent(item.documentId)}`)} /><div className="reading-report-people">{item.readers.map((reader) => <div key={reader.employeeNumber} className="reading-report-person"><span><strong>{reader.displayName}</strong><small>{reader.employeeNumber} · {reader.division} · {reader.jobTitle}</small></span><b>{reader.progress === 100 ? (isId ? 'Sudah membaca' : 'Read') : `${reader.progress}%`}</b></div>)}</div></div>)}</div></section>}
       </section>
 
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
@@ -106,7 +105,7 @@ function EmployeeOverview({ isId }: { isId: boolean }) {
           <section className="required-section">
             <SectionHeading title={isId ? 'Wajib baca' : 'Required reading'} detail={isId ? 'Kebijakan yang ditugaskan untuk Anda' : 'Policies assigned to you'} />
             <div className="required-list">
-              {requiredReadings.length === 0 ? <p className="empty-row">{isId ? 'Tidak ada dokumen wajib baca.' : 'No required reading assigned.'}</p> : requiredReadings.map((reading) => <RequiredRead key={reading.id} title={reading.document.title} category={reading.document.collection ?? 'Operations'} due={reading.progress === 100 ? (isId ? 'Selesai' : 'Complete') : reading.isOverdue ? (isId ? 'Terlambat' : 'Overdue') : dueLabel(reading.dueAt, isId)} progress={reading.progress} overdue={reading.isOverdue} onClick={() => navigate(`/documents?doc=${encodeURIComponent(reading.documentId)}&reading=${encodeURIComponent(reading.id)}`)} />)}
+              {requiredReadings.length === 0 ? <p className="empty-row">{isId ? 'Tidak ada dokumen wajib baca.' : 'No required reading assigned.'}</p> : requiredReadings.map((reading) => <RequiredRead key={reading.id} title={reading.document.title} category={reading.document.collection ?? (isId ? 'Tanpa kategori' : 'Uncategorized')} status={reading.progress === 100 ? (isId ? 'Selesai' : 'Complete') : `${reading.progress}%`} progress={reading.progress} onClick={() => navigate(`/documents?doc=${encodeURIComponent(reading.documentId)}&reading=${encodeURIComponent(reading.id)}`)} />)}
             </div>
           </section>
         </div>
