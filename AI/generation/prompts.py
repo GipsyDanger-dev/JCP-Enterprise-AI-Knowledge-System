@@ -26,13 +26,20 @@ SYSTEM_PROMPT = (
 
 # Nadanya sengaja condong ke menjawab: uji coba menunjukkan model terlalu sering
 # minta penjelasan, termasuk untuk pertanyaan yang sebenarnya sudah spesifik.
+#
+# Dikirim bersama response_format json_object, jadi bentuk balasannya dipaksa oleh
+# provider. Versi sebelumnya meminta awalan teks "CLARIFY:" dan sesekali diabaikan
+# model; balasan prosa yang lolos itu lalu disangka jawaban dan diberi sitasi.
 CLARIFY_RULE = (
-    "\n\nSebelum menjawab, nilai dulu pertanyaannya. Kalau pertanyaannya begitu "
+    "\n\nBalas SELALU berupa satu objek JSON, tanpa teks lain di luar JSON.\n"
+    "Sebelum menjawab, nilai dulu pertanyaannya. Kalau pertanyaannya begitu "
     "luas sehingga jawaban jujurnya harus mencakup banyak topik berbeda, jangan "
-    "menjawab; balas satu baris saja dengan format persis:\n"
-    "CLARIFY: {\"pertanyaan\":\"<satu kalimat menanyakan maksud pengguna>\","
+    "menjawab; balas:\n"
+    "{\"type\":\"clarify\",\"pertanyaan\":\"<satu kalimat menanyakan maksud pengguna>\","
     "\"pilihan\":[\"<pertanyaan spesifik 1>\",\"<pertanyaan spesifik 2>\","
     "\"<pertanyaan spesifik 3>\"]}\n"
+    "Selain itu, jawab seperti biasa dan bungkus jawabannya:\n"
+    "{\"type\":\"answer\",\"jawaban\":\"<jawaban lengkap sesuai aturan di atas>\"}\n"
     "Setiap pilihan harus bisa dijawab dari konteks yang diberikan. Kalau ragu, "
     "jawab saja seperti biasa; hanya minta penjelasan bila pertanyaannya benar-benar rancu."
 )
