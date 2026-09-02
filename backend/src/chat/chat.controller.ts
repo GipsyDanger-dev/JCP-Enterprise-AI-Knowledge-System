@@ -25,6 +25,6 @@ export class ChatController {
     @Body() body: ChatQueryDto,
     @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.chatService.query(body.question.trim(), actor, body.conversationId);
+    return this.chatService.query(body.question.trim(), actor, body.conversationId, body.fromSuggestion);
   }
 }

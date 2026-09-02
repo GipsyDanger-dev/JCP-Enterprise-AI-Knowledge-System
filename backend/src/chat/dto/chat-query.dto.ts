@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class ChatQueryDto {
   @IsString()
@@ -9,4 +9,10 @@ export class ChatQueryDto {
   @IsOptional()
   @IsUUID('4')
   conversationId?: string;
+
+  // Pertanyaan yang datang dari klik tombol saran tidak boleh dibalas dengan
+  // pertanyaan balik: aplikasi akan terlihat mempertanyakan usulannya sendiri.
+  @IsOptional()
+  @IsBoolean()
+  fromSuggestion?: boolean;
 }

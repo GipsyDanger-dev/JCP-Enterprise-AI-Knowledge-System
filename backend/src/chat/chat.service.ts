@@ -20,6 +20,7 @@ interface AiAskResult {
   citations: AiCitation[];
   grounded: boolean;
   suggestions?: string[];
+  awaiting_choice?: boolean;
 }
 
 export interface ChatCitation {
@@ -50,6 +51,7 @@ export class ChatService {
     question: string,
     actor: AuthenticatedUser,
     conversationId?: string,
+    fromSuggestion?: boolean,
   ) {
     const conversation = await this.resolveConversation(question, actor, conversationId);
     const contextChunkIds = await this.getContextChunkIds(conversation.id);
@@ -79,6 +81,9 @@ export class ChatService {
           conversation_topic: conversationTopic,
           top_k: 5,
           use_llm: Boolean(process.env.SUMOPOD_API_KEY || process.env.LLM_API_KEY),
+          // Hanya pertanyaan yang diketik sendiri yang boleh dibalas dengan
+          // pertanyaan balik saat maksudnya terlalu luas.
+          allow_clarify: !fromSuggestion,
         }),
       });
 
@@ -95,6 +100,9 @@ export class ChatService {
         answer: result.answer,
         citations,
         suggestions: result.suggestions ?? [],
+        // Antarmuka mengunci kolom ketik selama ini bernilai true, supaya
+        // pengguna menuntaskan dulu pertanyaan balik dari AI.
+        awaitingChoice: result.awaiting_choice ?? false,
       };
     } catch (error) {
       const answer = 'Maaf, pertanyaan belum dapat diproses sekarang. Coba salah satu pertanyaan berikut tentang dokumen perusahaan:';
@@ -105,6 +113,8 @@ export class ChatService {
         answer,
         citations,
         suggestions: QUICK_SUGGESTIONS,
+        // Kegagalan bukan pertanyaan balik: kolom ketik harus tetap terbuka.
+        awaitingChoice: false,
       };
     }
   }
