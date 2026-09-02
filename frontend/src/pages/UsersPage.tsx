@@ -24,7 +24,10 @@ export function UsersPage() {
   // Create form
   const [showForm, setShowForm] = useState(false)
   const [formName, setFormName] = useState('')
-  const [formEmail, setFormEmail] = useState('')
+  const [formUsername, setFormUsername] = useState('')
+  const [formEmployeeNumber, setFormEmployeeNumber] = useState('')
+  const [formDivision, setFormDivision] = useState('')
+  const [formJobTitle, setFormJobTitle] = useState('')
   const [formRole, setFormRole] = useState<ApiRole>('USER')
   const [formPassword, setFormPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -33,6 +36,10 @@ export function UsersPage() {
   // Edit form
   const [editingUser, setEditingUser] = useState<ApiUser | null>(null)
   const [editName, setEditName] = useState('')
+  const [editUsername, setEditUsername] = useState('')
+  const [editEmployeeNumber, setEditEmployeeNumber] = useState('')
+  const [editDivision, setEditDivision] = useState('')
+  const [editJobTitle, setEditJobTitle] = useState('')
   const [editRole, setEditRole] = useState<ApiRole>('USER')
   const [editPhoto, setEditPhoto] = useState('')
   const [editPassword, setEditPassword] = useState('')
@@ -61,20 +68,26 @@ export function UsersPage() {
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
-    if (!formName.trim() || !formEmail.trim()) return
+    if (!formName.trim() || !formUsername.trim() || !formEmployeeNumber.trim() || !formDivision.trim() || !formJobTitle.trim()) return
     setIsSubmitting(true)
     setFormError(null)
     try {
       const newUser = await createUser({
         displayName: formName.trim(),
-        email: formEmail.trim(),
+        username: formUsername.trim(),
+        employeeNumber: formEmployeeNumber.trim(),
+        division: formDivision.trim(),
+        jobTitle: formJobTitle.trim(),
         role: formRole,
         password: formPassword || undefined,
       }, token ?? undefined)
       setUsers((prev) => [newUser, ...prev])
       setShowForm(false)
       setFormName('')
-      setFormEmail('')
+      setFormUsername('')
+      setFormEmployeeNumber('')
+      setFormDivision('')
+      setFormJobTitle('')
       setFormRole('USER')
       setFormPassword('')
     } catch (err) {
@@ -100,6 +113,10 @@ export function UsersPage() {
   const openEdit = (user: ApiUser) => {
     setEditingUser(user)
     setEditName(user.displayName)
+    setEditUsername(user.username)
+    setEditEmployeeNumber(user.employeeNumber)
+    setEditDivision(user.division)
+    setEditJobTitle(user.jobTitle)
     setEditRole(user.role)
     setEditPhoto(user.photoUrl ?? '')
     setEditPassword('')
@@ -127,6 +144,10 @@ export function UsersPage() {
     try {
       const updated = await updateUser(editingUser.id, {
         displayName: editName.trim(),
+        username: editUsername.trim(),
+        employeeNumber: editEmployeeNumber.trim(),
+        division: editDivision.trim(),
+        jobTitle: editJobTitle.trim(),
         role: editRole,
         photoUrl: editPhoto || undefined,
       }, token ?? undefined)
@@ -198,7 +219,7 @@ export function UsersPage() {
                         : <span className="avatar">{userInitials(user.displayName)}</span>}
                       <span>
                         <strong>{user.displayName}</strong>
-                        <small>{user.email}</small>
+                        <small>@{user.username}</small>
                       </span>
                     </div>
                   </td>
@@ -240,6 +261,26 @@ export function UsersPage() {
                 <div className="auth-field">
                   <label>{isId ? 'Nama' : 'Name'}</label>
                   <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} required placeholder={isId ? 'Nama lengkap' : 'Full name'} />
+                </div>
+
+                <div className="auth-field">
+                  <label>{isId ? 'Username' : 'Username'}</label>
+                  <input type="text" value={editUsername} onChange={(e) => setEditUsername(e.target.value)} required placeholder={isId ? 'username' : 'username'} minLength={3} maxLength={50} autoComplete="username" />
+                </div>
+
+                <div className="auth-field">
+                  <label>{isId ? 'Nomor karyawan' : 'Employee number'}</label>
+                  <input type="text" value={editEmployeeNumber} onChange={(e) => setEditEmployeeNumber(e.target.value)} required placeholder={isId ? 'Contoh: EMP-0001' : 'Example: EMP-0001'} minLength={2} maxLength={50} />
+                </div>
+
+                <div className="auth-field">
+                  <label>{isId ? 'Divisi' : 'Division'}</label>
+                  <input type="text" value={editDivision} onChange={(e) => setEditDivision(e.target.value)} required placeholder={isId ? 'Contoh: Human Resources' : 'Example: Human Resources'} minLength={2} maxLength={100} />
+                </div>
+
+                <div className="auth-field">
+                  <label>{isId ? 'Jabatan' : 'Job title'}</label>
+                  <input type="text" value={editJobTitle} onChange={(e) => setEditJobTitle(e.target.value)} required placeholder={isId ? 'Contoh: HR Specialist' : 'Example: HR Specialist'} minLength={2} maxLength={100} />
                 </div>
 
                 <div className="auth-field">
@@ -311,8 +352,23 @@ export function UsersPage() {
                 </div>
 
                 <div className="auth-field">
-                  <label htmlFor="user-email">Email</label>
-                  <input id="user-email" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} required placeholder="nama@perusahaan.com" />
+                  <label htmlFor="user-username">Username</label>
+                  <input id="user-username" type="text" value={formUsername} onChange={(e) => setFormUsername(e.target.value)} required placeholder="username" minLength={3} maxLength={50} autoComplete="username" />
+                </div>
+
+                <div className="auth-field">
+                  <label htmlFor="user-employee-number">{isId ? 'Nomor karyawan' : 'Employee number'}</label>
+                  <input id="user-employee-number" type="text" value={formEmployeeNumber} onChange={(e) => setFormEmployeeNumber(e.target.value)} required placeholder="EMP-0001" minLength={2} maxLength={50} />
+                </div>
+
+                <div className="auth-field">
+                  <label htmlFor="user-division">{isId ? 'Divisi' : 'Division'}</label>
+                  <input id="user-division" type="text" value={formDivision} onChange={(e) => setFormDivision(e.target.value)} required placeholder={isId ? 'Contoh: Human Resources' : 'Example: Human Resources'} minLength={2} maxLength={100} />
+                </div>
+
+                <div className="auth-field">
+                  <label htmlFor="user-job-title">{isId ? 'Jabatan' : 'Job title'}</label>
+                  <input id="user-job-title" type="text" value={formJobTitle} onChange={(e) => setFormJobTitle(e.target.value)} required placeholder={isId ? 'Contoh: HR Specialist' : 'Example: HR Specialist'} minLength={2} maxLength={100} />
                 </div>
 
                 <div className="auth-field">
@@ -334,7 +390,7 @@ export function UsersPage() {
 
               <div className="modal-actions">
                 <button type="button" className="secondary-button" onClick={() => setShowForm(false)}>{isId ? 'Batal' : 'Cancel'}</button>
-                <button type="submit" className="primary-button" disabled={isSubmitting || !formName.trim() || !formEmail.trim()}>
+                <button type="submit" className="primary-button" disabled={isSubmitting || !formName.trim() || !formUsername.trim() || !formEmployeeNumber.trim() || !formDivision.trim() || !formJobTitle.trim()}>
                   {isSubmitting ? <><Loader2 size={15} className="spin" /> {isId ? 'Menambahkan…' : 'Adding…'}</> : <><Plus size={15} /> {isId ? 'Tambah' : 'Add'}</>}
                 </button>
               </div>

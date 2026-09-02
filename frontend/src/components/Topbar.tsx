@@ -3,7 +3,7 @@ import { Bell, ChevronDown, Loader2, LogOut, Menu, Moon, Search, Sun, User } fro
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { listAuditLogs, type AuditLogEntry } from '@/api/auditLogs'
+import { listNotifications, markNotificationsRead, type AppNotification } from '@/api/notifications'
 
 export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
   const { person, language, setLanguage } = useWorkspace()
@@ -13,7 +13,8 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [searchValue, setSearchValue] = useState('')
-  const [notifications, setNotifications] = useState<AuditLogEntry[]>([])
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const stored = localStorage.getItem('jcp-theme')
@@ -58,25 +59,31 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
   }
 
   useEffect(() => {
-    if (!showNotifications || !token || user?.role !== 'ADMIN') return
-    setNotificationsLoading(true)
-    listAuditLogs(token, 5)
-      .then((response) => setNotifications(response.data))
-      .catch(() => setNotifications([]))
-      .finally(() => setNotificationsLoading(false))
-  }, [showNotifications, token, user?.role])
-
-  const activityLabel = (entry: AuditLogEntry) => {
-    const labels: Record<string, { id: string; en: string }> = {
-      AUTH_LOGIN: { id: 'Login ke sistem', en: 'Signed in to the system' },
-      USER_CREATED: { id: 'Pengguna dibuat', en: 'User created' },
-      USER_UPDATED: { id: 'Pengguna diperbarui', en: 'User updated' },
-      DOCUMENT_UPLOADED: { id: 'Dokumen diunggah', en: 'Document uploaded' },
-      DOCUMENT_DELETED: { id: 'Dokumen dihapus', en: 'Document deleted' },
-      PROCESSING_JOB_COMPLETED: { id: 'Dokumen selesai diproses', en: 'Document processing completed' },
-      PROCESSING_JOB_FAILED: { id: 'Pemrosesan dokumen gagal', en: 'Document processing failed' },
+    if (!token) { setNotifications([]); setUnreadCount(0); return }
+    let cancelled = false
+    const load = async () => {
+      try {
+        const feed = await listNotifications(token)
+        if (!cancelled) { setNotifications(feed.items); setUnreadCount(feed.unreadCount) }
+      } catch {
+        if (!cancelled) { setNotifications([]); setUnreadCount(0) }
+      }
     }
-    return labels[entry.action]?.[isId ? 'id' : 'en'] ?? entry.action
+    setNotificationsLoading(true)
+    load().finally(() => { if (!cancelled) setNotificationsLoading(false) })
+    const interval = window.setInterval(load, 30_000)
+    return () => { cancelled = true; window.clearInterval(interval) }
+  }, [token])
+
+  const toggleNotifications = () => {
+    const next = !showNotifications
+    setShowNotifications(next)
+    setShowProfile(false)
+    if (!next || !token || unreadCount === 0) return
+    markNotificationsRead(token).then(() => {
+      setUnreadCount(0)
+      setNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })))
+    }).catch(() => {})
   }
 
   return (
@@ -109,14 +116,14 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
           {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
         </button>
         <div className="topbar-dropdown-wrap" ref={notifRef}>
-          <button className="icon-button" title="Notifications" onClick={() => { setShowNotifications(!showNotifications); setShowProfile(false) }}>
-            <Bell size={18} />{notifications.length > 0 && <span className="notification-dot" />}
+          <button className="icon-button" title="Notifications" onClick={toggleNotifications}>
+            <Bell size={18} />{unreadCount > 0 && <span className="notification-dot" />}
           </button>
           {showNotifications && (
             <div className="topbar-dropdown notification-dropdown">
               <div className="dropdown-header"><strong>{isId ? 'Notifikasi' : 'Notifications'}</strong></div>
-              {notificationsLoading ? <div className="dropdown-empty"><Loader2 size={15} className="spin" /> {isId ? 'Memuat...' : 'Loading...'}</div> : notifications.length === 0 ? <div className="dropdown-empty">{isId ? 'Belum ada aktivitas baru.' : 'No recent activity.'}</div> : notifications.map((entry) => (
-                <div className="dropdown-item" key={entry.id}><div className="dropdown-item-dot" /><div><small>{new Date(entry.createdAt).toLocaleString(isId ? 'id-ID' : 'en-US', { dateStyle: 'short', timeStyle: 'short' })}</small><p>{activityLabel(entry)}</p></div></div>
+              {notificationsLoading ? <div className="dropdown-empty"><Loader2 size={15} className="spin" /> {isId ? 'Memuat...' : 'Loading...'}</div> : notifications.length === 0 ? <div className="dropdown-empty">{isId ? 'Belum ada notifikasi.' : 'No notifications yet.'}</div> : notifications.map((entry) => (
+                <button className="dropdown-item" key={entry.id} onClick={() => { setShowNotifications(false); if (entry.href) navigate(entry.href) }}><div className="dropdown-item-dot" /><div><small>{new Date(entry.createdAt).toLocaleString(isId ? 'id-ID' : 'en-US', { dateStyle: 'short', timeStyle: 'short' })}</small><strong>{entry.title}</strong>{entry.body && <p>{entry.body}</p>}</div></button>
               ))}
             </div>
           )}

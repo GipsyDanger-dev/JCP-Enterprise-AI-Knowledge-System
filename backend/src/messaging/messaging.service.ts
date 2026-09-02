@@ -20,7 +20,7 @@ export class MessagingService {
           take: 50,
         },
         employee: {
-          select: { id: true, displayName: true, email: true, photoUrl: true },
+          select: { id: true, displayName: true, username: true, photoUrl: true },
         },
       },
     });
@@ -31,7 +31,7 @@ export class MessagingService {
         include: {
           messages: true,
           employee: {
-            select: { id: true, displayName: true, email: true, photoUrl: true },
+            select: { id: true, displayName: true, username: true, photoUrl: true },
           },
         },
       });
@@ -50,7 +50,7 @@ export class MessagingService {
       orderBy: { updatedAt: 'desc' },
       include: {
         employee: {
-          select: { id: true, displayName: true, email: true, photoUrl: true },
+          select: { id: true, displayName: true, username: true, photoUrl: true },
         },
       },
     });
@@ -59,7 +59,7 @@ export class MessagingService {
       id: conv.id,
       employeeId: conv.employeeId,
       employeeName: conv.employee.displayName,
-      employeeEmail: conv.employee.email,
+      employeeUsername: conv.employee.username ?? '',
       employeePhotoUrl: conv.employee.photoUrl,
       lastMessage: conv.lastMessage ?? '',
       lastMessageAt: conv.lastMessageAt?.toISOString() ?? conv.updatedAt.toISOString(),

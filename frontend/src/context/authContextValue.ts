@@ -6,7 +6,7 @@ export interface AuthContextValue {
   token: string | null
   /** true saat memulihkan sesi dari token tersimpan */
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (username: string, password: string) => Promise<void>
   logout: () => void
 }
 

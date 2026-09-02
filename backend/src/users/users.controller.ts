@@ -41,8 +41,8 @@ export class UsersController {
   @Post()
   @ApiOperation({ summary: 'Create an active ADMIN or USER account' })
   @ApiCreatedResponse({ description: 'Safe profile of the newly created user' })
-  @ApiBadRequestResponse({ description: 'Invalid email, name, password, or role' })
-  @ApiConflictResponse({ description: 'The email address is already registered' })
+  @ApiBadRequestResponse({ description: 'Invalid username, name, password, or role' })
+  @ApiConflictResponse({ description: 'The username is already registered' })
   create(@Body() input: CreateUserDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.usersService.create(input, actor);
   }

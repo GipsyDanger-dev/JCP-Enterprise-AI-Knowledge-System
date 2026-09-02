@@ -4,7 +4,7 @@ export interface AuditLogEntry {
   id: string
   actorType: string
   actorUserId: string
-  actorUser?: { id: string; displayName: string; email: string; role: string }
+  actorUser?: { id: string; displayName: string; username?: string | null; role: string }
   action: string
   targetType: string
   targetId: string

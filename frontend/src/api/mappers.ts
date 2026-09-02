@@ -46,6 +46,6 @@ function formatRelativeTime(iso: string): string {
   return `${day} ${month}, ${time}`
 }
 
-export function toDomainUser(user: ApiUser): { id: string; name: string; email: string; role: Role } {
-  return { id: user.id, name: user.displayName, email: user.email, role: toDomainRole(user.role) }
+export function toDomainUser(user: ApiUser): { id: string; name: string; username: string; role: Role } {
+  return { id: user.id, name: user.displayName, username: user.username, role: toDomainRole(user.role) }
 }

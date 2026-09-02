@@ -24,8 +24,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           setUser({
             id: profile.sub,
-            displayName: profile.displayName || profile.email,
-            email: profile.email,
+            displayName: profile.displayName || profile.username,
+            username: profile.username,
+            employeeNumber: profile.employeeNumber,
+            division: profile.division,
+            jobTitle: profile.jobTitle,
             role: profile.role,
             photoUrl: (profile as any).photoUrl,
           })
@@ -44,8 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true }
   }, [token])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const response = await apiLogin({ email, password })
+  const login = useCallback(async (username: string, password: string) => {
+    const response = await apiLogin({ username, password })
     localStorage.setItem(TOKEN_KEY, response.accessToken)
     setToken(response.accessToken)
     setUser(response.user)

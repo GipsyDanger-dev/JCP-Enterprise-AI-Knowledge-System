@@ -10,7 +10,10 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 const SAFE_USER_SELECT = {
   id: true,
-  email: true,
+  username: true,
+  employeeNumber: true,
+  division: true,
+  jobTitle: true,
   displayName: true,
   role: true,
   isActive: true,
@@ -35,7 +38,7 @@ export class UsersService {
   }
 
   async create(input: CreateUserDto, actor: AuthenticatedUser) {
-    const email = input.email.trim().toLowerCase();
+    const username = input.username.trim().toLowerCase();
     const displayName = input.displayName.trim();
     const passwordHash = await hashPassword(input.password);
 
@@ -43,7 +46,10 @@ export class UsersService {
       return await this.prisma.$transaction(async (transaction) => {
         const user = await transaction.user.create({
           data: {
-            email,
+            username,
+            employeeNumber: input.employeeNumber.trim().toUpperCase(),
+            division: input.division.trim(),
+            jobTitle: input.jobTitle.trim(),
             displayName,
             passwordHash,
             role: input.role ?? UserRole.USER,
@@ -57,13 +63,13 @@ export class UsersService {
           action: AuditAction.USER_CREATED,
           targetType: 'USER',
           targetId: user.id,
-          metadata: { email: user.email, role: user.role },
+          metadata: { username: user.username, role: user.role },
         });
         return user;
       });
     } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Email address is already registered');
+        throw new ConflictException('Username is already registered');
       }
       throw error;
     }
@@ -75,6 +81,10 @@ export class UsersService {
 
     const data: Prisma.UserUpdateInput = {};
     if (input.displayName !== undefined) data.displayName = input.displayName.trim();
+    if (input.username !== undefined) data.username = input.username.trim().toLowerCase();
+    if (input.employeeNumber !== undefined) data.employeeNumber = input.employeeNumber.trim().toUpperCase();
+    if (input.division !== undefined) data.division = input.division.trim();
+    if (input.jobTitle !== undefined) data.jobTitle = input.jobTitle.trim();
     if (input.role !== undefined) data.role = input.role;
     if (input.photoUrl !== undefined) data.photoUrl = input.photoUrl;
 
@@ -107,7 +117,7 @@ export class UsersService {
   }
 
   async remove(id: string, actor: AuthenticatedUser) {
-    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true, email: true } });
+    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true, username: true } });
     if (!user) throw new NotFoundException('User not found');
     if (id === actor.sub) throw new ConflictException('Cannot deactivate your own account');
 
@@ -122,7 +132,7 @@ export class UsersService {
         action: AuditAction.USER_UPDATED,
         targetType: 'USER',
         targetId: id,
-        metadata: { action: 'deactivated', email: user.email },
+        metadata: { action: 'deactivated', username: user.username },
       });
     });
 

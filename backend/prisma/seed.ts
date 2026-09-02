@@ -9,18 +9,19 @@ function requiredEnvironment(name: string): string {
   return value;
 }
 
-async function upsertUser(role: UserRole, emailName: string, passwordName: string, displayName: string) {
+async function upsertUser(role: UserRole, emailName: string, passwordName: string, displayName: string, employeeNumber: string, division: string, jobTitle: string) {
   const email = requiredEnvironment(emailName).toLowerCase();
+  const username = email.split('@', 1)[0];
   const password = requiredEnvironment(passwordName);
   if (password.length < 12) throw new Error(`${passwordName} must contain at least 12 characters`);
 
   const passwordHash = await hashPassword(password);
   await prisma.user.upsert({
     where: { email },
-    update: { displayName, isActive: true, passwordHash, role },
-    create: { displayName, email, isActive: true, passwordHash, role },
+    update: { displayName, username, employeeNumber, division, jobTitle, isActive: true, passwordHash, role },
+    create: { displayName, username, employeeNumber, division, jobTitle, email, isActive: true, passwordHash, role },
   });
-  console.log(`Seeded ${role}: ${email}`);
+  console.log(`Seeded ${role}: ${username}`);
 }
 
 async function main(): Promise<void> {
@@ -28,8 +29,8 @@ async function main(): Promise<void> {
   const userEmail = requiredEnvironment('SEED_USER_EMAIL').toLowerCase();
   if (adminEmail === userEmail) throw new Error('Seed admin and user emails must be different');
 
-  await upsertUser(UserRole.ADMIN, 'SEED_ADMIN_EMAIL', 'SEED_ADMIN_PASSWORD', 'Local Admin');
-  await upsertUser(UserRole.USER, 'SEED_USER_EMAIL', 'SEED_USER_PASSWORD', 'Local User');
+  await upsertUser(UserRole.ADMIN, 'SEED_ADMIN_EMAIL', 'SEED_ADMIN_PASSWORD', 'Local Admin', 'ADM-0001', 'Management', 'Administrator');
+  await upsertUser(UserRole.USER, 'SEED_USER_EMAIL', 'SEED_USER_PASSWORD', 'Local User', 'EMP-0001', 'Operations', 'Employee');
 }
 
 main()

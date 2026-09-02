@@ -9,6 +9,8 @@ import { HealthController } from './health.controller';
 import { MessagingModule } from './messaging/messaging.module';
 import { ProcessingJobsModule } from './processing-jobs/processing-jobs.module';
 import { UsersModule } from './users/users.module';
+import { RequiredReadingsModule } from './required-readings/required-readings.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { UsersModule } from './users/users.module';
     ChatModule,
     MessagingModule,
     AiModule,
+    RequiredReadingsModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
 })

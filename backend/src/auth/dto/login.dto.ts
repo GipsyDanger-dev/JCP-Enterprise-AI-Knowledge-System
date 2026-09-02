@@ -1,11 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsString, MaxLength, MinLength } from 'class-validator';
 
 export class LoginDto {
-  @ApiProperty({ example: 'admin@local.test' })
-  @IsEmail()
+  @ApiProperty({ example: 'admin' })
+  @IsString()
+  // Existing accounts without a username may still authenticate with their legacy email.
   @MaxLength(254)
-  email!: string;
+  username!: string;
 
   @ApiProperty({ example: 'your-password', minLength: 8 })
   @IsString()

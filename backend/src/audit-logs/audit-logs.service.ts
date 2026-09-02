@@ -52,7 +52,7 @@ export class AuditLogsService {
           actorUser: {
             select: {
               id: true,
-              email: true,
+              username: true,
               displayName: true,
               role: true,
             },

@@ -239,7 +239,7 @@ export function AdminInboxPage() {
                 {selectedConv.employeePhotoUrl ? <img className="inbox-item-avatar inbox-photo-avatar" src={selectedConv.employeePhotoUrl} alt={`${selectedConv.employeeName} profile`} /> : <span className="inbox-item-avatar">{userInitials(selectedConv.employeeName)}</span>}
                 <div>
                   <strong>{selectedConv.employeeName}</strong>
-                  <small>{selectedConv.employeeEmail}</small>
+                  <small>{selectedConv.employeeUsername ? `@${selectedConv.employeeUsername}` : ''}</small>
                 </div>
                 <span className="inbox-thread-status">{isId ? 'Aktif' : 'Active'}</span>
               </div>

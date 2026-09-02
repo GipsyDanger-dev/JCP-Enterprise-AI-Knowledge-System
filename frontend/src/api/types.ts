@@ -13,14 +13,17 @@ export type ApiRole = 'ADMIN' | 'USER'
 export interface ApiUser {
   id: string
   displayName: string
-  email: string
+  username: string
+  employeeNumber: string
+  division: string
+  jobTitle: string
   role: ApiRole
   isActive?: boolean
   photoUrl?: string | null
 }
 
 export interface LoginRequest {
-  email: string
+  username: string
   password: string
 }
 
@@ -33,21 +36,31 @@ export interface LoginResponse {
 /** Response aktual GET /auth/me adalah payload JWT secara langsung. */
 export interface MeResponse {
   sub: string
-  email: string
+  username: string
   displayName?: string
+  employeeNumber: string
+  division: string
+  jobTitle: string
   role: ApiRole
   photoUrl?: string | null
 }
 
 export interface CreateUserRequest {
   displayName: string
-  email: string
+  username: string
+  employeeNumber: string
+  division: string
+  jobTitle: string
   role: ApiRole
   password?: string
 }
 
 export interface UpdateUserRequest {
   displayName?: string
+  username?: string
+  employeeNumber?: string
+  division?: string
+  jobTitle?: string
   role?: ApiRole
   photoUrl?: string
 }
@@ -205,7 +218,7 @@ export interface DirectConversation {
   id: string
   employeeId: string
   employeeName: string
-  employeeEmail: string
+  employeeUsername: string
   employeePhotoUrl?: string | null
   adminPhotoUrl?: string | null
   lastMessage: string
