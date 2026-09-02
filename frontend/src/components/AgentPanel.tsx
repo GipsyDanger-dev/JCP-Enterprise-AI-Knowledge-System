@@ -5,7 +5,7 @@ import { SourceCard } from './SourceCard'
 import { VerifiedBadge } from './VerifiedBadge'
 
 export function AgentPanel() {
-  const { question, setQuestion, chatHistory, isLoadingAnswer, onAsk, askQuestion, language, documents } = useWorkspace()
+  const { question, setQuestion, chatHistory, isLoadingAnswer, awaitingChoice, onAsk, askQuestion, language, documents } = useWorkspace()
   const latestMessage = chatHistory[chatHistory.length - 1]
   const hasConversation = Boolean(latestMessage) || isLoadingAnswer
   const isId = language === 'id'
@@ -63,11 +63,13 @@ export function AgentPanel() {
         <input
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder={isId ? 'Tanyakan apa saja tentang ruang kerja Anda' : 'Ask anything about your workspace'}
+          placeholder={awaitingChoice
+            ? (isId ? 'Pilih salah satu pertanyaan di atas untuk melanjutkan' : 'Pick one of the questions above to continue')
+            : (isId ? 'Tanyakan apa saja tentang ruang kerja Anda' : 'Ask anything about your workspace')}
           aria-label={isId ? 'Tanyakan ke agen pengetahuan' : 'Ask the knowledge agent'}
-          disabled={isLoadingAnswer}
+          disabled={isLoadingAnswer || awaitingChoice}
         />
-        <button title={isId ? 'Kirim pertanyaan' : 'Send question'} disabled={isLoadingAnswer || !question.trim()}>
+        <button title={isId ? 'Kirim pertanyaan' : 'Send question'} disabled={isLoadingAnswer || awaitingChoice || !question.trim()}>
           {isLoadingAnswer ? <Loader2 size={17} className="spin" /> : <Send size={17} />}
         </button>
       </form>

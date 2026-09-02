@@ -134,6 +134,7 @@ export interface Citation {
 export interface ChatQueryRequest {
   question: string
   conversationId?: string
+  fromSuggestion?: boolean
 }
 
 export interface ChatQueryResponse {
@@ -142,6 +143,7 @@ export interface ChatQueryResponse {
   message?: string
   citations: Citation[]
   suggestions?: string[]
+  awaitingChoice?: boolean
 }
 
 export interface ConversationSummary {

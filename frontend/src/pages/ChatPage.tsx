@@ -108,7 +108,7 @@ function SuggestionList({ suggestions, onSelect }: { suggestions: string[]; onSe
 
 export function ChatPage() {
   const { token } = useAuth()
-  const { question, setQuestion, chatHistory, clearChat, isLoadingAnswer, onAsk, askQuestion, language, documents } = useWorkspace()
+  const { question, setQuestion, chatHistory, clearChat, isLoadingAnswer, awaitingChoice, onAsk, askQuestion, language, documents } = useWorkspace()
   const hasConversation = chatHistory.length > 0 || isLoadingAnswer
   const isId = language === 'id'
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -218,10 +218,12 @@ export function ChatPage() {
         <input
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder={isId ? 'Ajukan pertanyaan tentang pengetahuan perusahaan Anda' : 'Ask a question about your company knowledge'}
-          disabled={isLoadingAnswer}
+          placeholder={awaitingChoice
+            ? (isId ? 'Pilih salah satu pertanyaan di atas untuk melanjutkan' : 'Pick one of the questions above to continue')
+            : (isId ? 'Ajukan pertanyaan tentang pengetahuan perusahaan Anda' : 'Ask a question about your company knowledge')}
+          disabled={isLoadingAnswer || awaitingChoice}
         />
-        <button title={isId ? 'Kirim pertanyaan' : 'Send question'} disabled={isLoadingAnswer || !question.trim()}>
+        <button title={isId ? 'Kirim pertanyaan' : 'Send question'} disabled={isLoadingAnswer || awaitingChoice || !question.trim()}>
           {isLoadingAnswer ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
         </button>
       </form>

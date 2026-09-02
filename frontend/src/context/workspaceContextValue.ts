@@ -11,6 +11,7 @@ export interface ChatMessage {
   answer: string
   citations: Citation[]
   suggestions: string[]
+  awaitingChoice: boolean
   error: string | null
   timestamp: number
 }
@@ -26,6 +27,8 @@ export interface WorkspaceContextValue {
   chatHistory: ChatMessage[]
   clearChat: () => void
   isLoadingAnswer: boolean
+  // AI sedang menunggu pengguna memilih salah satu pertanyaan lanjutan.
+  awaitingChoice: boolean
   onAsk: (event: FormEvent) => void
   askQuestion: (value: string) => void
   triggerUpload: () => void

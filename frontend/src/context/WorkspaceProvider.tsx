@@ -196,7 +196,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const sendQuestion = async (q: string) => {
+  const sendQuestion = async (q: string, fromSuggestion = false) => {
     if (!q.trim()) return
     const messageId = `msg-${Date.now()}`
     setQuestion('')
@@ -207,17 +207,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       answer: '',
       citations: [],
       suggestions: [],
+      awaitingChoice: false,
       error: null,
       timestamp: Date.now(),
     }])
     setIsLoadingAnswer(true)
     try {
-      const res = await queryChat({ question: q, conversationId: conversationId ?? undefined }, token ?? undefined)
+      const res = await queryChat({ question: q, conversationId: conversationId ?? undefined, fromSuggestion }, token ?? undefined)
       setConversationId(res.conversationId)
       // Update the existing message with AI response
       setChatHistory((prev) => prev.map((msg) =>
         msg.id === messageId
-          ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, suggestions: res.suggestions ?? [], error: null }
+          ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, suggestions: res.suggestions ?? [], awaitingChoice: res.awaitingChoice ?? false, error: null }
           : msg
       ))
     } catch (err) {
@@ -236,9 +237,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     sendQuestion(question)
   }
 
+  // Dipakai hanya oleh tombol saran. Penandanya mematikan pertanyaan balik,
+  // supaya aplikasi tidak mempertanyakan usulannya sendiri.
   const askQuestion = (value: string) => {
     setQuestion(value)
-    sendQuestion(value)
+    sendQuestion(value, true)
   }
 
   const clearChat = useCallback(() => {
@@ -273,6 +276,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       isLoadingAnswer,
       onAsk,
       askQuestion,
+      // Terkunci selama pesan terakhir masih berupa pertanyaan balik dari AI.
+      awaitingChoice: chatHistory[chatHistory.length - 1]?.awaitingChoice ?? false,
       triggerUpload,
       onUpload,
       isUploading,
