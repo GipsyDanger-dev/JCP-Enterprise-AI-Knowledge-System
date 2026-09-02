@@ -12,6 +12,10 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
 export function RequireRole({ role, children }: { role: ApiRole; children: ReactNode }) {
   const { user } = useAuth()
-  if (!user || user.role !== role) return <Navigate to="/" replace />
+  const hasRole = user && (
+    user.role === role
+    || (role === 'ADMIN' && user.role === 'SUPER_ADMIN')
+  )
+  if (!hasRole) return <Navigate to="/" replace />
   return <>{children}</>
 }

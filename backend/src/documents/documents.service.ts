@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -9,8 +10,9 @@ import {
   AuditActorType,
   DocumentStatus,
   ProcessingJobStatus,
-  UserRole,
+  Prisma,
 } from '@prisma/client';
+import { isEmployeeRole } from '../auth/role.utils';
 import { createHash, randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -19,6 +21,10 @@ import { PrismaService } from '../database/prisma.service';
 import { DOCUMENT_STORAGE, DocumentStorage } from './document-storage.interface';
 import { UploadedDocumentFile, validateDocumentFile } from './document-file.validator';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
+
+const normalizeCategoryName = (value: string) => value.trim().replace(/\s+/g, ' ');
+const categoryKey = (value: string) => normalizeCategoryName(value).toLocaleLowerCase('id-ID');
 
 @Injectable()
 export class DocumentsService {
@@ -44,13 +50,14 @@ export class DocumentsService {
     const documentVersionId = randomUUID();
     const processingJobId = randomUUID();
     const title = input.title?.trim() || file.originalname.slice(0, -extname(file.originalname).length);
+    const collection = await this.resolveCollection(input.collection);
 
     await this.prisma.$transaction(async (transaction) => {
       await transaction.document.create({
         data: {
           id: documentId,
           title,
-          collection: input.collection?.trim() || 'Operations',
+          collection,
           status: DocumentStatus.QUEUED,
           uploadedById: actor.sub,
         },
@@ -97,7 +104,7 @@ export class DocumentsService {
     return {
       id: documentId,
       title,
-      collection: input.collection?.trim() || 'Operations',
+      collection,
       status: DocumentStatus.QUEUED,
       version: {
         id: documentVersionId,
@@ -114,11 +121,48 @@ export class DocumentsService {
     };
   }
 
+  async listCategories() {
+    return this.prisma.documentCategory.findMany({
+      select: { id: true, name: true, createdAt: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async createCategory(input: CreateDocumentCategoryDto) {
+    const name = normalizeCategoryName(input.name);
+    if (name.length < 2) throw new BadRequestException('Category name must contain at least 2 characters');
+    const key = categoryKey(name);
+    if (key === 'all') throw new BadRequestException('"All" is reserved for the document filter');
+    const existing = await this.prisma.documentCategory.findUnique({ where: { key }, select: { id: true } });
+    if (existing) throw new ConflictException('A category with this name already exists');
+
+    try {
+      return await this.prisma.documentCategory.create({
+        data: { id: randomUUID(), name, key },
+        select: { id: true, name: true, createdAt: true },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('A category with this name already exists');
+      }
+      throw error;
+    }
+  }
+
+  private async resolveCollection(input?: string) {
+    const key = input?.trim() ? categoryKey(input) : null;
+    const category = key
+      ? await this.prisma.documentCategory.findUnique({ where: { key }, select: { name: true } })
+      : await this.prisma.documentCategory.findFirst({ orderBy: { createdAt: 'asc' }, select: { name: true } });
+    if (!category) throw new BadRequestException('Select a valid document category');
+    return category.name;
+  }
+
   async findAll(actor: AuthenticatedUser) {
     const documents = await this.prisma.document.findMany({
       where: {
         deletedAt: null,
-        ...(actor.role === UserRole.USER ? { status: DocumentStatus.READY } : {}),
+        ...(isEmployeeRole(actor.role) ? { status: DocumentStatus.READY } : {}),
       },
       orderBy: { createdAt: 'desc' },
       select: {

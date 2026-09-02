@@ -10,6 +10,29 @@ datasource db {
 enum UserRole {
   ADMIN
   USER
+  SUPER_ADMIN
+  DINAS_PENDIDIKAN
+  DINAS_KESEHATAN
+  DINAS_PUPR
+  DINAS_SOSIAL
+  DISDUKCAPIL
+  SATPOL_PP
+  DINAS_PERHUBUNGAN
+  DINAS_LINGKUNGAN_HIDUP
+  DPMPTSP
+  DINAS_KOPERASI_UKM
+  DINAS_PARIWISATA
+  DINAS_PERTANIAN
+  DINAS_PERIKANAN
+  DISPERINDAG
+  DISNAKER
+  BAPPEDA
+  BKAD
+  BAPENDA
+  BKPSDM
+  BPBD
+  SETDA
+  INSPEKTORAT
 }
 
 enum DocumentStatus {
@@ -79,6 +102,7 @@ model User {
   sessions      Session[]
   requiredReadings RequiredReading[]
   notifications AppNotification[]
+  announcements Announcement[]
 
   @@map("users")
 }
@@ -99,6 +123,16 @@ model Document {
   @@index([status])
   @@index([uploadedById])
   @@map("documents")
+}
+
+model DocumentCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  key       String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([name])
+  @@map("document_categories")
 }
 
 model RequiredReading {
@@ -131,6 +165,22 @@ model AppNotification {
 
   @@index([userId, readAt, createdAt])
   @@map("app_notifications")
+}
+
+model Announcement {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String   @db.VarChar(180)
+  body        String   @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  publishedAt DateTime @default(now()) @map("published_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String   @map("created_by_id") @db.Uuid
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([isActive, publishedAt])
+  @@index([createdById])
+  @@map("announcements")
 }
 
 model DocumentVersion {

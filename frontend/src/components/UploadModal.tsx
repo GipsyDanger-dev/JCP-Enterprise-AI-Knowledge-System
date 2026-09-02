@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react'
-import { FileText, FolderOpen, LoaderCircle, Upload, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Check, FileText, FolderOpen, LoaderCircle, Plus, Upload, X } from 'lucide-react'
 import { uploadDocument } from '@/api/documents'
+import { createDocumentCategory, listDocumentCategories } from '@/api/documentCategories'
 import { errorMessage } from '@/api/client'
-import type { ApiDocument } from '@/api/types'
+import type { ApiDocument, ApiDocumentCategory } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
@@ -12,26 +13,39 @@ interface UploadModalProps {
   open: boolean
   onClose: () => void
   onUploaded: (document: ApiDocument) => void
+  onCategoryCreated?: (category: ApiDocumentCategory) => void
 }
 
-export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
+export function UploadModal({ open, onClose, onUploaded, onCategoryCreated }: UploadModalProps) {
   const { token } = useAuth()
   const { language } = useWorkspace()
   const isId = language === 'id'
   const fileRef = useRef<HTMLInputElement>(null)
-  const COLLECTIONS = [
-    { id: 'operations', label: 'Operations' },
-    { id: 'it-security', label: 'IT & Security' },
-    { id: 'finance', label: 'Finance' },
-    { id: 'people', label: 'People' },
-    { id: 'legal', label: 'Legal' },
-    { id: 'marketing', label: 'Marketing' },
-  ]
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
-  const [collection, setCollection] = useState('operations')
+  const [collection, setCollection] = useState('')
+  const [categories, setCategories] = useState<ApiDocumentCategory[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(false)
+  const [showCategoryForm, setShowCategoryForm] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [creatingCategory, setCreatingCategory] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open || !token) return
+    let active = true
+    setCategoriesLoading(true)
+    listDocumentCategories(token)
+      .then((items) => {
+        if (!active) return
+        setCategories(items)
+        setCollection((current) => items.some((item) => item.name === current) ? current : (items[0]?.name ?? ''))
+      })
+      .catch((err) => { if (active) setError(errorMessage(err)) })
+      .finally(() => { if (active) setCategoriesLoading(false) })
+    return () => { active = false }
+  }, [open, token])
 
   if (!open) return null
 
@@ -57,14 +71,14 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   }
 
   const handleUpload = async () => {
-    if (!file) return
+    if (!file || !collection) return
     setUploading(true)
     setError(null)
     try {
       const document = await uploadDocument(file, token ?? undefined, title, collection)
       setFile(null)
       setTitle('')
-      setCollection('operations')
+      setCollection(categories[0]?.name ?? '')
       onUploaded(document)
       onClose()
     } catch (err) {
@@ -78,9 +92,30 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     if (uploading) return
     setFile(null)
     setTitle('')
-    setCollection('operations')
+    setCollection(categories[0]?.name ?? '')
+    setShowCategoryForm(false)
+    setNewCategoryName('')
     setError(null)
     onClose()
+  }
+
+  const handleCreateCategory = async () => {
+    const name = newCategoryName.trim()
+    if (!name) return
+    setCreatingCategory(true)
+    setError(null)
+    try {
+      const category = await createDocumentCategory(name, token ?? undefined)
+      setCategories((items) => [...items, category].sort((a, b) => a.name.localeCompare(b.name)))
+      setCollection(category.name)
+      setNewCategoryName('')
+      setShowCategoryForm(false)
+      onCategoryCreated?.(category)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setCreatingCategory(false)
+    }
   }
 
   return (
@@ -125,18 +160,27 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
         <div className="upload-field">
           <label><FolderOpen size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Koleksi' : 'Collection'}</label>
           <div className="upload-collection-grid">
-            {COLLECTIONS.map((col) => (
+            {categories.map((category) => (
               <button
-                key={col.id}
+                key={category.id}
                 type="button"
-                className={`upload-collection-chip ${collection === col.id ? 'active' : ''}`}
-                onClick={() => setCollection(col.id)}
+                className={`upload-collection-chip ${collection === category.name ? 'active' : ''}`}
+                onClick={() => setCollection(category.name)}
                 disabled={uploading}
               >
-                {col.label}
+                {collection === category.name && <Check size={13} />}
+                {category.name}
               </button>
             ))}
+            <button type="button" className="upload-collection-add" onClick={() => setShowCategoryForm((shown) => !shown)} disabled={uploading || categoriesLoading}><Plus size={14} /> {isId ? 'Tambah kategori' : 'Add category'}</button>
           </div>
+          {categoriesLoading && <small className="upload-category-help">{isId ? 'Memuat kategori...' : 'Loading categories...'}</small>}
+          {!categoriesLoading && categories.length === 0 && <small className="upload-category-help">{isId ? 'Belum ada kategori. Tambahkan kategori pertama.' : 'No categories yet. Add the first category.'}</small>}
+          {showCategoryForm && <div className="upload-category-create">
+            <input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} maxLength={100} placeholder={isId ? 'Nama kategori baru' : 'New category name'} disabled={creatingCategory || uploading} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); handleCreateCategory() } }} />
+            <button type="button" className="secondary-button" onClick={() => { setShowCategoryForm(false); setNewCategoryName('') }} disabled={creatingCategory}>{isId ? 'Batal' : 'Cancel'}</button>
+            <button type="button" className="primary-button" onClick={handleCreateCategory} disabled={creatingCategory || newCategoryName.trim().length < 2}>{creatingCategory ? (isId ? 'Menyimpan...' : 'Saving...') : (isId ? 'Simpan' : 'Save')}</button>
+          </div>}
         </div>
 
         {error && <div className="upload-error-msg">{error}</div>}
@@ -144,7 +188,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
 
         <div className="modal-actions">
           <button className="secondary-button" onClick={handleClose} disabled={uploading}>{isId ? 'Batal' : 'Cancel'}</button>
-          <button className="primary-button" onClick={handleUpload} disabled={!file || uploading}>
+          <button className="primary-button" onClick={handleUpload} disabled={!file || !collection || uploading}>
             {uploading ? <><LoaderCircle size={15} className="spin" /> {isId ? 'Mengunggah…' : 'Uploading…'}</> : <><Upload size={15} /> {isId ? 'Unggah' : 'Upload'}</>}
           </button>
         </div>

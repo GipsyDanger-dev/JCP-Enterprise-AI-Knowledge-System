@@ -15,7 +15,7 @@ const FAQ_ID: FaqItem[] = [
   { question: 'Format file apa yang didukung?', answer: 'Saat ini kami mendukung file PDF (.pdf) dan Microsoft Word (.docx). Format lain akan ditambahkan di pembaruan mendatang.' },
   { question: 'Apa perbedaan peran Admin dan Karyawan?', answer: 'Admin memiliki akses penuh: mengunggah/menghapus dokumen, mengelola pengguna, dan melihat semua koleksi. Karyawan dapat menjelajahi perpustakaan pengetahuan, mengajukan pertanyaan AI, dan melihat koleksi yang dapat diakses.' },
   { question: 'Mengapa pertanyaan saya mengembalikan "Informasi tidak ditemukan"?', answer: 'Ini berarti AI tidak menemukan informasi yang relevan dalam dokumen yang diindeks. Coba rumuskan ulang pertanyaan Anda, atau periksa apakah dokumen yang relevan sudah diunggah dan diindeks.' },
-  { question: 'Bagaimana cara mengelola koleksi?', answer: 'Koleksi adalah kelompok organisasi untuk dokumen. Admin dapat menugaskan dokumen ke koleksi (Operations, IT & Security, People, Finance) saat pengunggahan atau melalui pengaturan dokumen.' },
+  { question: 'Bagaimana cara mengelola koleksi?', answer: 'Koleksi adalah kelompok organisasi untuk dokumen. Admin dapat membuat kategori baru dan memilihnya saat mengunggah dokumen.' },
 ]
 
 const FAQ_EN: FaqItem[] = [
@@ -24,7 +24,7 @@ const FAQ_EN: FaqItem[] = [
   { question: 'What file formats are supported?', answer: 'Currently we support PDF (.pdf) and Microsoft Word (.docx) files. More formats will be added in future updates.' },
   { question: 'What is the difference between Admin and Employee roles?', answer: 'Admins have full access: upload/delete documents, manage users, and view all collections. Employees can browse the knowledge library, ask AI questions, and view collections they have access to.' },
   { question: "Why does my question return 'Information not found'?", answer: 'This means the AI could not find relevant information in the indexed documents. Try rephrasing your question, or check if the relevant document has been uploaded and indexed.' },
-  { question: 'How do I manage collections?', answer: 'Collections are organizational groups for documents. Admins can assign documents to collections (Operations, IT & Security, People, Finance) during upload or via document settings.' },
+  { question: 'How do I manage collections?', answer: 'Collections organize documents. Admins can add a category and choose it while uploading a document.' },
 ]
 
 export function HelpPage() {

@@ -7,6 +7,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { MessagingService } from './messaging.service';
 import { UserRole } from '@prisma/client';
+import { isAdminRole } from '../auth/role.utils';
 
 @ApiTags('messaging')
 @ApiBearerAuth()
@@ -50,8 +51,8 @@ export class MessagingController {
     const content = body.content?.trim() ?? '';
     if (!content && (!Array.isArray(body.attachments) || body.attachments.length === 0)) throw new BadRequestException('content or attachment is required');
     if (content.length > 8000) throw new BadRequestException('content must not exceed 8000 characters');
-    const sender = actor.role === UserRole.ADMIN ? 'admin' : 'employee';
-    const senderName = actor.displayName ?? (actor.role === UserRole.ADMIN ? 'Admin' : 'Employee');
+    const sender = isAdminRole(actor.role) ? 'admin' : 'employee';
+    const senderName = actor.displayName ?? (isAdminRole(actor.role) ? 'Admin' : 'Employee');
     return this.messagingService.sendMessage(
       conversationId,
       sender,

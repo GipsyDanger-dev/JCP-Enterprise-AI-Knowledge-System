@@ -3,13 +3,14 @@ import {
   FolderOpen,
   LayoutDashboard,
   Library,
+  Megaphone,
   MessageSquareText,
   Users,
 } from 'lucide-react'
 
 export type { Citation } from '@/api/types'
 
-export type View = 'overview' | 'documents' | 'chat' | 'users'
+export type View = 'overview' | 'documents' | 'chat' | 'users' | 'announcements'
 export type Role = 'admin' | 'employee'
 export type DocumentStatus = 'Uploaded' | 'Ready' | 'Processing' | 'Queued' | 'Failed' | 'Deleted'
 
@@ -42,12 +43,14 @@ export function adminNavigation(lang: 'en' | 'id' = 'en'): NavigationItem[] {
         { id: 'overview', label: 'Ringkasan', icon: LayoutDashboard },
         { id: 'documents', label: 'Dokumen', icon: FolderOpen },
         { id: 'chat', label: 'Asisten AI', icon: MessageSquareText },
+        { id: 'announcements', label: 'Pengumuman', icon: Megaphone },
         { id: 'users', label: 'Orang & akses', icon: Users },
       ]
     : [
         { id: 'overview', label: 'Overview', icon: LayoutDashboard },
         { id: 'documents', label: 'Documents', icon: FolderOpen },
         { id: 'chat', label: 'AI Assistant', icon: MessageSquareText },
+        { id: 'announcements', label: 'Announcements', icon: Megaphone },
         { id: 'users', label: 'People & access', icon: Users },
       ]
 }
@@ -58,11 +61,13 @@ export function employeeNavigation(lang: 'en' | 'id' = 'en'): NavigationItem[] {
         { id: 'overview', label: 'Beranda', icon: LayoutDashboard },
         { id: 'chat', label: 'Tanya AI', icon: MessageSquareText },
         { id: 'documents', label: 'Perpustakaan pengetahuan', icon: Library },
+        { id: 'announcements', label: 'Pengumuman', icon: Megaphone },
       ]
     : [
         { id: 'overview', label: 'Home', icon: LayoutDashboard },
         { id: 'chat', label: 'Ask AI', icon: MessageSquareText },
         { id: 'documents', label: 'Knowledge library', icon: Library },
+        { id: 'announcements', label: 'Announcements', icon: Megaphone },
       ]
 }
 

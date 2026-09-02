@@ -1,9 +1,9 @@
 import type { ApiDocument, ApiDocumentStatus, ApiRole, ApiUser } from './types'
 import type { DocumentItem, DocumentStatus, Role } from '@/types/domain'
 
-/** API: ADMIN | USER → UI: admin | employee */
+/** API roles with administrative access map to the admin workspace. */
 export function toDomainRole(role: ApiRole): Role {
-  return role === 'ADMIN' ? 'admin' : 'employee'
+  return role === 'ADMIN' || role === 'SUPER_ADMIN' ? 'admin' : 'employee'
 }
 
 /** UI: admin | employee → API: ADMIN | USER */

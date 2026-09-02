@@ -8,7 +8,7 @@ export interface ApiErrorBody {
 }
 
 /* ============ Auth & Users ============ */
-export type ApiRole = 'ADMIN' | 'USER'
+export type ApiRole = 'ADMIN' | 'USER' | 'SUPER_ADMIN' | 'DINAS_PENDIDIKAN' | 'DINAS_KESEHATAN' | 'DINAS_PUPR' | 'DINAS_SOSIAL' | 'DISDUKCAPIL' | 'SATPOL_PP' | 'DINAS_PERHUBUNGAN' | 'DINAS_LINGKUNGAN_HIDUP' | 'DPMPTSP' | 'DINAS_KOPERASI_UKM' | 'DINAS_PARIWISATA' | 'DINAS_PERTANIAN' | 'DINAS_PERIKANAN' | 'DISPERINDAG' | 'DISNAKER' | 'BAPPEDA' | 'BKAD' | 'BAPENDA' | 'BKPSDM' | 'BPBD' | 'SETDA' | 'INSPEKTORAT'
 
 export interface ApiUser {
   id: string
@@ -155,6 +155,12 @@ export interface ChatQueryResponse {
   message?: string
   citations: Citation[]
   suggestions?: string[]
+}
+
+export interface ApiDocumentCategory {
+  id: string
+  name: string
+  createdAt: string
 }
 
 export interface ConversationSummary {
