@@ -1,5 +1,4 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 
@@ -9,7 +8,7 @@ export class MessagingService {
 
   /** Get or create a direct conversation between employee and admin */
   async getEmployeeConversation(employeeId: string, actor: AuthenticatedUser) {
-    if (actor.role !== UserRole.ADMIN && actor.sub !== employeeId) {
+    if (!actor.isAdmin && actor.sub !== employeeId) {
       throw new ForbiddenException('You can only access your own conversation');
     }
     let conv = await this.prisma.directConversation.findUnique({
@@ -154,12 +153,12 @@ export class MessagingService {
     if (!conv) return { success: true };
 
     // Admin clears employee's unread messages (> 0); Employee clears admin's unread messages (< 0)
-    if (actor.role === UserRole.ADMIN && conv.unreadCount > 0) {
+    if (actor.isAdmin && conv.unreadCount > 0) {
       await this.prisma.directConversation.update({
         where: { id: conversationId },
         data: { unreadCount: 0 },
       });
-    } else if (actor.role !== UserRole.ADMIN && conv.unreadCount < 0) {
+    } else if (!actor.isAdmin && conv.unreadCount < 0) {
       await this.prisma.directConversation.update({
         where: { id: conversationId },
         data: { unreadCount: 0 },
@@ -190,7 +189,7 @@ export class MessagingService {
       select: { employeeId: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
-    if (actor.role !== UserRole.ADMIN && conversation.employeeId !== actor.sub) {
+    if (!actor.isAdmin && conversation.employeeId !== actor.sub) {
       throw new ForbiddenException('You can only access your own conversation');
     }
     return conversation;
@@ -200,7 +199,7 @@ export class MessagingService {
     const message = await this.prisma.directMessage.findUnique({ where: { id: messageId } });
     if (!message) throw new NotFoundException('Message not found');
     await this.assertConversationAccess(message.conversationId, actor);
-    const expectedSender = actor.role === UserRole.ADMIN ? 'admin' : 'employee';
+    const expectedSender = actor.isAdmin ? 'admin' : 'employee';
     if (message.sender !== expectedSender) throw new ForbiddenException('You can only change your own messages');
     return message;
   }
@@ -222,7 +221,7 @@ export class MessagingService {
   }
 
   private async getAdminPhotoUrl() {
-    const admin = await this.prisma.user.findFirst({ where: { role: UserRole.ADMIN, isActive: true }, select: { photoUrl: true } });
+    const admin = await this.prisma.user.findFirst({ where: { isAdmin: true, isActive: true }, select: { photoUrl: true } });
     return admin?.photoUrl ?? null;
   }
 

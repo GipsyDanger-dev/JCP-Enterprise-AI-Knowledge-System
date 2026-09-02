@@ -14,7 +14,7 @@ import type { ApiUser } from '@/api/types'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
-const COLLECTIONS = ['All', 'Operations', 'IT & Security', 'Finance', 'People']
+const COLLECTIONS = ['All', 'BENDAHARA', 'SEKRETARIS', 'OPERASIONAL', 'HUMAS']
 
 const defaultDueDate = () => {
   const date = new Date()
@@ -218,12 +218,14 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
 }
 
 export function DocumentsPage() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const { documents, role, uploadError, removeDocument, registerUploadedDocument, language } = useWorkspace()
   const canManage = role === 'admin'
   const isId = language === 'id'
   const [searchParams, setSearchParams] = useSearchParams()
-  const initialCollection = searchParams.get('collection') ?? 'All'
+  // Non-admin: auto-filter by user's role. Admin: can pick any collection.
+  const userCollection = canManage ? null : (user?.role ?? null)
+  const initialCollection = searchParams.get('collection') ?? (userCollection ?? 'All')
   const initialQuery = searchParams.get('q') ?? ''
   const requestedDocumentId = searchParams.get('doc')
   const requiredReadingId = searchParams.get('reading')
@@ -262,10 +264,13 @@ export function DocumentsPage() {
   const filtered = useMemo(() => {
     return documents.filter((doc) => {
       const matchesQuery = doc.name.toLowerCase().includes(query.toLowerCase())
-      const matchesCollection = collection === 'All' || doc.collection === collection
+      // Non-admin: backend already filters by role, but also filter client-side as safety net
+      const matchesCollection = canManage
+        ? (collection === 'All' || doc.collection === collection)
+        : (doc.collection === userCollection)
       return matchesQuery && matchesCollection
     })
-  }, [documents, query, collection])
+  }, [documents, query, collection, canManage, userCollection])
   const divisions = useMemo(() => Array.from(new Set(employees.map((employee) => employee.division))).sort(), [employees])
   const visibleEmployees = selectedDivision ? employees.filter((employee) => employee.division === selectedDivision) : employees
 
@@ -313,20 +318,22 @@ export function DocumentsPage() {
       {uploadError && <div className="inline-alert" role="alert"><ShieldAlert size={15} /> {uploadError}</div>}
       <div className="table-toolbar">
         <div className="filter-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isId ? 'Cari dokumen' : 'Search documents'} /></div>
+        {canManage && (
         <div className="collection-dropdown-wrap">
           <button className="secondary-button" onClick={() => setShowCollections(!showCollections)}>
             <FolderOpen size={16} /> {collection} <ChevronDown size={14} />
           </button>
           {showCollections && (
             <div className="collection-dropdown">
-              {COLLECTIONS.map((c) => (
-                <button key={c} className={collection === c ? 'active' : ''} onClick={() => handleCollectionChange(c)}>
-                  {c === 'All' ? (isId ? 'Semua koleksi' : 'All collections') : c}
-                </button>
-              ))}
+            {COLLECTIONS.map((c) => (
+              <button key={c} className={collection === c ? 'active' : ''} onClick={() => handleCollectionChange(c)}>
+                {c === 'All' ? (isId ? 'Semua koleksi' : 'All collections') : c.replace(/_/g, ' ')}
+              </button>
+            ))}
             </div>
           )}
         </div>
+        )}
       </div>
       <div className="data-table">
         <table>

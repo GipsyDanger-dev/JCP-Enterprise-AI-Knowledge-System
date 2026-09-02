@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditAction, AuditActorType, Prisma, UserRole } from '@prisma/client';
+import { AuditAction, AuditActorType, Prisma } from '@prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { hashPassword } from '../auth/password.util';
@@ -16,6 +16,7 @@ const SAFE_USER_SELECT = {
   jobTitle: true,
   displayName: true,
   role: true,
+  isAdmin: true,
   isActive: true,
   photoUrl: true,
   lastLoginAt: true,
@@ -52,7 +53,7 @@ export class UsersService {
             jobTitle: input.jobTitle.trim(),
             displayName,
             passwordHash,
-            role: input.role ?? UserRole.USER,
+            role: input.role ?? 'OPERASIONAL',
             isActive: true,
           },
           select: SAFE_USER_SELECT,
@@ -86,6 +87,7 @@ export class UsersService {
     if (input.division !== undefined) data.division = input.division.trim();
     if (input.jobTitle !== undefined) data.jobTitle = input.jobTitle.trim();
     if (input.role !== undefined) data.role = input.role;
+    if (input.isAdmin !== undefined) data.isAdmin = input.isAdmin;
     if (input.photoUrl !== undefined) data.photoUrl = input.photoUrl;
 
     return this.prisma.$transaction(async (transaction) => {

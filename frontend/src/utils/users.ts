@@ -11,5 +11,5 @@ export function userInitials(name: string): string {
 }
 
 export function userRoleLabel(role: ApiRole): string {
-  return role === 'ADMIN' ? 'Admin' : 'Employee'
+  return role === 'SUPER_ADMIN' ? 'Admin' : role.replace(/_/g, ' ')
 }

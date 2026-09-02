@@ -38,10 +38,14 @@ export class UpdateUserDto {
   @MaxLength(100)
   displayName?: string;
 
-  @ApiPropertyOptional({ enum: UserRole, example: UserRole.USER })
+  @ApiPropertyOptional({ enum: UserRole, example: 'BAPPEDA' })
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  isAdmin?: boolean;
 
   @ApiPropertyOptional({ example: 'https://example.com/photo.jpg', maxLength: 220000 })
   @IsOptional()

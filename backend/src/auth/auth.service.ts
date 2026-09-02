@@ -29,7 +29,7 @@ export class AuthService {
     }
 
     const sessionId = randomUUID();
-    const payload: JwtPayload = { sub: user.id, username: user.username ?? user.email ?? '', role: user.role, displayName: user.displayName, sid: sessionId };
+    const payload: JwtPayload = { sub: user.id, username: user.username ?? user.email ?? '', role: user.role, isAdmin: user.isAdmin, displayName: user.displayName, sid: sessionId };
     const accessToken = await this.jwtService.signAsync(payload);
     
     const decodedToken = this.jwtService.decode(accessToken) as any;
@@ -58,7 +58,7 @@ export class AuthService {
           action: AuditAction.AUTH_LOGIN,
           targetType: 'USER',
           targetId: user.id,
-          metadata: { role: user.role } as any,
+          metadata: { role: user.role, isAdmin: user.isAdmin } as any,
         }
       });
     });
@@ -74,6 +74,7 @@ export class AuthService {
         division: user.division,
         jobTitle: user.jobTitle,
         role: user.role,
+        isAdmin: user.isAdmin,
       },
     };
   }
@@ -99,7 +100,7 @@ export class AuthService {
 
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return { sub: userId, username: '', employeeNumber: '', division: '', jobTitle: '', role: 'USER' };
+    if (!user) return { sub: userId, username: '', employeeNumber: '', division: '', jobTitle: '', role: 'OPERASIONAL', isAdmin: false };
     return {
       sub: user.id,
       username: user.username ?? user.email ?? '',
@@ -108,6 +109,7 @@ export class AuthService {
       division: user.division,
       jobTitle: user.jobTitle,
       role: user.role,
+      isAdmin: user.isAdmin,
       photoUrl: user.photoUrl,
     };
   }

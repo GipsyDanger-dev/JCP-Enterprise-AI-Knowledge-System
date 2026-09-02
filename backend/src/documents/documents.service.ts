@@ -9,7 +9,6 @@ import {
   AuditActorType,
   DocumentStatus,
   ProcessingJobStatus,
-  UserRole,
 } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
@@ -50,9 +49,9 @@ export class DocumentsService {
         data: {
           id: documentId,
           title,
-          collection: input.collection?.trim() || 'Operations',
-          status: DocumentStatus.QUEUED,
-          uploadedById: actor.sub,
+        collection: input.collection?.trim() || 'Umum',
+        status: DocumentStatus.QUEUED,
+        uploadedById: actor.sub,
         },
       });
       await transaction.documentVersion.create({
@@ -97,7 +96,7 @@ export class DocumentsService {
     return {
       id: documentId,
       title,
-      collection: input.collection?.trim() || 'Operations',
+      collection: input.collection?.trim() || 'Umum',
       status: DocumentStatus.QUEUED,
       version: {
         id: documentVersionId,
@@ -118,7 +117,7 @@ export class DocumentsService {
     const documents = await this.prisma.document.findMany({
       where: {
         deletedAt: null,
-        ...(actor.role === UserRole.USER ? { status: DocumentStatus.READY } : {}),
+        ...(!actor.isAdmin ? { status: DocumentStatus.READY, collection: actor.role } : {}),
       },
       orderBy: { createdAt: 'desc' },
       select: {

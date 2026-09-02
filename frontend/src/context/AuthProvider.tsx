@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             division: profile.division,
             jobTitle: profile.jobTitle,
             role: profile.role,
+            isAdmin: (profile as any).isAdmin ?? false,
             photoUrl: (profile as any).photoUrl,
           })
         }

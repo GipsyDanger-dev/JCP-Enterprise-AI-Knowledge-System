@@ -26,10 +26,9 @@ import {
   ApiPayloadTooLargeResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { AdminOnly, Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import {
@@ -47,7 +46,7 @@ export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   @Post()
-  @Roles(UserRole.ADMIN)
+  @AdminOnly()
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_FILE_SIZE, files: 1 } }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload a PDF or DOCX and queue it for processing' })
@@ -75,7 +74,6 @@ export class DocumentsController {
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'List document metadata without loading binary content' })
   @ApiOkResponse({ description: 'ADMIN sees active documents; USER sees only READY documents' })
   findAll(@CurrentUser() actor: AuthenticatedUser) {
@@ -83,7 +81,7 @@ export class DocumentsController {
   }
 
   @Get(':id/status')
-  @Roles(UserRole.ADMIN)
+  @AdminOnly()
   @ApiOperation({ summary: 'Get the latest processing status for a document' })
   @ApiOkResponse({ description: 'Document and latest job status' })
   @ApiNotFoundResponse({ description: 'Document not found' })
@@ -93,7 +91,6 @@ export class DocumentsController {
   }
 
   @Get(':id/chunks')
-  @Roles(UserRole.ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Get document chunks for preview' })
   @ApiOkResponse({ description: 'Document chunks with text content' })
   @ApiNotFoundResponse({ description: 'Document not found' })
@@ -102,7 +99,6 @@ export class DocumentsController {
   }
 
   @Get(':id/download')
-  @Roles(UserRole.ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Download the document binary file' })
   @ApiOkResponse({ description: 'Document binary content' })
   @ApiNotFoundResponse({ description: 'Document not found' })
@@ -118,7 +114,7 @@ export class DocumentsController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN)
+  @AdminOnly()
   @ApiOperation({ summary: 'Soft-delete metadata and remove the stored binary file' })
   @ApiOkResponse({ description: 'Document deleted and active processing job stopped' })
   @ApiNotFoundResponse({ description: 'Document not found' })

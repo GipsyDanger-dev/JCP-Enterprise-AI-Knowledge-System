@@ -126,7 +126,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         let count = 0
         let notifName: string | undefined
         let notifPreview: string | undefined
-        if (user.role === 'ADMIN') {
+        if (user.isAdmin) {
           const convs = await listConversations(token)
           if (!cancelled) {
             count = convs.reduce((sum, c) => sum + c.unreadCount, 0)

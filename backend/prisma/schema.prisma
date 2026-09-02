@@ -8,8 +8,16 @@ datasource db {
 }
 
 enum UserRole {
+  // Legacy (tidak dipakai, tetap ada di DB)
   ADMIN
   USER
+  // Super admin — akses semua dokumen
+  SUPER_ADMIN
+  // 4 Divisi utama
+  BENDAHARA
+  SEKRETARIS
+  OPERASIONAL
+  HUMAS
 }
 
 enum DocumentStatus {
@@ -66,7 +74,8 @@ model User {
   jobTitle      String         @map("job_title")
   passwordHash  String         @map("password_hash")
   displayName   String         @map("display_name")
-  role          UserRole       @default(USER)
+  role          UserRole       @default(SUPER_ADMIN)
+  isAdmin       Boolean        @default(false) @map("is_admin")
   isActive      Boolean        @default(true) @map("is_active")
   photoUrl      String?        @map("photo_url")
   lastLoginAt   DateTime?      @map("last_login_at")
@@ -86,7 +95,7 @@ model User {
 model Document {
   id           String            @id @default(uuid()) @db.Uuid
   title        String
-  collection   String?           @default("Operations")
+  collection   String?           @default("Umum")
   status       DocumentStatus    @default(UPLOADED)
   uploadedById String            @map("uploaded_by_id") @db.Uuid
   uploadedBy   User              @relation(fields: [uploadedById], references: [id], onDelete: Restrict)

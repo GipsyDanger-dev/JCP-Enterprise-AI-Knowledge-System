@@ -2,11 +2,10 @@ import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPip
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { AdminOnly } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { MessagingService } from './messaging.service';
-import { UserRole } from '@prisma/client';
 
 @ApiTags('messaging')
 @ApiBearerAuth()
@@ -26,7 +25,7 @@ export class MessagingController {
 
   /** Admin: list all conversations */
   @Get('conversations')
-  @Roles(UserRole.ADMIN)
+  @AdminOnly()
   listConversations() {
     return this.messagingService.listConversations();
   }
@@ -50,8 +49,8 @@ export class MessagingController {
     const content = body.content?.trim() ?? '';
     if (!content && (!Array.isArray(body.attachments) || body.attachments.length === 0)) throw new BadRequestException('content or attachment is required');
     if (content.length > 8000) throw new BadRequestException('content must not exceed 8000 characters');
-    const sender = actor.role === UserRole.ADMIN ? 'admin' : 'employee';
-    const senderName = actor.displayName ?? (actor.role === UserRole.ADMIN ? 'Admin' : 'Employee');
+    const sender = actor.isAdmin ? 'admin' : 'employee';
+    const senderName = actor.displayName ?? (actor.isAdmin ? 'Admin' : 'Employee');
     return this.messagingService.sendMessage(
       conversationId,
       sender,

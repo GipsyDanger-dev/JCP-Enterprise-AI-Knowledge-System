@@ -1,14 +1,14 @@
 import type { ApiDocument, ApiDocumentStatus, ApiRole, ApiUser } from './types'
 import type { DocumentItem, DocumentStatus, Role } from '@/types/domain'
 
-/** API: ADMIN | USER → UI: admin | employee */
+/** API role → UI role */
 export function toDomainRole(role: ApiRole): Role {
-  return role === 'ADMIN' ? 'admin' : 'employee'
+  return role === 'SUPER_ADMIN' ? 'admin' : 'employee'
 }
 
-/** UI: admin | employee → API: ADMIN | USER */
+/** UI role → API role */
 export function toApiRole(role: Role): ApiRole {
-  return role === 'admin' ? 'ADMIN' : 'USER'
+  return role === 'admin' ? 'SUPER_ADMIN' : 'SEKRETARIS'
 }
 
 /** Status dokumen Prisma uppercase → status tampilan UI. */

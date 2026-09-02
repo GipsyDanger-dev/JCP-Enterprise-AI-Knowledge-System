@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
-import type { ApiRole } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 
 export function RequireAuth({ children }: { children: ReactNode }) {
@@ -10,8 +9,12 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-export function RequireRole({ role, children }: { role: ApiRole; children: ReactNode }) {
+/**
+ * role="admin" → requires isAdmin flag (super admin)
+ */
+export function RequireRole({ role, children }: { role: 'admin' | 'user'; children: ReactNode }) {
   const { user } = useAuth()
-  if (!user || user.role !== role) return <Navigate to="/" replace />
+  if (!user) return <Navigate to="/" replace />
+  if (role === 'admin' && !user.isAdmin) return <Navigate to="/" replace />
   return <>{children}</>
 }

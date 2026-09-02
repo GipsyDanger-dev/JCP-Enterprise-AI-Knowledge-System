@@ -28,7 +28,7 @@ export function UsersPage() {
   const [formEmployeeNumber, setFormEmployeeNumber] = useState('')
   const [formDivision, setFormDivision] = useState('')
   const [formJobTitle, setFormJobTitle] = useState('')
-  const [formRole, setFormRole] = useState<ApiRole>('USER')
+  const [formRole, setFormRole] = useState<ApiRole>('OPERASIONAL')
   const [formPassword, setFormPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -40,7 +40,7 @@ export function UsersPage() {
   const [editEmployeeNumber, setEditEmployeeNumber] = useState('')
   const [editDivision, setEditDivision] = useState('')
   const [editJobTitle, setEditJobTitle] = useState('')
-  const [editRole, setEditRole] = useState<ApiRole>('USER')
+  const [editRole, setEditRole] = useState<ApiRole>('OPERASIONAL')
   const [editPhoto, setEditPhoto] = useState('')
   const [editPassword, setEditPassword] = useState('')
   const [editSaving, setEditSaving] = useState(false)
@@ -63,8 +63,8 @@ export function UsersPage() {
   useEffect(() => { loadUsers() }, [loadUsers])
 
   const filtered = filter === 'all' ? users : users.filter((u) => u.role === filter)
-  const adminCount = users.filter((u) => u.role === 'ADMIN').length
-  const employeeCount = users.filter((u) => u.role === 'USER').length
+  const adminCount = users.filter((u) => u.role === 'SUPER_ADMIN').length
+  const employeeCount = users.filter((u) => u.role !== 'SUPER_ADMIN').length
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
@@ -88,7 +88,7 @@ export function UsersPage() {
       setFormEmployeeNumber('')
       setFormDivision('')
       setFormJobTitle('')
-      setFormRole('USER')
+      setFormRole('OPERASIONAL')
       setFormPassword('')
     } catch (err) {
       setFormError(errorMessage(err))
@@ -149,6 +149,7 @@ export function UsersPage() {
         division: editDivision.trim(),
         jobTitle: editJobTitle.trim(),
         role: editRole,
+        isAdmin: editRole === 'SUPER_ADMIN',
         photoUrl: editPhoto || undefined,
       }, token ?? undefined)
       setUsers((prev) => prev.map((u) => u.id === updated.id ? updated : u))
@@ -181,10 +182,10 @@ export function UsersPage() {
         <button className={`filter-chip ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
           {isId ? 'Semua' : 'All'} ({users.length})
         </button>
-        <button className={`filter-chip ${filter === 'ADMIN' ? 'active' : ''}`} onClick={() => setFilter('ADMIN')}>
+        <button className={`filter-chip ${filter === 'SUPER_ADMIN' ? 'active' : ''}`} onClick={() => setFilter('SUPER_ADMIN')}>
           Admin ({adminCount})
         </button>
-        <button className={`filter-chip ${filter === 'USER' ? 'active' : ''}`} onClick={() => setFilter('USER')}>
+        <button className={`filter-chip ${filter !== 'SUPER_ADMIN' && filter !== 'all' ? 'active' : ''}`} onClick={() => setFilter('BAPPEDA')}>
           {isId ? 'Karyawan' : 'Employee'} ({employeeCount})
         </button>
       </div>
@@ -224,7 +225,7 @@ export function UsersPage() {
                     </div>
                   </td>
                   <td><span className={`role-badge ${user.role.toLowerCase()}`}>{userRoleLabel(user.role)}</span></td>
-                  <td>{user.role === 'ADMIN' ? (isId ? 'Akses penuh' : 'Full access') : (isId ? 'Perpustakaan pengetahuan' : 'Knowledge library')}</td>
+                  <td>{user.role === 'SUPER_ADMIN' ? (isId ? 'Akses penuh' : 'Full access') : (isId ? `Dokumen ${user.role.replace(/_/g, ' ')}` : `${user.role.replace(/_/g, ' ')} docs`)}</td>
                   <td>{user.isActive !== false
                     ? <span className="active-user"><Check size={13} /> {isId ? 'Aktif' : 'Active'}</span>
                     : <span className="inactive-user"><X size={13} /> {isId ? 'Nonaktif' : 'Inactive'}</span>
@@ -287,8 +288,11 @@ export function UsersPage() {
                   <label>{isId ? 'Role' : 'Role'}</label>
                   <div className="select-wrapper">
                     <select value={editRole} onChange={(e) => setEditRole(e.target.value as ApiRole)}>
-                      <option value="USER">Employee</option>
-                      <option value="ADMIN">Admin</option>
+                      <option value="SUPER_ADMIN">Super Admin</option>
+                      <option value="BENDAHARA">Bendahara</option>
+                      <option value="SEKRETARIS">Sekretaris</option>
+                      <option value="OPERASIONAL">Operasional</option>
+                      <option value="HUMAS">Humas</option>
                     </select>
                     <ChevronDown size={15} className="select-icon" />
                   </div>
@@ -375,8 +379,11 @@ export function UsersPage() {
                   <label htmlFor="user-role">Role</label>
                   <div className="select-wrapper">
                     <select id="user-role" value={formRole} onChange={(e) => setFormRole(e.target.value as ApiRole)}>
-                      <option value="USER">Employee</option>
-                      <option value="ADMIN">Admin</option>
+                      <option value="SUPER_ADMIN">Super Admin</option>
+                      <option value="BENDAHARA">Bendahara</option>
+                      <option value="SEKRETARIS">Sekretaris</option>
+                      <option value="OPERASIONAL">Operasional</option>
+                      <option value="HUMAS">Humas</option>
                     </select>
                     <ChevronDown size={15} className="select-icon" />
                   </div>

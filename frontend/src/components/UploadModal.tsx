@@ -20,16 +20,14 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const isId = language === 'id'
   const fileRef = useRef<HTMLInputElement>(null)
   const COLLECTIONS = [
-    { id: 'operations', label: 'Operations' },
-    { id: 'it-security', label: 'IT & Security' },
-    { id: 'finance', label: 'Finance' },
-    { id: 'people', label: 'People' },
-    { id: 'legal', label: 'Legal' },
-    { id: 'marketing', label: 'Marketing' },
+    { id: 'BENDAHARA', label: 'Bendahara' },
+    { id: 'SEKRETARIS', label: 'Sekretaris' },
+    { id: 'OPERASIONAL', label: 'Operasional' },
+    { id: 'HUMAS', label: 'Humas' },
   ]
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
-  const [collection, setCollection] = useState('operations')
+  const [collection, setCollection] = useState('OPERASIONAL')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,7 +62,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
       const document = await uploadDocument(file, token ?? undefined, title, collection)
       setFile(null)
       setTitle('')
-      setCollection('operations')
+      setCollection('OPERASIONAL')
       onUploaded(document)
       onClose()
     } catch (err) {
@@ -78,7 +76,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     if (uploading) return
     setFile(null)
     setTitle('')
-    setCollection('operations')
+    setCollection('OPERASIONAL')
     setError(null)
     onClose()
   }

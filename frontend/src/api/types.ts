@@ -8,7 +8,7 @@ export interface ApiErrorBody {
 }
 
 /* ============ Auth & Users ============ */
-export type ApiRole = 'ADMIN' | 'USER'
+export type ApiRole = 'SUPER_ADMIN' | 'ADMIN' | 'USER' | 'BENDAHARA' | 'SEKRETARIS' | 'OPERASIONAL' | 'HUMAS'
 
 export interface ApiUser {
   id: string
@@ -18,6 +18,7 @@ export interface ApiUser {
   division: string
   jobTitle: string
   role: ApiRole
+  isAdmin?: boolean
   isActive?: boolean
   photoUrl?: string | null
 }
@@ -30,7 +31,7 @@ export interface LoginRequest {
 export interface LoginResponse {
   accessToken: string
   tokenType: 'Bearer'
-  user: ApiUser
+  user: ApiUser & { isAdmin?: boolean }
 }
 
 /** Response aktual GET /auth/me adalah payload JWT secara langsung. */
@@ -42,6 +43,7 @@ export interface MeResponse {
   division: string
   jobTitle: string
   role: ApiRole
+  isAdmin?: boolean
   photoUrl?: string | null
 }
 
@@ -62,6 +64,7 @@ export interface UpdateUserRequest {
   division?: string
   jobTitle?: string
   role?: ApiRole
+  isAdmin?: boolean
   photoUrl?: string
 }
 
@@ -204,7 +207,7 @@ export interface MessageAttachment {
 export interface DirectMessage {
   id: string
   conversationId: string
-  sender: MessageSender
+  sender: MessageSender
   senderName: string | null
   content: string
   attachments: MessageAttachment[] | null

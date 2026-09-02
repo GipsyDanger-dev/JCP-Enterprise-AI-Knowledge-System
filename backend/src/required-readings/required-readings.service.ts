@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DocumentStatus, NotificationType, UserRole } from '@prisma/client';
+import { DocumentStatus, NotificationType } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -25,7 +25,7 @@ export class RequiredReadingsService {
     const dueAt = resolveDueAt(dueAtInput);
     const doc = await this.prisma.document.findFirst({ where: { id: documentId, deletedAt: null, status: DocumentStatus.READY }, select: { id: true, title: true } });
     if (!doc) throw new NotFoundException('Ready document not found');
-    const users = await this.prisma.user.findMany({ where: { id: { in: uniqueUserIds }, role: UserRole.USER, isActive: true }, select: { id: true, displayName: true, employeeNumber: true } });
+    const users = await this.prisma.user.findMany({ where: { id: { in: uniqueUserIds }, isAdmin: false, isActive: true }, select: { id: true, displayName: true, employeeNumber: true } });
     if (users.length === 0) throw new BadRequestException('No active employees were selected');
 
     const existing = await this.prisma.requiredReading.findMany({ where: { documentId, userId: { in: users.map((user) => user.id) } }, select: { userId: true } });
@@ -63,7 +63,7 @@ export class RequiredReadingsService {
     if (item.completedAt) return { id: item.id, progress: 100, completedAt: item.completedAt };
     if (item.progress < 95) throw new BadRequestException('Document has not been read to the end');
     const completed = await this.prisma.requiredReading.update({ where: { id }, data: { progress: 100, completedAt: new Date(), lastProgressAt: new Date() }, select: { id: true, progress: true, completedAt: true } });
-    const admins = await this.prisma.user.findMany({ where: { role: UserRole.ADMIN, isActive: true }, select: { id: true } });
+    const admins = await this.prisma.user.findMany({ where: { isAdmin: true, isActive: true }, select: { id: true } });
     await this.notifications.createMany(admins.map((admin) => ({ userId: admin.id, type: NotificationType.REQUIRED_READING_COMPLETED, title: 'Wajib baca diselesaikan', body: `${item.user.displayName} telah membaca ${item.document.title}.`, href: '/' })));
     return completed;
   }
