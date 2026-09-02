@@ -309,6 +309,43 @@ class PgVectorStore:
         }
         return [(1.0, chunks[chunk_id]) for chunk_id in ids if chunk_id in chunks]
 
+    def _answer_from_matches(self, query: str, matches: list[tuple[float, dict[str, Any]]],
+                             use_llm: bool = False, model: str = DEFAULT_MODEL,
+                             api_key: str | None = None, allow_clarify: bool = False) -> dict[str, Any]:
+        """Turn retrieved chunks into the answer payload.
+
+        Deliberately left outside the retrieval ``try`` blocks: a ProviderError
+        here means the LLM itself failed, which is not the same as "the answer
+        is not in the documents". It must reach http_api so the user is told the
+        AI service is unavailable instead of being wrongly told nothing matched.
+        """
+        citations = citations_from_matches(matches)
+        answer = (
+            generate_answer(
+                query, matches, model=model, api_key=api_key,
+                # Sifat berkas (halaman, ukuran, tanggal) tidak ada di dalam
+                # teks dokumen, jadi ikut dikirim sebagai konteks.
+                documents=self.document_metadata(),
+                allow_clarify=allow_clarify,
+            )
+            if use_llm
+            else matches[0][1]["text"]
+        )
+        clarify = parse_clarify(answer)
+        if clarify:
+            return clarify_response(clarify, query)
+        if is_no_answer(answer):
+            return no_answer_response()
+        return {
+            "answer": answer,
+            "citations": citations,
+            "grounded": True,
+            "retrieval": [
+                {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
+                for score, chunk in matches
+            ],
+        }
+
     def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False) -> dict[str, Any]:
         """TF-IDF fallback when vector search fails or finds nothing."""
         try:
@@ -343,37 +380,15 @@ class PgVectorStore:
             tfidf = TfidfRetriever(chunks)
             matches = tfidf.search(query, top_k=top_k)
             print(f"[AI] TF-IDF: {len(chunks)} chunks, {len(matches)} matches for '{query[:30]}'")
-            if not matches:
-                return no_answer_response()
-            citations = citations_from_matches(matches)
-            answer = (
-                generate_answer(
-                    query, matches, model=model, api_key=api_key,
-                    # Sifat berkas (halaman, ukuran, tanggal) tidak ada di dalam
-                    # teks dokumen, jadi ikut dikirim sebagai konteks.
-                    documents=self.document_metadata(),
-                    allow_clarify=allow_clarify,
-                )
-                if use_llm
-                else matches[0][1]["text"]
-            )
-            clarify = parse_clarify(answer)
-            if clarify:
-                return clarify_response(clarify, query)
-            if is_no_answer(answer):
-                return no_answer_response()
-            return {
-                "answer": answer,
-                "citations": citations,
-                "grounded": True,
-                "retrieval": [
-                    {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
-                    for score, chunk in matches
-                ],
-            }
         except Exception as exc:
-            print(f"[AI] TF-IDF fallback failed: {exc}")
+            print(f"[AI] TF-IDF retrieval failed: {exc}")
             return no_answer_response()
+        if not matches:
+            return no_answer_response()
+        return self._answer_from_matches(
+            query, matches, use_llm=use_llm, model=model,
+            api_key=api_key, allow_clarify=allow_clarify,
+        )
 
     # ---------- orchestration ----------
 
@@ -402,39 +417,19 @@ class PgVectorStore:
                 match for match in retrieved_matches if match[1]["chunk_id"] not in seen
             ]
             matches = matches[:top_k]
-            if not matches:
-                # Vector search found nothing above threshold, try TF-IDF fallback
-                print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
-                return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify)
-            citations = citations_from_matches(matches)
-            answer = (
-                generate_answer(
-                    query, matches, model=model, api_key=api_key,
-                    # Sifat berkas (halaman, ukuran, tanggal) tidak ada di dalam
-                    # teks dokumen, jadi ikut dikirim sebagai konteks.
-                    documents=self.document_metadata(),
-                    allow_clarify=allow_clarify,
-                )
-                if use_llm
-                else matches[0][1]["text"]
-            )
-            clarify = parse_clarify(answer)
-            if clarify:
-                return clarify_response(clarify, query)
-            if is_no_answer(answer):
-                return no_answer_response()
-            return {
-                "answer": answer,
-                "citations": citations,
-                "grounded": True,
-                "retrieval": [
-                    {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
-                    for score, chunk in matches
-                ],
-            }
         except Exception as exc:
+            # Only retrieval is guarded here. TF-IDF needs no embeddings, so it is
+            # a genuine fallback when the vector path fails.
             print(f"[AI] Vector search failed ({exc}), falling back to TF-IDF")
             return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify)
+        if not matches:
+            # Vector search found nothing above threshold, try TF-IDF fallback
+            print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify)
+        return self._answer_from_matches(
+            query, matches, use_llm=use_llm, model=model,
+            api_key=api_key, allow_clarify=allow_clarify,
+        )
 
 
 def content_hash(path: Path) -> str:
