@@ -2,7 +2,7 @@ import { authHeaders, request } from './client'
 
 export interface AppNotification {
   id: string
-  type: 'REQUIRED_READING_ASSIGNED' | 'REQUIRED_READING_COMPLETED'
+  type: 'REQUIRED_READING_ASSIGNED' | 'REQUIRED_READING_COMPLETED' | 'ANNOUNCEMENT_PUBLISHED'
   title: string
   body: string | null
   href: string | null
