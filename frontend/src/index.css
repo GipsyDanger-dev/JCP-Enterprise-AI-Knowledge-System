@@ -634,6 +634,7 @@ button { cursor: pointer; }
 .data-table tbody tr:hover { background: var(--bg-panel); }
 .document-name { display: flex; align-items: center; gap: 9px; color: var(--text-card); }
 .document-name > span { width: 30px; height: 30px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--brand-400); background: transparent; }
+.document-division-badge { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: var(--radius-pill); background: var(--violet-bg); color: var(--violet); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); vertical-align: middle; }
 .person-cell { display: flex; align-items: center; gap: 9px; }
 .person-cell strong, .person-cell small { display: block; }
 .person-cell strong { color: var(--text-card); font-size: var(--fs-sm); }

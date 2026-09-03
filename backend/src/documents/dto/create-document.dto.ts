@@ -14,4 +14,10 @@ export class CreateDocumentDto {
   @IsString()
   @MaxLength(100)
   collection?: string;
+
+  @ApiPropertyOptional({ description: 'Restrict visibility to this division (null = visible to everyone)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  division?: string;
 }

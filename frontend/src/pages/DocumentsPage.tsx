@@ -386,7 +386,7 @@ export function DocumentsPage() {
           ) : filtered.map((document) => (
             <tr key={document.id} className="clickable-row" onClick={() => setSelectedDoc(document)}>
               <td><div className="document-name"><span><FileText size={18} /></span><strong>{document.name}</strong></div></td>
-              <td>{document.collection}</td>
+              <td>{document.collection}{document.division && <span className="document-division-badge" title={isId ? `Terbatas untuk divisi ${document.division}` : `Restricted to ${document.division}`}>{document.division}</span>}</td>
               <td>{document.updatedAt}</td>
               <td><StatusBadge status={document.status} /></td>
               <td>{document.chunks ?? '—'}</td>

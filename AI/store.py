@@ -375,6 +375,35 @@ class PgVectorStore:
             return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key)
 
 
+def ingest_file_to_pg(
+    content: bytes,
+    filename: str,
+    store: PgVectorStore,
+    document_version_id: str,
+    embed: bool = True,
+    api_key: str | None = None,
+) -> list[dict[str, Any]]:
+    """Ingest one uploaded file (raw bytes) for an existing backend DocumentVersion.
+
+    The bytes are written to a temporary directory so the filename/checksum
+    validation in :func:`ingest_to_pg` can run unchanged; the temp dir is
+    cleaned up automatically. This is the transport used by the Backend so
+    both services no longer need to share a filesystem.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / filename
+        path.write_bytes(content)
+        return ingest_to_pg(
+            Path(tmp),
+            store,
+            document_version_id,
+            embed=embed,
+            api_key=api_key,
+        )
+
+
 def content_hash(path: Path) -> str:
     import hashlib
 

@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 try:
@@ -74,6 +76,36 @@ class HttpApiTests(unittest.TestCase):
     def test_delete_missing_document_is_404(self):
         response = self.client.delete("/documents/nggak_ada.pdf")
         self.assertEqual(response.status_code, 404)
+
+    def test_ingest_file_multipart_indexes_and_answers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            index = Path(tmp) / "kb.json"
+            with mock.patch.object(http_api, "DEFAULT_INDEX", index):
+                doc = "sop_upload_test.txt"
+                content = b"Karyawan berhak atas cuti tahunan 12 hari kerja setelah bekerja 1 tahun."
+                response = self.client.post(
+                    "/ingest-file",
+                    files={"file": (doc, content, "text/plain")},
+                    data={"embed": "false"},
+                )
+                self.assertEqual(response.status_code, 200)
+                body = response.json()
+                self.assertEqual(body["store"], "json")
+                self.assertEqual(body["documents"][0]["filename"], doc)
+
+                ask = self.client.post("/ask", json={"query": "Berapa hari cuti tahunan karyawan?"})
+                self.assertEqual(ask.status_code, 200)
+                ask_body = ask.json()
+                self.assertTrue(ask_body["grounded"])
+                self.assertIn("12 hari", ask_body["answer"])
+
+    def test_ingest_file_rejects_empty_content(self):
+        response = self.client.post(
+            "/ingest-file",
+            files={"file": ("empty.txt", b"", "text/plain")},
+            data={"embed": "false"},
+        )
+        self.assertEqual(response.status_code, 400)
 
     def test_provider_http_error_maps_to_safe_502(self):
         secret = "sk-provider-secret-value"

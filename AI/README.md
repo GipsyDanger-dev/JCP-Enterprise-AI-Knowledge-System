@@ -34,9 +34,7 @@ Sudah diperbaiki:
 
 Yang masih perlu diselesaikan:
 
-1. `/ingest` masih menerima `input_dir`; Backend belum mengirim binary `bytea`
-   atau multipart ke AI.
-2. Migration dan vector query belum diuji terhadap instance PostgreSQL nyata di
+1. Migration dan vector query belum diuji terhadap instance PostgreSQL nyata di
    environment ini.
 
 ## Aturan utama
@@ -129,13 +127,15 @@ Port `8001` hanya merupakan port yang diekspos ke host.
 | --- | --- | --- |
 | GET | `/health` | Status service dan store aktif |
 | POST | `/ask` | Retrieval dan grounded answer |
-| POST | `/ingest` | Ingestion satu file untuk `document_version_id` (kontrak sementara) |
+| POST | `/ingest-file` | Ingestion multipart: Backend mengirim binary file langsung |
+| POST | `/ingest` | Ingestion legacy via `input_dir` (standalone/JSON store) |
 | GET | `/documents` | Daftar dokumen yang telah diindeks |
 | DELETE | `/documents/{filename}` | Menghapus dokumen dan chunk terkait |
 
-Spesifikasi lengkap terdapat di `API_CONTRACT.md`. Pada PostgreSQL, endpoint
-`/ingest` wajib menerima `document_version_id` milik Backend dan tepat satu file
-dalam `input_dir`. Endpoint belum terhubung langsung dengan file `bytea` Backend.
+Spesifikasi lengkap terdapat di `API_CONTRACT.md`. `POST /ingest-file` adalah
+transport production: Backend membaca binary dari PostgreSQL `bytea` dan
+mengirimnya sebagai multipart, sehingga Backend dan AI tidak perlu berbagi
+filesystem (aman untuk container Docker terpisah).
 
 ## LLM dan embedding
 

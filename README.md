@@ -159,6 +159,20 @@ Documents:
 
 Backend tidak menggunakan MinIO untuk alur dokumen ini. Service MinIO di environment tetap dibiarkan sampai keputusan infrastructure diperbarui oleh owner DevOps.
 
+### Visibilitas dokumen per divisi
+
+Admin dapat membatasi dokumen ke satu divisi saat upload (field `division`).
+Karyawan hanya melihat dokumen `READY` yang bersifat publik atau milik
+divisinya; admin melihat semua dokumen. Download dan preview chunk menerapkan
+filter yang sama.
+
+### Transport file ke AI (multipart)
+
+`DocumentProcessorService` membaca binary dari PostgreSQL `bytea` lalu
+mengirimnya ke `POST /ingest-file` AI Service sebagai multipart. Backend dan AI
+tidak perlu berbagi filesystem, sehingga alur upload–ingest aman di Docker
+dengan container terpisah.
+
 ## Kontrak pemrosesan dokumen
 
 Backend menyediakan kontrak internal bagi worker milik AI Engineer. Kontrak ini hanya mengatur antrean, akses file, dan perubahan status; parsing, chunking, embedding, retrieval, dan LLM tidak diimplementasikan oleh Backend.
@@ -170,6 +184,19 @@ Semua endpoint berikut membutuhkan header `X-Worker-Token` yang nilainya sama de
 - `PATCH /internal/processing-jobs/:id/result` — menerima hasil `COMPLETED` atau `FAILED` dan memperbarui status dokumen menjadi `READY` atau `FAILED` secara transaksional.
 
 Nilai `WORKER_TOKEN` harus berbeda dari `JWT_SECRET` dan tidak boleh dikirim ke frontend atau disimpan di Git.
+
+## Messaging real-time (SSE)
+
+Pesan langsung karyawan ↔ admin memakai Server-Sent Events:
+
+- `GET /messaging/stream?token=...` — stream pesan baru, edit, hapus, dan
+  indikator mengetik (token lewat query karena EventSource tidak bisa
+  mengirim header Authorization).
+- `POST /messaging/:conversationId/typing` — menyiarkan status mengetik ke
+  lawan bicara.
+
+Frontend menggantikan polling 2 detik dengan stream ini; EventSource
+terhubung otomatis kembali jika koneksi terputus.
 
 ## Persistence percakapan
 

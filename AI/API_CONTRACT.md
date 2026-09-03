@@ -133,12 +133,48 @@ Aturan:
 - LLM tidak boleh membuat citation.
 - `retriever` hanya berpengaruh pada JSON store; pgvector selalu memakai vector.
 
-## 3. Ingest saat ini
+## 3. Ingest
 
-### `POST /ingest`
+### `POST /ingest-file` (multipart — transport production)
 
-Kontrak ini bersifat sementara dan hanya menerima direktori yang dapat dibaca
-oleh filesystem AI Service.
+Backend mengirim binary file sebagai multipart; kedua service tidak perlu
+berbagi filesystem (aman untuk Docker terpisah).
+
+Request multipart:
+
+```text
+file                  : binary (PDF/DOCX/TXT/MD)
+document_version_id   : UUID milik Backend (wajib pada store pgvector)
+embed                 : true | false (default true)
+model                 : embedding model opsional
+```
+
+Response `200`:
+
+```json
+{
+  "documents": [
+    {
+      "filename": "sop_perjalanan.txt",
+      "document_id": "document-id",
+      "document_version_id": "document-version-uuid",
+      "version": 1,
+      "num_chunks": 1,
+      "status": "indexed"
+    }
+  ],
+  "store": "pgvector"
+}
+```
+
+File tanpa nama menghasilkan HTTP `400`; body kosong juga `400`; tanpa field
+`file` FastAPI mengembalikan `422`. Pada PostgreSQL, `document_version_id`
+wajib berupa UUID dan nama file/checksum harus sesuai metadata Backend.
+
+### `POST /ingest` (JSON — legacy/standalone)
+
+Kontrak ini hanya menerima direktori yang dapat dibaca oleh filesystem AI
+Service (dipakai pengembangan standalone / JSON store).
 
 Request:
 
@@ -183,9 +219,7 @@ Direktori yang tidak ditemukan menghasilkan HTTP `400`:
 Keterbatasan:
 
 - Path dipahami dari sisi AI Service/container, bukan dari Backend atau browser.
-- Endpoint belum menerima file multipart atau binary dari PostgreSQL.
-- Endpoint PostgreSQL sudah menerima `document_version_id` Backend.
-- Kontrak ini belum sesuai untuk alur upload production MVP.
+- Untuk alur production Backend → AI, gunakan `POST /ingest-file` (multipart).
 
 ## 4. Daftar dokumen AI
 
@@ -298,7 +332,13 @@ mengubahnya menjadi error atau jawaban karangan.
 
 1. Terapkan migration `chunks` pada PostgreSQL development.
 2. Uji vector search dan metadata filter terhadap pgvector asli.
-3. Tetapkan endpoint ingestion file dan ukuran maksimal request.
-4. Tambahkan timeout serta penanganan error pada Backend AI client.
-5. Uji idempotency, delete cascade, no-answer, dan citation end-to-end.
-6. Perbarui version dokumen setelah kontrak transport file disepakati tim.
+3. Tambahkan timeout serta penanganan error pada Backend AI client.
+4. Uji idempotency, delete cascade, no-answer, dan citation end-to-end.
+5. Perbarui version dokumen setelah kontrak transport file disepakati tim.
+
+## Status transport file (diperbarui)
+
+`POST /ingest-file` (multipart) sudah diimplementasikan dan dipakai
+`DocumentProcessorService` Backend: Backend membaca binary dari PostgreSQL
+`bytea` lalu mengirimnya langsung ke AI, tanpa temp dir bersama. Kontrak
+`/ingest` JSON tetap tersedia untuk pengembangan standalone.

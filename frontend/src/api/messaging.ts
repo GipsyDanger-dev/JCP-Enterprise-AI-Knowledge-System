@@ -6,6 +6,30 @@ import type {
   SendMessageResponse,
 } from './types'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? `http://${window.location.hostname}:8000`
+
+export interface MessagingStreamEvent {
+  type: 'message.created' | 'message.updated' | 'message.deleted' | 'typing'
+  conversationId: string
+  message?: DirectMessage
+  messageId?: string
+  typing?: boolean
+  name?: string
+}
+
+/** Open a real-time SSE stream for the current user. Returns an unsubscribe function. */
+export function subscribeMessaging(token: string, onEvent: (event: MessagingStreamEvent) => void): () => void {
+  const source = new EventSource(`${API_BASE_URL}/messaging/stream?token=${encodeURIComponent(token)}`)
+  source.onmessage = (event) => {
+    try {
+      onEvent(JSON.parse(event.data) as MessagingStreamEvent)
+    } catch {
+      // ignore malformed events
+    }
+  }
+  return () => source.close()
+}
+
 /** Employee: get or create their conversation with admin */
 export function getEmployeeConversation(employeeId: string | number, token?: string): Promise<DirectConversation> {
   return request<DirectConversation>(`/messaging/employee/${employeeId}`, { headers: authHeaders(token) })
@@ -39,11 +63,13 @@ export function getAdminMessages(conversationId: string, token?: string): Promis
   return request<DirectMessage[]>(`/messaging/${conversationId}/messages`, { headers: authHeaders(token) })
 }
 
-/** Subscribe to typing state changes */
-export function onTypingChange(conversationId: string, listener: (typing: boolean) => void): () => void {
-  void conversationId
-  void listener
-  return () => { }
+/** Send the typing indicator state for a conversation. */
+export function sendTypingStatus(conversationId: string, typing: boolean, token?: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/messaging/${conversationId}/typing`, {
+    method: 'POST',
+    body: { typing },
+    headers: authHeaders(token),
+  })
 }
 
 /** Admin: send a message — sender determined by backend from JWT */

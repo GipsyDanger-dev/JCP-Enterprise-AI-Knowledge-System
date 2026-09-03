@@ -30,6 +30,7 @@ export function toDomainDocument(document: ApiDocument): DocumentItem {
     id: document.id,
     name: version?.originalFilename ?? document.title,
     collection: document.collection || 'Knowledge Base',
+    division: document.division ?? null,
     updatedAt: document.updatedAt ? formatRelativeTime(document.updatedAt) : 'Baru saja',
     status: toDomainDocumentStatus(document.status),
     chunks: version?.chunkCount ?? null,

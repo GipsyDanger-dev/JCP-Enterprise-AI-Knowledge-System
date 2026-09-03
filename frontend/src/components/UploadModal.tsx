@@ -24,6 +24,7 @@ export function UploadModal({ open, onClose, onUploaded, onCategoryCreated }: Up
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
   const [collection, setCollection] = useState('')
+  const [division, setDivision] = useState('')
   const [categories, setCategories] = useState<ApiDocumentCategory[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(false)
   const [showCategoryForm, setShowCategoryForm] = useState(false)
@@ -75,10 +76,11 @@ export function UploadModal({ open, onClose, onUploaded, onCategoryCreated }: Up
     setUploading(true)
     setError(null)
     try {
-      const document = await uploadDocument(file, token ?? undefined, title, collection)
+      const document = await uploadDocument(file, token ?? undefined, title, collection, division)
       setFile(null)
       setTitle('')
       setCollection(categories[0]?.name ?? '')
+      setDivision('')
       onUploaded(document)
       onClose()
     } catch (err) {
@@ -93,6 +95,7 @@ export function UploadModal({ open, onClose, onUploaded, onCategoryCreated }: Up
     setFile(null)
     setTitle('')
     setCollection(categories[0]?.name ?? '')
+    setDivision('')
     setShowCategoryForm(false)
     setNewCategoryName('')
     setError(null)
@@ -181,6 +184,17 @@ export function UploadModal({ open, onClose, onUploaded, onCategoryCreated }: Up
             <button type="button" className="secondary-button" onClick={() => { setShowCategoryForm(false); setNewCategoryName('') }} disabled={creatingCategory}>{isId ? 'Batal' : 'Cancel'}</button>
             <button type="button" className="primary-button" onClick={handleCreateCategory} disabled={creatingCategory || newCategoryName.trim().length < 2}>{creatingCategory ? (isId ? 'Menyimpan...' : 'Saving...') : (isId ? 'Simpan' : 'Save')}</button>
           </div>}
+        </div>        <div className="upload-field">
+          <label>{isId ? 'Batasi ke divisi (opsional)' : 'Restrict to division (optional)'}</label>
+          <input
+            id="upload-division"
+            value={division}
+            onChange={(event) => setDivision(event.target.value)}
+            placeholder={isId ? 'Kosongkan agar terlihat semua karyawan' : 'Leave empty so all employees can see it'}
+            disabled={uploading}
+            maxLength={100}
+          />
+          <small className="upload-category-help">{isId ? 'Hanya karyawan di divisi ini yang dapat melihat dokumen.' : 'Only employees in this division will be able to see the document.'}</small>
         </div>
 
         {error && <div className="upload-error-msg">{error}</div>}

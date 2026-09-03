@@ -12,7 +12,8 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const token = this.extractBearerToken(request.headers.authorization);
+    const token = this.extractBearerToken(request.headers.authorization)
+      ?? this.extractQueryToken(request.query?.token);
     if (!token) throw new UnauthorizedException('Authentication required');
 
     try {
@@ -34,11 +35,11 @@ export class JwtAuthGuard implements CanActivate {
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, email: true, username: true, role: true, isActive: true, displayName: true },
+        select: { id: true, email: true, username: true, role: true, isActive: true, displayName: true, division: true },
       });
 
       if (!user?.isActive) throw new UnauthorizedException('Authentication required');
-      request.user = { sub: user.id, username: user.username ?? user.email ?? '', role: user.role, displayName: user.displayName, sid: payload.sid };
+      request.user = { sub: user.id, username: user.username ?? user.email ?? '', role: user.role, displayName: user.displayName, division: user.division, sid: payload.sid };
       return true;
     } catch {
       throw new UnauthorizedException('Authentication required');
@@ -48,5 +49,10 @@ export class JwtAuthGuard implements CanActivate {
   private extractBearerToken(authorization?: string): string | undefined {
     const [type, token] = authorization?.trim().split(/\s+/) ?? [];
     return type?.toLowerCase() === 'bearer' ? token : undefined;
+  }
+
+  private extractQueryToken(value: string | string[] | undefined): string | undefined {
+    if (Array.isArray(value)) return value[0];
+    return value;
   }
 }

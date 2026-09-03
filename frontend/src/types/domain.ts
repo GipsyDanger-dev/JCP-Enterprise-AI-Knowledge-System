@@ -18,6 +18,7 @@ export interface DocumentItem {
   id: string
   name: string
   collection: string
+  division?: string | null
   updatedAt: string
   status: DocumentStatus
   chunks: number | null

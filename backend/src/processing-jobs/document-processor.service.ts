@@ -24,6 +24,8 @@ export class DocumentProcessorService implements OnModuleInit {
   private async processNext() {
     if (this.processing) return;
     this.processing = true;
+    let activeJobId: string | null = null;
+    let activeDocId: string | null = null;
 
     try {
       // Find oldest QUEUED job
@@ -39,6 +41,7 @@ export class DocumentProcessorService implements OnModuleInit {
             select: {
               id: true,
               originalFilename: true,
+              mimeType: true,
               document: { select: { id: true, title: true } },
             },
           },
@@ -50,8 +53,11 @@ export class DocumentProcessorService implements OnModuleInit {
         return;
       }
 
+      activeJobId = job.id;
+      activeDocId = job.documentVersion.document.id;
       const versionId = job.documentVersion.id;
       const filename = job.documentVersion.originalFilename;
+      const mimeType = job.documentVersion.mimeType ?? 'application/octet-stream';
       const docTitle = job.documentVersion.document.title;
       const docId = job.documentVersion.document.id;
 
@@ -71,27 +77,16 @@ export class DocumentProcessorService implements OnModuleInit {
       const fileContent = await this.storage.read(versionId);
       const content = Buffer.from(fileContent);
 
-      // Save to temp dir for AI engine ingestion
-      const { writeFileSync, mkdirSync, rmSync } = await import('node:fs');
-      const { join } = await import('node:path');
-      const tmpDir = join(process.cwd(), 'tmp', versionId);
-      mkdirSync(tmpDir, { recursive: true });
-      const filePath = join(tmpDir, filename);
-      writeFileSync(filePath, content);
+      // Stream the file to the AI service as multipart — no shared filesystem needed.
+      const form = new FormData();
+      form.append('file', new Blob([content], { type: mimeType }), filename);
+      form.append('document_version_id', versionId);
+      form.append('embed', 'true');
 
-      // Call AI engine /ingest
-      const ingestResponse = await fetch(`${this.aiBaseUrl}/ingest`, {
+      const ingestResponse = await fetch(`${this.aiBaseUrl}/ingest-file`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input_dir: tmpDir,
-          document_version_id: versionId,
-          embed: true,
-        }),
+        body: form,
       });
-
-      // Cleanup temp dir
-      rmSync(tmpDir, { recursive: true, force: true });
 
       if (!ingestResponse.ok) {
         const errorText = await ingestResponse.text();
@@ -116,15 +111,11 @@ export class DocumentProcessorService implements OnModuleInit {
     } catch (error) {
       this.logger.error(`❌ Processing failed: ${error instanceof Error ? error.message : error}`);
 
-      // Try to mark as FAILED
+      // Mark the exact failed job (if any) as FAILED
       try {
-        const jobId = await this.prisma.processingJob.findFirst({
-          where: { status: 'PROCESSING' },
-          select: { id: true, documentVersion: { select: { document: { select: { id: true } } } } },
-        });
-        if (jobId) {
+        if (activeJobId && activeDocId) {
           await this.prisma.processingJob.update({
-            where: { id: jobId.id },
+            where: { id: activeJobId },
             data: {
               status: 'FAILED',
               errorMessage: error instanceof Error ? error.message : 'Unknown error',
@@ -132,7 +123,7 @@ export class DocumentProcessorService implements OnModuleInit {
             },
           });
           await this.prisma.document.update({
-            where: { id: jobId.documentVersion.document.id },
+            where: { id: activeDocId },
             data: { status: 'FAILED' },
           });
         }
@@ -141,4 +132,4 @@ export class DocumentProcessorService implements OnModuleInit {
       this.processing = false;
     }
   }
-}
+}

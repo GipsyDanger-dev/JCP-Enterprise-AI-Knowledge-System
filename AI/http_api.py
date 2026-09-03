@@ -24,7 +24,7 @@ from typing import Any
 from uuid import UUID
 
 try:
-    from fastapi import FastAPI, HTTPException
+    from fastapi import FastAPI, File, Form, HTTPException, UploadFile
     from pydantic import BaseModel
 except ImportError:  # pragma: no cover - optional dependency
     raise RuntimeError(
@@ -35,7 +35,7 @@ from config import DEFAULT_MODEL, EMBEDDING_MODEL
 from generation.guardrails import QUICK_SUGGESTIONS, is_out_of_scope, out_of_scope_response
 from knowledge_base import KnowledgeBase
 from provider_errors import ProviderError
-from store import PgVectorStore, default_dsn, ingest_to_pg
+from store import PgVectorStore, default_dsn, ingest_file_to_pg, ingest_to_pg
 
 PROJECT_DIR = Path(__file__).resolve().parent
 DEFAULT_INDEX = PROJECT_DIR / "knowledge_base.json"
@@ -269,6 +269,67 @@ def ingest_documents(request: IngestRequest) -> dict[str, Any]:
         ingest(input_dir, DEFAULT_INDEX, embed=request.embed)
     except ProviderError as error:
         raise provider_http_error(error) from None
+    kb = KnowledgeBase.load(DEFAULT_INDEX)
+    return {
+        "documents": [
+            {"filename": d["filename"], "document_id": d["document_id"],
+             "version": d["version"], "num_chunks": d["num_chunks"]}
+            for d in kb.documents
+        ],
+        "store": "json",
+    }
+
+
+@app.post("/ingest-file", response_model=IngestResponse)
+async def ingest_file(
+    file: UploadFile = File(...),
+    document_version_id: UUID | None = Form(None),
+    embed: bool = Form(True),
+    model: str | None = Form(None),
+) -> dict[str, Any]:
+    """Ingest one uploaded file sent as multipart from the Backend.
+
+    This is the production transport: the Backend streams the binary file
+    directly, so the two services do not need to share a filesystem.
+    """
+    if file.filename is None or not file.filename.strip():
+        raise HTTPException(status_code=400, detail="file must have a filename")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="file is empty")
+
+    store = current_store()
+    if isinstance(store, PgVectorStore):
+        if document_version_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="document_version_id is required for PostgreSQL ingestion",
+            )
+        try:
+            documents = ingest_file_to_pg(
+                content,
+                file.filename,
+                store,
+                str(document_version_id),
+                embed=embed,
+                api_key=os.environ.get("SUMOPOD_API_KEY"),
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except ProviderError as error:
+            raise provider_http_error(error) from None
+        return {"documents": documents, "store": "pgvector"}
+
+    # JSON store: write the uploaded file to a temp dir and reuse the CLI path.
+    import tempfile
+    from knowledge_base import ingest
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        target = Path(tmp_dir) / file.filename
+        target.write_bytes(content)
+        try:
+            ingest(Path(tmp_dir), DEFAULT_INDEX, embed=embed)
+        except ProviderError as error:
+            raise provider_http_error(error) from None
     kb = KnowledgeBase.load(DEFAULT_INDEX)
     return {
         "documents": [

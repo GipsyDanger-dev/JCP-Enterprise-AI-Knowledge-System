@@ -100,6 +100,7 @@ export interface ApiDocument {
   id: string
   title: string
   collection?: string
+  division?: string | null
   status: ApiDocumentStatus
   createdAt?: string
   updatedAt?: string

@@ -58,6 +58,7 @@ export class DocumentsService {
           id: documentId,
           title,
           collection,
+          division: input.division?.trim() || null,
           status: DocumentStatus.QUEUED,
           uploadedById: actor.sub,
         },
@@ -105,6 +106,7 @@ export class DocumentsService {
       id: documentId,
       title,
       collection,
+      division: input.division?.trim() || null,
       status: DocumentStatus.QUEUED,
       version: {
         id: documentVersionId,
@@ -162,7 +164,12 @@ export class DocumentsService {
     const documents = await this.prisma.document.findMany({
       where: {
         deletedAt: null,
-        ...(isEmployeeRole(actor.role) ? { status: DocumentStatus.READY } : {}),
+        ...(isEmployeeRole(actor.role)
+          ? {
+              status: DocumentStatus.READY,
+              OR: [{ division: null }, { division: actor.division ?? null }],
+            }
+          : {}),
       },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -253,9 +260,18 @@ export class DocumentsService {
     };
   }
 
-  async download(id: string) {
+  async download(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(isEmployeeRole(actor.role)
+          ? {
+              status: DocumentStatus.READY,
+              OR: [{ division: null }, { division: actor.division ?? null }],
+            }
+          : {}),
+      },
       select: {
         versions: {
           orderBy: { versionNumber: 'desc' },
@@ -274,9 +290,18 @@ export class DocumentsService {
     };
   }
 
-  async getChunks(id: string) {
+  async getChunks(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(isEmployeeRole(actor.role)
+          ? {
+              status: DocumentStatus.READY,
+              OR: [{ division: null }, { division: actor.division ?? null }],
+            }
+          : {}),
+      },
       select: {
         id: true,
         title: true,

@@ -1,11 +1,21 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { ADMIN_ROLE_VALUES, isAdminRole } from '../auth/role.utils';
 import { PrismaService } from '../database/prisma.service';
+import { MessagingEventsService, MessagingStreamEvent } from './messaging-events.service';
 
 @Injectable()
 export class MessagingService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: MessagingEventsService,
+  ) { }
+
+  /** SSE stream for the authenticated user (employee) or the shared admin channel. */
+  stream(actor: AuthenticatedUser): Observable<MessagingStreamEvent> {
+    return this.events.stream(actor.sub, isAdminRole(actor.role));
+  }
 
   /** Get or create a direct conversation between employee and admin */
   async getEmployeeConversation(employeeId: string, actor: AuthenticatedUser) {
@@ -123,6 +133,11 @@ export class MessagingService {
       nextUnread = currentUnread > 0 ? -1 : currentUnread - 1;
     }
 
+    const conversation = await this.prisma.directConversation.findUnique({
+      where: { id: convId },
+      select: { employeeId: true },
+    });
+
     await this.prisma.directConversation.update({
       where: { id: convId },
       data: {
@@ -132,16 +147,14 @@ export class MessagingService {
       },
     });
 
-    return {
-      id: msg.id,
-      conversationId: msg.conversationId,
-      sender: msg.sender,
-      senderName: msg.senderName,
-      content: msg.content,
-      attachments: msg.attachments,
-      editedAt: msg.editedAt?.toISOString() ?? null,
-      createdAt: msg.createdAt.toISOString(),
-    };
+    const serialized = this.serializeMessage(msg);
+    this.events.emitToConversation(conversation?.employeeId ?? actor.sub, {
+      type: 'message.created',
+      conversationId: convId,
+      message: serialized,
+    });
+
+    return serialized;
   }
 
   /** Reset unread count for current actor */
@@ -174,14 +187,50 @@ export class MessagingService {
       where: { id: message.id }, data: { content, editedAt: new Date() },
     }).then(async (created) => ({ ...created, adminPhotoUrl: await this.getAdminPhotoUrl() }));
     await this.refreshConversationPreview(message.conversationId);
-    return this.serializeMessage(updated);
+    const serialized = this.serializeMessage(updated);
+    const conversation = await this.prisma.directConversation.findUnique({
+      where: { id: message.conversationId },
+      select: { employeeId: true },
+    });
+    this.events.emitToConversation(conversation?.employeeId ?? actor.sub, {
+      type: 'message.updated',
+      conversationId: message.conversationId,
+      message: serialized,
+    });
+    return serialized;
   }
 
   async deleteMessage(messageId: string, actor: AuthenticatedUser) {
     const message = await this.getOwnedMessage(messageId, actor);
     await this.prisma.directMessage.delete({ where: { id: message.id } });
     await this.refreshConversationPreview(message.conversationId);
+    const conversation = await this.prisma.directConversation.findUnique({
+      where: { id: message.conversationId },
+      select: { employeeId: true },
+    });
+    this.events.emitToConversation(conversation?.employeeId ?? actor.sub, {
+      type: 'message.deleted',
+      conversationId: message.conversationId,
+      messageId: message.id,
+    });
     return { success: true, id: message.id };
+  }
+
+  /** Broadcast typing state to the other side of a conversation. */
+  async setTyping(conversationId: string, typing: boolean, actor: AuthenticatedUser) {
+    const conversation = await this.assertConversationAccess(conversationId, actor);
+    const event: MessagingStreamEvent = {
+      type: 'typing',
+      conversationId,
+      typing,
+      name: actor.displayName ?? (isAdminRole(actor.role) ? 'Admin' : 'Employee'),
+    };
+    if (isAdminRole(actor.role)) {
+      this.events.emitToEmployee(conversation.employeeId, event);
+    } else {
+      this.events.emitToAdmins(event);
+    }
+    return { success: true };
   }
 
   private async assertConversationAccess(conversationId: string, actor: AuthenticatedUser) {

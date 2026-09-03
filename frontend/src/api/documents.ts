@@ -5,11 +5,12 @@ export function listDocuments(token?: string): Promise<ApiDocument[]> {
   return request<ApiDocument[]>('/documents', { headers: authHeaders(token) })
 }
 
-export function uploadDocument(file: File, token?: string, title?: string, collection?: string): Promise<ApiDocument> {
+export function uploadDocument(file: File, token?: string, title?: string, collection?: string, division?: string): Promise<ApiDocument> {
   const form = new FormData()
   form.append('file', file)
   if (title?.trim()) form.append('title', title.trim())
   if (collection?.trim()) form.append('collection', collection.trim())
+  if (division?.trim()) form.append('division', division.trim())
   return request<ApiDocument>('/documents', { method: 'POST', body: form, headers: authHeaders(token) })
 }
 

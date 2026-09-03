@@ -3,7 +3,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { getEmployeeConversation, getDirectMessages, sendDirectMessage, editDirectMessage, deleteDirectMessage, onTypingChange, markConversationAsRead } from '@/api/messaging'
+import { getEmployeeConversation, getDirectMessages, sendDirectMessage, editDirectMessage, deleteDirectMessage, sendTypingStatus, subscribeMessaging, markConversationAsRead } from '@/api/messaging'
 import { errorMessage } from '@/api/client'
 import type { DirectMessage, MessageAttachment } from '@/api/types'
 import { MessageList } from '@/components/MessageList'
@@ -53,31 +53,23 @@ export function MessagingPage() {
 
   const prevMsgCountRef = useRef(0)
 
-  // Keep the employee conversation current without requiring a browser refresh.
+  // Real-time updates via SSE — no polling needed.
   useEffect(() => {
-    if (!conversationId || !token) return
-    let cancelled = false
-    const refreshMessages = () => {
-      getDirectMessages(conversationId, token)
-        .then((msgs) => {
-          if (!cancelled) {
-            setMessages((prev) => {
-              if (prev.length === msgs.length && prev[prev.length - 1]?.id === msgs[msgs.length - 1]?.id) {
-                return prev
-              }
-              return msgs
-            })
-            markConversationAsRead(conversationId, token).catch(() => {})
-            setUnreadMessages(0)
-          }
-        })
-        .catch((err) => { if (!cancelled) setError(errorMessage(err)) })
-    }
-    const interval = window.setInterval(refreshMessages, 2_000)
-    return () => {
-      cancelled = true
-      window.clearInterval(interval)
-    }
+    if (!token) return
+    return subscribeMessaging(token, (event) => {
+      if (event.conversationId !== conversationId) return
+      if (event.type === 'message.created' && event.message) {
+        setMessages((prev) => prev.some((msg) => msg.id === event.message?.id) ? prev : [...prev, event.message!])
+        markConversationAsRead(conversationId, token).catch(() => {})
+        setUnreadMessages(0)
+      } else if (event.type === 'message.updated' && event.message) {
+        setMessages((prev) => prev.map((msg) => msg.id === event.message?.id ? event.message! : msg))
+      } else if (event.type === 'message.deleted' && event.messageId) {
+        setMessages((prev) => prev.filter((msg) => msg.id !== event.messageId))
+      } else if (event.type === 'typing') {
+        setIsTyping(Boolean(event.typing))
+      }
+    })
   }, [conversationId, token, setUnreadMessages])
 
   // Reset unread count when opening messages
@@ -85,11 +77,21 @@ export function MessagingPage() {
     setUnreadMessages(0)
   }, [setUnreadMessages])
 
-  // Subscribe to typing state
-  useEffect(() => {
-    if (!conversationId) return
-    return onTypingChange(conversationId, setIsTyping)
-  }, [conversationId])
+  // Broadcast typing while composing; stop 2.5s after the last keystroke.
+  const typingTimerRef = useRef<number | null>(null)
+  const notifyTyping = () => {
+    if (!conversationId || !token) return
+    sendTypingStatus(conversationId, true, token).catch(() => {})
+    if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current)
+    typingTimerRef.current = window.setTimeout(() => {
+      sendTypingStatus(conversationId, false, token).catch(() => {})
+      typingTimerRef.current = null
+    }, 2500)
+  }
+  useEffect(() => () => {
+    if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current)
+    if (conversationId && token) sendTypingStatus(conversationId, false, token).catch(() => {})
+  }, [conversationId, token])
 
   // Auto scroll only when new messages are added or on first load
   useEffect(() => {
@@ -164,6 +166,7 @@ export function MessagingPage() {
 
       <MessageComposer
         onSend={handleSend}
+        onTyping={notifyTyping}
         disabled={sending || loading}
         placeholder={isId ? 'Ketik pesan ke admin…' : 'Type a message to admin…'}
         isId={isId}

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, Sse, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -6,6 +6,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { MessagingService } from './messaging.service';
+import { MessagingStreamEvent } from './messaging-events.service';
+import { Observable } from 'rxjs';
 import { UserRole } from '@prisma/client';
 import { isAdminRole } from '../auth/role.utils';
 
@@ -74,6 +76,22 @@ export class MessagingController {
   @Delete('messages/:messageId')
   deleteMessage(@Param('messageId', new ParseUUIDPipe({ version: '4' })) messageId: string, @CurrentUser() actor: AuthenticatedUser) {
     return this.messagingService.deleteMessage(messageId, actor);
+  }
+
+  /** Real-time event stream (messages, edits, deletes, typing). */
+  @Sse('stream')
+  stream(@CurrentUser() actor: AuthenticatedUser): Observable<MessagingStreamEvent> {
+    return this.messagingService.stream(actor);
+  }
+
+  /** Broadcast typing state to the other side of a conversation. */
+  @Post(':conversationId/typing')
+  setTyping(
+    @Param('conversationId', new ParseUUIDPipe({ version: '4' })) conversationId: string,
+    @Body() body: { typing: boolean },
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.messagingService.setTyping(conversationId, Boolean(body.typing), actor);
   }
 
   /** Reset unread count */

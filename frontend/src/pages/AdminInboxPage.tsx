@@ -3,7 +3,7 @@ import { ArrowLeft, Loader2, MessageSquareText } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { listConversations, getAdminMessages, sendAdminMessage, editDirectMessage, deleteDirectMessage, onTypingChange, markConversationAsRead } from '@/api/messaging'
+import { listConversations, getAdminMessages, sendAdminMessage, editDirectMessage, deleteDirectMessage, sendTypingStatus, subscribeMessaging, markConversationAsRead } from '@/api/messaging'
 import { errorMessage } from '@/api/client'
 import type { DirectConversation, DirectMessage, MessageAttachment } from '@/api/types'
 import { userInitials } from '@/utils/users'
@@ -47,22 +47,38 @@ export function AdminInboxPage() {
 
   useEffect(() => { loadConversations() }, [loadConversations])
 
-  // Polling keeps the inbox list current for messages sent by employees.
+  // Real-time SSE keeps the inbox list and the open thread current.
   useEffect(() => {
     if (!token) return
-    const interval = window.setInterval(() => {
-      listConversations(token)
-        .then((data) => {
-          if (selectedConv) {
-            setConversations(data.map((c) => (c.id === selectedConv.id ? { ...c, unreadCount: 0 } : c)))
-          } else {
-            setConversations(data)
+    return subscribeMessaging(token, (event) => {
+      if (event.type === 'typing') {
+        if (selectedConv?.id === event.conversationId) setIsTyping(Boolean(event.typing))
+        return
+      }
+      if (event.type === 'message.created' && event.message) {
+        setConversations((prev) => {
+          const existing = prev.find((c) => c.id === event.conversationId)
+          const updated = {
+            lastMessage: event.message!.content || '(attachment)',
+            lastMessageAt: event.message!.createdAt,
+            unreadCount: selectedConv?.id === event.conversationId ? 0 : (existing?.unreadCount ?? 0) + 1,
           }
+          return existing
+            ? prev.map((c) => c.id === event.conversationId ? { ...c, ...updated } : c)
+            : prev
         })
-        .catch((err) => setError(errorMessage(err)))
-    }, 2_000)
-    return () => window.clearInterval(interval)
-  }, [token, selectedConv])
+        if (selectedConv?.id === event.conversationId) {
+          setMessages((prev) => prev.some((msg) => msg.id === event.message?.id) ? prev : [...prev, event.message!])
+          markConversationAsRead(event.conversationId, token).catch(() => {})
+          setUnreadMessages(0)
+        }
+      } else if (event.type === 'message.updated' && event.message && selectedConv?.id === event.conversationId) {
+        setMessages((prev) => prev.map((msg) => msg.id === event.message?.id ? event.message! : msg))
+      } else if (event.type === 'message.deleted' && event.messageId && selectedConv?.id === event.conversationId) {
+        setMessages((prev) => prev.filter((msg) => msg.id !== event.messageId))
+      }
+    })
+  }, [token, selectedConv?.id, setUnreadMessages])
 
   // Load messages when conversation selected & mark as read
   useEffect(() => {
@@ -82,46 +98,27 @@ export function AdminInboxPage() {
 
   const prevMsgCountRef = useRef(0)
 
-  // Refresh the selected thread so employee replies appear without a reload.
-  useEffect(() => {
-    if (!selectedConv || !token) return
-    let cancelled = false
-    const refreshMessages = () => {
-      getAdminMessages(selectedConv.id, token)
-        .then((msgs) => {
-          if (!cancelled) {
-            setMessages((prev) => {
-              if (prev.length === msgs.length && prev[prev.length - 1]?.id === msgs[msgs.length - 1]?.id) {
-                return prev
-              }
-              return msgs
-            })
-            markConversationAsRead(selectedConv.id, token).catch(() => {})
-            setConversations((prev) =>
-              prev.map((c) => (c.id === selectedConv.id ? { ...c, unreadCount: 0 } : c))
-            )
-          }
-        })
-        .catch((err) => { if (!cancelled) setError(errorMessage(err)) })
-    }
-    const interval = window.setInterval(refreshMessages, 2_000)
-    return () => {
-      cancelled = true
-      window.clearInterval(interval)
-    }
-  }, [selectedConv, token])
-
   // Reset message count ref when changing conversation
   useEffect(() => {
     prevMsgCountRef.current = 0
   }, [selectedConv?.id])
 
-  // Subscribe to typing state
-  useEffect(() => {
-    if (!selectedConv) return
-    setIsTyping(false)
-    return onTypingChange(selectedConv.id, setIsTyping)
-  }, [selectedConv])
+  // Broadcast typing while composing; stop 2.5s after the last keystroke.
+  const typingTimerRef = useRef<number | null>(null)
+  const notifyTyping = () => {
+    if (!selectedConv || !token) return
+    sendTypingStatus(selectedConv.id, true, token).catch(() => {})
+    if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current)
+    typingTimerRef.current = window.setTimeout(() => {
+      sendTypingStatus(selectedConv.id, false, token).catch(() => {})
+      typingTimerRef.current = null
+    }, 2500)
+  }
+  const selectedConvId = selectedConv?.id
+  useEffect(() => () => {
+    if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current)
+    if (selectedConvId && token) sendTypingStatus(selectedConvId, false, token).catch(() => {})
+  }, [selectedConvId, token])
 
   // Auto scroll only when new messages are added or on initial conversation load
   useEffect(() => {
@@ -261,6 +258,7 @@ export function AdminInboxPage() {
               {/* Composer */}
               <MessageComposer
                 onSend={handleSend}
+                onTyping={notifyTyping}
                 disabled={sending || loadingMessages}
                 placeholder={isId ? 'Balas pesan…' : 'Type a reply…'}
                 isId={isId}

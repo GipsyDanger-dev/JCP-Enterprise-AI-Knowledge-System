@@ -5,12 +5,13 @@ import type { MessageAttachment } from '@/api/types'
 
 interface MessageComposerProps {
   onSend: (content: string, attachments: MessageAttachment[]) => void
+  onTyping?: () => void
   disabled?: boolean
   placeholder?: string
   isId: boolean
 }
 
-export function MessageComposer({ onSend, disabled, placeholder, isId }: MessageComposerProps) {
+export function MessageComposer({ onSend, onTyping, disabled, placeholder, isId }: MessageComposerProps) {
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<MessageAttachment[]>([])
   const [uploading, setUploading] = useState(false)
@@ -105,7 +106,7 @@ export function MessageComposer({ onSend, disabled, placeholder, isId }: Message
         </button>
         <input
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => { setInput(e.target.value); onTyping?.() }}
           placeholder={placeholder ?? (isId ? 'Ketik pesan…' : 'Type a message…')}
           disabled={disabled}
         />

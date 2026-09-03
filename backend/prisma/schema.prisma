@@ -115,6 +115,7 @@ model Document {
   id           String            @id @default(uuid()) @db.Uuid
   title        String
   collection   String?           @default("Operations")
+  division     String?           @map("division")
   status       DocumentStatus    @default(UPLOADED)
   uploadedById String            @map("uploaded_by_id") @db.Uuid
   uploadedBy   User              @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
