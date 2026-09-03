@@ -27,6 +27,29 @@ export class NotificationsService {
     return { ok: true };
   }
 
+  /** Jumlah notifikasi belum dibaca untuk satu tipe (mis. badge pengumuman). */
+  countUnreadByType(userId: string, type: NotificationType) {
+    return this.prisma.appNotification.count({ where: { userId, type, readAt: null } });
+  }
+
+  /** Notifikasi belum dibaca paling baru untuk satu tipe. */
+  latestUnreadByType(userId: string, type: NotificationType) {
+    return this.prisma.appNotification.findFirst({
+      where: { userId, type, readAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: { title: true, body: true },
+    });
+  }
+
+  /** Tandai terbaca hanya untuk satu tipe, tanpa mengganggu notifikasi lain. */
+  async markReadByType(userId: string, type: NotificationType) {
+    const { count } = await this.prisma.appNotification.updateMany({
+      where: { userId, type, readAt: null },
+      data: { readAt: new Date() },
+    });
+    return { ok: true, count };
+  }
+
   createMany(items: NotificationInput[]) {
     if (items.length === 0) return Promise.resolve({ count: 0 });
     return this.prisma.appNotification.createMany({ data: items });

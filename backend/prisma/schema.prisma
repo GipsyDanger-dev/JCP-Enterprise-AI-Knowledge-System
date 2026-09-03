@@ -63,6 +63,7 @@ enum AuditAction {
 enum NotificationType {
   REQUIRED_READING_ASSIGNED
   REQUIRED_READING_COMPLETED
+  ANNOUNCEMENT_PUBLISHED
 }
 
 model User {
