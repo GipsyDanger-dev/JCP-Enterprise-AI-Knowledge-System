@@ -10,7 +10,7 @@ export interface ApiErrorBody {
 /* ============ Auth & Users ============ */
 // SUPER_ADMIN dan PEGAWAI adalah tingkat wewenang yang dipakai sekarang.
 // Sisanya nilai lama yang masih mungkin tersimpan di akun lawas.
-export type ApiRole = 'SUPER_ADMIN' | 'PEGAWAI' | 'ADMIN' | 'USER' | 'BENDAHARA' | 'SEKRETARIS' | 'OPERASIONAL' | 'HUMAS'
+export type ApiRole = 'SUPER_ADMIN' | 'ADMIN_UNIT' | 'PEGAWAI' | 'ADMIN' | 'USER' | 'BENDAHARA' | 'SEKRETARIS' | 'OPERASIONAL' | 'HUMAS'
 
 export interface ApiUnitKerja {
   id: string
@@ -122,6 +122,9 @@ export interface ApiDocument {
   id: string
   title: string
   collection?: string
+  category?: { id: string; name: string } | null
+  /** Bila terisi, dokumen ini hanya untuk unit kerja tersebut. */
+  unitKerja?: ApiUnitKerja | null
   status: ApiDocumentStatus
   createdAt?: string
   updatedAt?: string

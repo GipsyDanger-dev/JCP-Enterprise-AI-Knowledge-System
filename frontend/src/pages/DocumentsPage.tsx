@@ -4,17 +4,16 @@ import { ArrowUpRight, BookOpenCheck, CheckCircle2, ChevronDown, Download, FileT
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { UploadModal } from '@/components/UploadModal'
-import { downloadDocument, getDocumentBlob, getDocumentChunks, type DocumentChunk } from '@/api/documents'
+import { downloadDocument, getDocumentBlob, getDocumentChunks, listDocumentCategories, type DocumentChunk } from '@/api/documents'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import type { DocumentItem } from '@/types/domain'
+import type { ApiDocumentCategory } from '@/api/types'
 import { assignRequiredReading, completeRequiredReading, listMyRequiredReadings, requiredReadingReport, updateRequiredReadingProgress, type RequiredReadingReport } from '@/api/requiredReadings'
 import { listUsers } from '@/api/users'
 import type { ApiUser } from '@/api/types'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-
-const COLLECTIONS = ['All', 'BENDAHARA', 'SEKRETARIS', 'OPERASIONAL', 'HUMAS']
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
 
@@ -225,20 +224,21 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
 }
 
 export function DocumentsPage() {
-  const { token, user } = useAuth()
+  const { token } = useAuth()
   const { documents, role, uploadError, removeDocument, registerUploadedDocument, language } = useWorkspace()
   const canManage = role === 'admin'
   const isId = language === 'id'
   const [searchParams, setSearchParams] = useSearchParams()
-  // Non-admin: auto-filter by user's role. Admin: can pick any collection.
-  const userCollection = canManage ? null : (user?.role ?? null)
-  const initialCollection = searchParams.get('collection') ?? (userCollection ?? 'All')
+  const initialCollection = searchParams.get('collection') ?? 'All'
   const initialQuery = searchParams.get('q') ?? ''
   const requestedDocumentId = searchParams.get('doc')
   const requestedAssignmentDocumentId = searchParams.get('assign')
   const requiredReadingId = searchParams.get('reading')
   const [query, setQuery] = useState(initialQuery)
   const [collection, setCollection] = useState(initialCollection)
+  // Kategori datang dari server dan sudah tersaring: hanya yang benar-benar
+  // bisa diakses pengguna ini yang ikut terkirim.
+  const [categories, setCategories] = useState<ApiDocumentCategory[]>([])
   const [showCollections, setShowCollections] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null)
   const [showUpload, setShowUpload] = useState(false)
@@ -284,16 +284,29 @@ export function DocumentsPage() {
     return () => { active = false }
   }, [assignmentDoc, token])
 
+  useEffect(() => {
+    let batal = false
+    listDocumentCategories(token ?? undefined)
+      .then((data) => {
+        if (batal) return
+        setCategories(data)
+        // Satu kategori berarti tidak ada yang bisa dipilih: langsung jadikan
+        // lingkupnya, supaya judul filter menerangkan isi daftar apa adanya.
+        if (data.length === 1) setCollection(data[0].name)
+      })
+      .catch(() => { if (!batal) setCategories([]) })
+    return () => { batal = true }
+  }, [token])
+
   const filtered = useMemo(() => {
     return documents.filter((doc) => {
       const matchesQuery = doc.name.toLowerCase().includes(query.toLowerCase())
-      // Non-admin: backend already filters by role, but also filter client-side as safety net
-      const matchesCollection = canManage
-        ? (collection === 'All' || doc.collection === collection)
-        : (doc.collection === userCollection)
+      // Pembatasan siapa-boleh-lihat-apa sudah dilakukan backend. Di sini murni
+      // penyaringan tampilan, jadi aturannya sama untuk admin maupun pegawai.
+      const matchesCollection = collection === 'All' || doc.collection === collection
       return matchesQuery && matchesCollection
     })
-  }, [documents, query, collection, canManage, userCollection])
+  }, [documents, query, collection])
   const divisions = useMemo(() => Array.from(new Set(employees.map((employee) => employee.division))).sort(), [employees])
   const visibleEmployees = selectedDivision ? employees.filter((employee) => employee.division === selectedDivision) : employees
   const assignedEmployeeIds = useMemo(() => new Set((readingReport.find((item) => item.documentId === assignmentDoc?.id)?.readers ?? []).map((reader) => reader.userId)), [assignmentDoc?.id, readingReport])
@@ -362,18 +375,30 @@ export function DocumentsPage() {
       {uploadError && <div className="inline-alert" role="alert"><ShieldAlert size={15} /> {uploadError}</div>}
       <div className="table-toolbar">
         <div className="filter-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isId ? 'Cari dokumen' : 'Search documents'} /></div>
-        {canManage && (
+        {/* Tanpa kategori yang bisa diakses, filternya tidak ditampilkan sama
+            sekali. Dengan tepat satu kategori, pilihan "Semua" dibuang karena
+            hasilnya akan persis sama dengan kategori itu sendiri. */}
+        {categories.length > 0 && (
         <div className="collection-dropdown-wrap">
           <button className="secondary-button" onClick={() => setShowCollections(!showCollections)}>
-            <FolderOpen size={16} /> {collection} <ChevronDown size={14} />
+            <FolderOpen size={16} />
+            {collection === 'All' ? (isId ? 'Semua kategori' : 'All categories') : collection}
+            {categories.length > 1 && <ChevronDown size={14} />}
           </button>
-          {showCollections && (
+          {showCollections && categories.length > 1 && (
             <div className="collection-dropdown">
-            {COLLECTIONS.map((c) => (
-              <button key={c} className={collection === c ? 'active' : ''} onClick={() => handleCollectionChange(c)}>
-                {c === 'All' ? (isId ? 'Semua koleksi' : 'All collections') : c.replace(/_/g, ' ')}
+              <button className={collection === 'All' ? 'active' : ''} onClick={() => handleCollectionChange('All')}>
+                {isId ? 'Semua kategori' : 'All categories'}
               </button>
-            ))}
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  className={collection === category.name ? 'active' : ''}
+                  onClick={() => handleCollectionChange(category.name)}
+                >
+                  {category.name}
+                </button>
+              ))}
             </div>
           )}
         </div>

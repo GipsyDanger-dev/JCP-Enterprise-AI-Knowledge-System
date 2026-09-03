@@ -1,16 +1,35 @@
 import { API_BASE_URL, authHeaders, request } from './client'
-import type { ApiDocument, DeleteDocumentResponse, DocumentStatusResponse } from './types'
+import type {
+  ApiDocument,
+  ApiDocumentCategory,
+  DeleteDocumentResponse,
+  DocumentStatusResponse,
+} from './types'
 
 export function listDocuments(token?: string): Promise<ApiDocument[]> {
   return request<ApiDocument[]>('/documents', { headers: authHeaders(token) })
 }
 
-export function uploadDocument(file: File, token?: string, title?: string, collection?: string): Promise<ApiDocument> {
+export interface UploadDocumentOptions {
+  title?: string
+  /** Kategori/subjek. Menentukan unit kerja mana yang boleh membaca dokumennya. */
+  categoryId?: string
+  /** Opsional: batasi hanya untuk satu unit kerja. Hanya mempersempit akses. */
+  unitKerjaId?: string
+}
+
+export function uploadDocument(file: File, token?: string, options: UploadDocumentOptions = {}): Promise<ApiDocument> {
   const form = new FormData()
   form.append('file', file)
-  if (title?.trim()) form.append('title', title.trim())
-  if (collection?.trim()) form.append('collection', collection.trim())
+  if (options.title?.trim()) form.append('title', options.title.trim())
+  if (options.categoryId) form.append('categoryId', options.categoryId)
+  if (options.unitKerjaId) form.append('unitKerjaId', options.unitKerjaId)
   return request<ApiDocument>('/documents', { method: 'POST', body: form, headers: authHeaders(token) })
+}
+
+/** Hanya kategori yang benar-benar bisa diakses pengguna yang sedang login. */
+export function listDocumentCategories(token?: string): Promise<ApiDocumentCategory[]> {
+  return request<ApiDocumentCategory[]>('/documents/categories', { headers: authHeaders(token) })
 }
 
 export function getDocumentStatus(id: string, token?: string): Promise<DocumentStatusResponse> {

@@ -255,8 +255,9 @@ export function UsersPage() {
                   <td><span className={`role-badge ${user.role.toLowerCase()}`}>{userRoleLabel(user.role)}</span></td>
                   <td>{user.role === 'SUPER_ADMIN'
                     ? (isId ? 'Akses penuh' : 'Full access')
-                    : user.unitKerja?.name
-                      ?? (isId ? 'Belum ditempatkan' : 'No work unit')}</td>
+                    : user.unitKerja
+                      ? `${user.unitKerja.name}${user.role === 'ADMIN_UNIT' ? (isId ? ' — kelola' : ' — manage') : ''}`
+                      : (isId ? 'Belum ditempatkan' : 'No work unit')}</td>
                   <td>{user.isActive !== false
                     ? <span className="active-user"><Check size={13} /> {isId ? 'Aktif' : 'Active'}</span>
                     : <span className="inactive-user"><X size={13} /> {isId ? 'Nonaktif' : 'Inactive'}</span>
@@ -342,6 +343,7 @@ export function UsersPage() {
                   <div className="select-wrapper">
                     <select value={editRole} onChange={(e) => setEditRole(e.target.value as ApiRole)}>
                       <option value="SUPER_ADMIN">Super Admin</option>
+                      <option value="ADMIN_UNIT">Admin Unit</option>
                       <option value="PEGAWAI">Pegawai</option>
                     </select>
                     <ChevronDown size={15} className="select-icon" />
@@ -452,6 +454,7 @@ export function UsersPage() {
                   <div className="select-wrapper">
                     <select id="user-role" value={formRole} onChange={(e) => setFormRole(e.target.value as ApiRole)}>
                       <option value="SUPER_ADMIN">Super Admin</option>
+                      <option value="ADMIN_UNIT">Admin Unit</option>
                       <option value="PEGAWAI">Pegawai</option>
                     </select>
                     <ChevronDown size={15} className="select-icon" />

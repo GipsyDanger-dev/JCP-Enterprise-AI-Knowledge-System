@@ -847,6 +847,16 @@ button { cursor: pointer; }
 .select-wrapper { position: relative; }
 .select-wrapper select { padding-right: 32px; }
 
+/* Centang "batasi ke unit kerja" pada dialog unggah dokumen. */
+.upload-restrict-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.upload-restrict-toggle input { width: 15px; height: 15px; cursor: pointer; }
+
 /* Keterangan kecil di bawah field form, mis. penjelasan bahwa unit kerja
    menentukan dokumen yang terlihat. */
 .field-hint {
