@@ -41,6 +41,10 @@ export interface WorkspaceContextValue {
   setLanguage: (lang: Language) => void
   unreadMessages: number
   setUnreadMessages: (count: number) => void
+  /** Pengumuman yang belum dibaca — dipakai badge di sidebar. */
+  unreadAnnouncements: number
+  /** Tandai seluruh pengumuman terbaca dan bersihkan badge. */
+  markAnnouncementsSeen: () => Promise<void>
 }
 
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)

@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { getConversation, queryChat } from '@/api/chat'
 import { errorMessage } from '@/api/client'
 import { deleteDocument, getDocumentStatus, listDocuments, uploadDocument } from '@/api/documents'
+import { getAnnouncementUnreadCount, markAnnouncementsRead } from '@/api/announcements'
 import { listConversations, getEmployeeConversation } from '@/api/messaging'
 import { toDomainDocument, toDomainDocumentStatus, toDomainRole } from '@/api/mappers'
 import type { ApiDocument, ConversationDetail } from '@/api/types'
@@ -13,7 +14,7 @@ import { navigationFor } from '@/types/domain'
 import type { DocumentItem, Role } from '@/types/domain'
 import { WorkspaceContext } from './workspaceContextValue'
 import type { Language } from './workspaceContextValue'
-import { notifyNewMessage } from '@/utils/notifications'
+import { notifyNewAnnouncement, notifyNewMessage } from '@/utils/notifications'
 import { userInitials } from '@/utils/users'
 
 const POLL_INTERVAL_MS = 2000
@@ -34,7 +35,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return v === 'id' ? 'id' : 'en'
   })
   const [unreadMessages, setUnreadMessages] = useState(0)
+  const [unreadAnnouncements, setUnreadAnnouncements] = useState(0)
   const prevUnreadRef = useRef(0)
+  const prevUnreadAnnouncementsRef = useRef(0)
   const prevUserIdRef = useRef<string | null>(user?.id ?? null)
   const uploadRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
@@ -57,6 +60,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setIsUploading(false)
       setUnreadMessages(0)
       prevUnreadRef.current = 0
+      setUnreadAnnouncements(0)
+      prevUnreadAnnouncementsRef.current = 0
     }
   }, [user?.id])
 
@@ -159,6 +164,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const interval = setInterval(poll, 5000)
     return () => { cancelled = true; clearInterval(interval) }
   }, [user, token])
+
+  // Polling pengumuman belum dibaca + notifikasi
+  useEffect(() => {
+    if (!user || !token) { setUnreadAnnouncements(0); prevUnreadAnnouncementsRef.current = 0; return }
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const { count, latestTitle } = await getAnnouncementUnreadCount(token)
+        if (cancelled) return
+        // Bunyikan hanya saat ada pengumuman baru, bukan tiap polling
+        if (count > prevUnreadAnnouncementsRef.current) notifyNewAnnouncement(latestTitle ?? undefined)
+        prevUnreadAnnouncementsRef.current = count
+        setUnreadAnnouncements(count)
+      } catch { /* ignore */ }
+    }
+    poll()
+    const interval = setInterval(poll, 5000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [user, token])
+
+  /** Dipanggil halaman pengumuman: tandai terbaca lalu bersihkan badge. */
+  const markAnnouncementsSeen = useCallback(async () => {
+    if (!token) return
+    try {
+      await markAnnouncementsRead(token)
+      prevUnreadAnnouncementsRef.current = 0
+      setUnreadAnnouncements(0)
+    } catch { /* biarkan polling berikutnya menyesuaikan */ }
+  }, [token])
 
   const changeRole = (nextRole: Role) => {
     setRole(nextRole)
@@ -287,6 +321,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       language,
       setLanguage,
       unreadMessages,
+      unreadAnnouncements,
+      markAnnouncementsSeen,
       setUnreadMessages,
     }}>
       <input ref={uploadRef} className="visually-hidden" type="file" accept=".pdf,.docx,.txt,.md" onChange={onUpload} />
