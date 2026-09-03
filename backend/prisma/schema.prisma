@@ -7,17 +7,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Tingkat wewenang, bukan bidang kerja. Bidang kerja pindah ke UnitKerja:
+// dua orang di dinas yang sama butuh dokumen yang sama, yang membedakan
+// hanya seberapa jauh mereka boleh mengubah isinya.
 enum UserRole {
-  // Legacy (tidak dipakai, tetap ada di DB)
+  // Legacy — masih ada di database, tidak dipakai lagi oleh kode.
   ADMIN
   USER
-  // Super admin — akses semua dokumen
-  SUPER_ADMIN
-  // 4 Divisi utama
   BENDAHARA
   SEKRETARIS
   OPERASIONAL
   HUMAS
+  // Dipakai sekarang
+  SUPER_ADMIN
+  PEGAWAI
 }
 
 // Jenis produk hukum — mengikuti kategori resmi JDIH Sleman satu lawan satu.
@@ -91,8 +94,12 @@ model User {
   email               String?              @unique
   username            String?              @unique
   employeeNumber      String               @unique @map("employee_number")
+  // Teks bebas warisan; dipertahankan supaya data lama tidak hilang.
+  // Sumber kebenaran untuk hak akses adalah unitKerjaId.
   division            String
   jobTitle            String               @map("job_title")
+  unitKerjaId         String?              @map("unit_kerja_id") @db.Uuid
+  unitKerja           UnitKerja?           @relation(fields: [unitKerjaId], references: [id], onDelete: SetNull)
   passwordHash        String               @map("password_hash")
   displayName         String               @map("display_name")
   role                UserRole             @default(SUPER_ADMIN)
@@ -147,16 +154,33 @@ model Document {
   @@map("documents")
 }
 
+/// Unit kerja / OPD. Berupa tabel, bukan enum, karena daftarnya berubah setiap
+/// ada reorganisasi perangkat daerah — mengubah baris jauh lebih murah daripada
+/// mengubah tipe enum PostgreSQL. Isi awalnya versi sementara sampai daftar
+/// resmi dari Perbup SOTK didapat; menggantinya cukup lewat seed.
+model UnitKerja {
+  id         String             @id @default(uuid()) @db.Uuid
+  name       String
+  code       String             @unique
+  isActive   Boolean            @default(true) @map("is_active")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  users      User[]
+  categories DocumentCategory[] @relation("CategoryAccess")
+
+  @@index([name])
+  @@map("unit_kerja")
+}
+
 model DocumentCategory {
-  id           String     @id @default(uuid()) @db.Uuid
-  name         String
-  key          String     @unique
+  id        String      @id @default(uuid()) @db.Uuid
+  name      String
+  key       String      @unique
   // Daftar kosong berarti terbuka untuk semua pegawai yang sudah login.
   // Hak akses sengaja ditempel di kategori: menandai ratusan dokumen satu per
   // satu terlalu rawan salah, sedangkan kategori cukup ditandai sekali.
-  allowedRoles UserRole[] @map("allowed_roles")
-  documents    Document[]
-  createdAt    DateTime   @default(now()) @map("created_at")
+  units     UnitKerja[] @relation("CategoryAccess")
+  documents Document[]
+  createdAt DateTime    @default(now()) @map("created_at")
 
   @@index([name])
   @@map("document_categories")

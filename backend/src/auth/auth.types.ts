@@ -5,6 +5,8 @@ export interface JwtPayload {
   username: string;
   role: UserRole;
   isAdmin: boolean;
+  /** Unit kerja penentu akses dokumen. Null untuk akun yang belum ditempatkan. */
+  unitKerjaId?: string | null;
   displayName?: string;
   sid: string;
 }

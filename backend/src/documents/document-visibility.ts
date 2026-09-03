@@ -27,9 +27,13 @@ export function documentVisibilityWhere(actor: AuthenticatedUser): Prisma.Docume
     status: DocumentStatus.READY,
     legalStatus: { not: LegalStatus.RANCANGAN },
     OR: [
+      // Belum berkategori, atau kategorinya tidak dibatasi unit kerja mana pun.
       { categoryId: null },
-      { category: { allowedRoles: { isEmpty: true } } },
-      { category: { allowedRoles: { has: actor.role } } },
+      { category: { units: { none: {} } } },
+      // Kategori yang secara tegas mencantumkan unit kerja aktor.
+      ...(actor.unitKerjaId
+        ? [{ category: { units: { some: { id: actor.unitKerjaId } } } }]
+        : []),
     ],
   };
 }
@@ -44,6 +48,9 @@ export function documentVisibilityWhere(actor: AuthenticatedUser): Prisma.Docume
 export function allowedCategoryFilter(actor: AuthenticatedUser): Prisma.DocumentCategoryWhereInput | null {
   if (actor.isAdmin) return null;
   return {
-    OR: [{ allowedRoles: { isEmpty: true } }, { allowedRoles: { has: actor.role } }],
+    OR: [
+      { units: { none: {} } },
+      ...(actor.unitKerjaId ? [{ units: { some: { id: actor.unitKerjaId } } }] : []),
+    ],
   };
 }

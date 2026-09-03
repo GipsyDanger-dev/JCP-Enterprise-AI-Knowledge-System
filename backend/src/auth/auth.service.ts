@@ -29,7 +29,7 @@ export class AuthService {
     }
 
     const sessionId = randomUUID();
-    const payload: JwtPayload = { sub: user.id, username: user.username ?? user.email ?? '', role: user.role, isAdmin: user.isAdmin, displayName: user.displayName, sid: sessionId };
+    const payload: JwtPayload = { sub: user.id, username: user.username ?? user.email ?? '', role: user.role, isAdmin: user.isAdmin, unitKerjaId: user.unitKerjaId ?? null, displayName: user.displayName, sid: sessionId };
     const accessToken = await this.jwtService.signAsync(payload);
     
     const decodedToken = this.jwtService.decode(accessToken) as any;
