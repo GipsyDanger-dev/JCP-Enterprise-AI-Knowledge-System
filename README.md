@@ -105,6 +105,8 @@ Salin `.env.example` menjadi `.env`. Jangan commit `.env` atau credential asli.
 | --- | --- |
 | `DATABASE_URL` | Koneksi PostgreSQL bersama |
 | `JWT_SECRET` | Penandatanganan JWT Backend |
+| `GOOGLE_CLIENT_ID` | OAuth Web Client ID untuk memverifikasi Google ID token di Backend |
+| `VITE_GOOGLE_CLIENT_ID` | OAuth Web Client ID publik untuk Google Identity Services di Frontend |
 | `AI_SERVICE_URL` | URL AI dari Backend; lokal `http://127.0.0.1:8001`, Docker `http://ai-api:8000` |
 | `WORKER_TOKEN` | Shared secret Backend <-> AI Service (header `X-Worker-Token`) |
 | `SUMOPOD_API_KEY` | Akses embedding/LLM AI Service |
@@ -149,7 +151,10 @@ Endpoint pengelolaan akun berikut hanya dapat digunakan oleh `ADMIN`:
 Auth:
 
 - `POST /auth/login`
+- `POST /auth/google` — login atau membuat akun `PERSONAL` menggunakan Google ID token
 - `GET /auth/me`
+
+Login Google memakai tombol resmi Google Identity Services. Backend memverifikasi ID token, membuat akun Personal pada login pertama, kemudian menerbitkan JWT aplikasi. Akun Personal tidak otomatis menjadi Super Admin perusahaan.
 
 Documents:
 

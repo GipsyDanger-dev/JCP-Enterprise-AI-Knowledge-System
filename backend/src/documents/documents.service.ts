@@ -8,6 +8,7 @@ import {
 import {
   AuditAction,
   AuditActorType,
+  AccountType,
   DocumentStatus,
   ProcessingJobStatus,
   Prisma,
@@ -153,7 +154,9 @@ export class DocumentsService {
     const documents = await this.prisma.document.findMany({
       where: {
         deletedAt: null,
-        ...(!actor.isAdmin ? { status: DocumentStatus.READY, collection: actor.role } : {}),
+        ...(actor.accountType === AccountType.PERSONAL
+          ? { uploadedById: actor.sub }
+          : !actor.isAdmin ? { status: DocumentStatus.READY, collection: actor.role } : {}),
       },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -244,9 +247,13 @@ export class DocumentsService {
     };
   }
 
-  async download(id: string) {
+  async download(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(actor.accountType === AccountType.PERSONAL ? { uploadedById: actor.sub } : {}),
+      },
       select: {
         versions: {
           orderBy: { versionNumber: 'desc' },
@@ -265,9 +272,13 @@ export class DocumentsService {
     };
   }
 
-  async getChunks(id: string) {
+  async getChunks(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(actor.accountType === AccountType.PERSONAL ? { uploadedById: actor.sub } : {}),
+      },
       select: {
         id: true,
         title: true,

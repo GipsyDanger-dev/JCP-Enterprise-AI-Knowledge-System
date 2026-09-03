@@ -267,7 +267,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         initials: userInitials(user?.displayName ?? ''),
         label: '',
       },
-      navigation: navigationFor(role, language),
+      navigation: navigationFor(role, language).filter((item) => user?.accountType !== 'PERSONAL' || item.id !== 'announcements'),
       documents,
       question,
       setQuestion,
@@ -305,6 +305,7 @@ function toWorkspaceHistory(conversation: ConversationDetail): ChatMessage[] {
         answer: '',
         citations: [],
         suggestions: [],
+        awaitingChoice: false,
         error: null,
         timestamp: new Date(message.createdAt).getTime(),
       })

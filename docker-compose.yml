@@ -12,6 +12,7 @@ services:
       SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
       WORKER_TOKEN: ${WORKER_TOKEN}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
@@ -74,6 +75,7 @@ services:
     command: npm run dev -- --host 0.0.0.0
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+      VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:?VITE_GOOGLE_CLIENT_ID is required}
     ports:
       - "5173:5173"
     volumes:

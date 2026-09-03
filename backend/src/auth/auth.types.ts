@@ -1,10 +1,11 @@
-import { UserRole } from '@prisma/client';
+import { AccountType, UserRole } from '@prisma/client';
 
 export interface JwtPayload {
   sub: string;
   username: string;
   role: UserRole;
   isAdmin: boolean;
+  accountType: AccountType;
   displayName?: string;
   sid: string;
 }

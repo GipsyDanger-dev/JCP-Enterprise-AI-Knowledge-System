@@ -73,7 +73,7 @@ Import-LocalEnvironment -Path $envFile
 # WORKER_TOKEN dipakai dua arah: guard /internal/* di backend dan header
 # X-Worker-Token saat backend memanggil AI service. Tanpa itu, AI service
 # menolak semua request selain /health.
-Require-Environment -Names @('DATABASE_URL', 'SUMOPOD_API_KEY', 'JWT_SECRET', 'WORKER_TOKEN')
+Require-Environment -Names @('DATABASE_URL', 'SUMOPOD_API_KEY', 'JWT_SECRET', 'WORKER_TOKEN', 'GOOGLE_CLIENT_ID', 'VITE_GOOGLE_CLIENT_ID')
 
 if (-not $env:AI_DATABASE_URL) { $env:AI_DATABASE_URL = $env:DATABASE_URL }
 if (-not $env:AI_SERVICE_URL) { $env:AI_SERVICE_URL = 'http://127.0.0.1:8001' }

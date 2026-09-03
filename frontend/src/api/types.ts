@@ -9,9 +9,11 @@ export interface ApiErrorBody {
 
 /* ============ Auth & Users ============ */
 export type ApiRole = 'SUPER_ADMIN' | 'ADMIN' | 'USER' | 'BENDAHARA' | 'SEKRETARIS' | 'OPERASIONAL' | 'HUMAS'
+export type ApiAccountType = 'COMPANY' | 'PERSONAL'
 
 export interface ApiUser {
   id: string
+  email?: string | null
   displayName: string
   username: string
   employeeNumber: string
@@ -19,6 +21,7 @@ export interface ApiUser {
   jobTitle: string
   role: ApiRole
   isAdmin?: boolean
+  accountType: ApiAccountType
   isActive?: boolean
   photoUrl?: string | null
 }
@@ -26,6 +29,17 @@ export interface ApiUser {
 export interface LoginRequest {
   username: string
   password: string
+}
+
+export interface GoogleLoginRequest {
+  credential: string
+}
+
+export interface PersonalRegisterRequest {
+  displayName: string
+  email: string
+  password: string
+  confirmPassword: string
 }
 
 export interface LoginResponse {
@@ -44,6 +58,7 @@ export interface MeResponse {
   jobTitle: string
   role: ApiRole
   isAdmin?: boolean
+  accountType: ApiAccountType
   photoUrl?: string | null
 }
 

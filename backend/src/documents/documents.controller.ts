@@ -110,8 +110,11 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Get document chunks for preview' })
   @ApiOkResponse({ description: 'Document chunks with text content' })
   @ApiNotFoundResponse({ description: 'Document not found' })
-  getChunks(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.documentsService.getChunks(id);
+  getChunks(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.documentsService.getChunks(id, actor);
   }
 
   @Get(':id/download')
@@ -120,8 +123,9 @@ export class DocumentsController {
   @ApiNotFoundResponse({ description: 'Document not found' })
   async download(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
   ): Promise<StreamableFile> {
-    const file = await this.documentsService.download(id);
+    const file = await this.documentsService.download(id, actor);
     return new StreamableFile(file.content, {
       type: file.mimeType,
       disposition: `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`,

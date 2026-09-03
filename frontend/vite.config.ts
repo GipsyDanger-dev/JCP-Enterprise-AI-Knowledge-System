@@ -14,6 +14,10 @@ export default defineConfig(({ mode }) => {
   const port = Number(process.env.FRONTEND_PORT ?? fileEnv.FRONTEND_PORT) || DEFAULT_PORT
 
   return {
+    // Root .env is shared by all services. Vite will only expose variables
+    // prefixed with VITE_, so secrets such as GOOGLE_CLIENT_ID counterparts
+    // without that prefix remain server-side.
+    envDir: repoRoot,
     plugins: [react()],
     resolve: {
       alias: {

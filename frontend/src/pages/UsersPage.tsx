@@ -10,7 +10,7 @@ import type { ApiUser, ApiRole } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
-type FilterRole = 'all' | ApiRole
+type FilterRole = 'all' | 'admin' | 'employee'
 
 export function UsersPage() {
   const { token } = useAuth()
@@ -62,7 +62,9 @@ export function UsersPage() {
 
   useEffect(() => { loadUsers() }, [loadUsers])
 
-  const filtered = filter === 'all' ? users : users.filter((u) => u.role === filter)
+  const filtered = filter === 'all'
+    ? users
+    : users.filter((user) => filter === 'admin' ? user.role === 'SUPER_ADMIN' : user.role !== 'SUPER_ADMIN')
   const adminCount = users.filter((u) => u.role === 'SUPER_ADMIN').length
   const employeeCount = users.filter((u) => u.role !== 'SUPER_ADMIN').length
 
@@ -182,10 +184,10 @@ export function UsersPage() {
         <button className={`filter-chip ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
           {isId ? 'Semua' : 'All'} ({users.length})
         </button>
-        <button className={`filter-chip ${filter === 'SUPER_ADMIN' ? 'active' : ''}`} onClick={() => setFilter('SUPER_ADMIN')}>
+        <button className={`filter-chip ${filter === 'admin' ? 'active' : ''}`} onClick={() => setFilter('admin')}>
           Admin ({adminCount})
         </button>
-        <button className={`filter-chip ${filter !== 'SUPER_ADMIN' && filter !== 'all' ? 'active' : ''}`} onClick={() => setFilter('BAPPEDA')}>
+        <button className={`filter-chip ${filter === 'employee' ? 'active' : ''}`} onClick={() => setFilter('employee')}>
           {isId ? 'Karyawan' : 'Employee'} ({employeeCount})
         </button>
       </div>

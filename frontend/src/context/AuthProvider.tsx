@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { login as apiLogin, me as apiMe, logout as apiLogout } from '@/api/auth'
+import {
+  login as apiLogin,
+  loginWithGoogle as apiGoogleLogin,
+  logout as apiLogout,
+  me as apiMe,
+  registerPersonal as apiRegisterPersonal,
+} from '@/api/auth'
 import type { ApiUser } from '@/api/types'
 import { AuthContext } from './authContextValue'
 
@@ -31,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             jobTitle: profile.jobTitle,
             role: profile.role,
             isAdmin: (profile as any).isAdmin ?? false,
+            accountType: profile.accountType ?? 'COMPANY',
             photoUrl: (profile as any).photoUrl,
           })
         }
@@ -55,6 +62,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user)
   }, [])
 
+  const loginWithGoogle = useCallback(async (credential: string) => {
+    const response = await apiGoogleLogin({ credential })
+    localStorage.setItem(TOKEN_KEY, response.accessToken)
+    setToken(response.accessToken)
+    setUser(response.user)
+  }, [])
+
+  const registerPersonal = useCallback(async (
+    displayName: string,
+    email: string,
+    password: string,
+    confirmPassword: string,
+  ) => {
+    const response = await apiRegisterPersonal({ displayName, email, password, confirmPassword })
+    localStorage.setItem(TOKEN_KEY, response.accessToken)
+    setToken(response.accessToken)
+    setUser(response.user)
+  }, [])
+
   const logout = useCallback(async () => {
     const currentToken = localStorage.getItem(TOKEN_KEY)
     if (currentToken) {
@@ -71,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, registerPersonal, logout }}>
       {children}
     </AuthContext.Provider>
   )

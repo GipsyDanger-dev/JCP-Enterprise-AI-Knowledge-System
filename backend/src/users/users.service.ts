@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditAction, AuditActorType, Prisma } from '@prisma/client';
+import { AccountType, AuditAction, AuditActorType, Prisma } from '@prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { hashPassword } from '../auth/password.util';
@@ -33,6 +33,7 @@ export class UsersService {
 
   findAll() {
     return this.prisma.user.findMany({
+      where: { accountType: AccountType.COMPANY },
       orderBy: { createdAt: 'asc' },
       select: SAFE_USER_SELECT,
     });
@@ -55,6 +56,7 @@ export class UsersService {
             passwordHash,
             role: input.role ?? 'OPERASIONAL',
             isActive: true,
+            accountType: AccountType.COMPANY,
           },
           select: SAFE_USER_SELECT,
         });
@@ -77,7 +79,7 @@ export class UsersService {
   }
 
   async update(id: string, input: UpdateUserDto, actor: AuthenticatedUser) {
-    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
+    const user = await this.prisma.user.findFirst({ where: { id, accountType: AccountType.COMPANY }, select: { id: true } });
     if (!user) throw new NotFoundException('User not found');
 
     const data: Prisma.UserUpdateInput = {};
@@ -109,7 +111,7 @@ export class UsersService {
   }
 
   async changePassword(id: string, input: ChangePasswordDto, actor: AuthenticatedUser) {
-    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
+    const user = await this.prisma.user.findFirst({ where: { id, accountType: AccountType.COMPANY }, select: { id: true } });
     if (!user) throw new NotFoundException('User not found');
 
     const passwordHash = await hashPassword(input.newPassword);
@@ -119,7 +121,7 @@ export class UsersService {
   }
 
   async remove(id: string, actor: AuthenticatedUser) {
-    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true, username: true } });
+    const user = await this.prisma.user.findFirst({ where: { id, accountType: AccountType.COMPANY }, select: { id: true, username: true } });
     if (!user) throw new NotFoundException('User not found');
     if (id === actor.sub) throw new ConflictException('Cannot deactivate your own account');
 

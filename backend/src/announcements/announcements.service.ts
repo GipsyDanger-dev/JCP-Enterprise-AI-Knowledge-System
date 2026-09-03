@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { AccountType } from '@prisma/client';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
 
@@ -20,6 +21,7 @@ export class AnnouncementsService {
   constructor(private readonly prisma: PrismaService) {}
 
   list(actor: AuthenticatedUser) {
+    if (actor.accountType === AccountType.PERSONAL) return [];
     return this.prisma.announcement.findMany({
       where: actor.isAdmin ? {} : { isActive: true },
       select: ANNOUNCEMENT_SELECT,

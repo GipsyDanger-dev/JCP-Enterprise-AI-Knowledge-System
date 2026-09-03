@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { MessageRole } from '@prisma/client';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { AccountType, MessageRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { aiServiceHeaders, aiServiceUrl } from '../config/env.util';
@@ -53,6 +53,9 @@ export class ChatService {
     conversationId?: string,
     fromSuggestion?: boolean,
   ) {
+    if (actor.accountType === AccountType.PERSONAL) {
+      throw new ForbiddenException('Personal AI workspace is not available yet');
+    }
     const conversation = await this.resolveConversation(question, actor, conversationId);
     const contextChunkIds = await this.getContextChunkIds(conversation.id);
     const conversationTopic = await this.getConversationTopic(conversation.id);

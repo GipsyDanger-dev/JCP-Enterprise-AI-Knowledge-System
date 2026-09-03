@@ -16,12 +16,6 @@ import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 const COLLECTIONS = ['All', 'BENDAHARA', 'SEKRETARIS', 'OPERASIONAL', 'HUMAS']
 
-const defaultDueDate = () => {
-  const date = new Date()
-  date.setDate(date.getDate() + 7)
-  return date.toISOString().slice(0, 10)
-}
-
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
 
 function PdfReader({ source, title }: { source: string; title: string }) {
