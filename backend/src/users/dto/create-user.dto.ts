@@ -3,6 +3,7 @@ import { UserRole } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
   IsEnum,
+  IsUUID,
   IsOptional,
   IsString,
   Matches,
@@ -63,8 +64,16 @@ export class CreateUserDto {
   @MaxLength(128)
   password!: string;
 
-  @ApiPropertyOptional({ enum: UserRole, default: 'BAPPEDA' })
+  @ApiPropertyOptional({ enum: UserRole, default: 'PEGAWAI' })
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+
+  @ApiPropertyOptional({
+    description: 'Unit kerja / OPD penentu akses dokumen. Kosongkan bila pegawai belum ditempatkan.',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  unitKerjaId?: string;
 }

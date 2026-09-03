@@ -30,6 +30,14 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  // Didaftarkan sebelum rute ber-parameter supaya tidak tertangkap sebagai :id.
+  @Get('reference-data')
+  @ApiOperation({ summary: 'Daftar unit kerja dan jabatan untuk dropdown form pengguna' })
+  @ApiOkResponse({ description: 'Unit kerja aktif dan nomenklatur jabatan' })
+  referenceData() {
+    return this.usersService.referenceData();
+  }
+
   @Get()
   @ApiOperation({ summary: 'List users without password hashes' })
   @ApiOkResponse({ description: 'All users ordered by creation time' })

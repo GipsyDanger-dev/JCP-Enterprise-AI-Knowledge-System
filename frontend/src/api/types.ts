@@ -8,7 +8,21 @@ export interface ApiErrorBody {
 }
 
 /* ============ Auth & Users ============ */
-export type ApiRole = 'SUPER_ADMIN' | 'ADMIN' | 'USER' | 'BENDAHARA' | 'SEKRETARIS' | 'OPERASIONAL' | 'HUMAS'
+// SUPER_ADMIN dan PEGAWAI adalah tingkat wewenang yang dipakai sekarang.
+// Sisanya nilai lama yang masih mungkin tersimpan di akun lawas.
+export type ApiRole = 'SUPER_ADMIN' | 'PEGAWAI' | 'ADMIN' | 'USER' | 'BENDAHARA' | 'SEKRETARIS' | 'OPERASIONAL' | 'HUMAS'
+
+export interface ApiUnitKerja {
+  id: string
+  code: string
+  name: string
+}
+
+/** Daftar acuan untuk dropdown pada form pengguna. */
+export interface ApiUserReferenceData {
+  unitKerja: ApiUnitKerja[]
+  jabatan: string[]
+}
 
 export interface ApiUser {
   id: string
@@ -18,6 +32,8 @@ export interface ApiUser {
   division: string
   jobTitle: string
   role: ApiRole
+  unitKerjaId?: string | null
+  unitKerja?: ApiUnitKerja | null
   isAdmin?: boolean
   isActive?: boolean
   photoUrl?: string | null
@@ -43,6 +59,7 @@ export interface MeResponse {
   division: string
   jobTitle: string
   role: ApiRole
+  unitKerjaId?: string
   isAdmin?: boolean
   photoUrl?: string | null
 }
@@ -54,6 +71,7 @@ export interface CreateUserRequest {
   division: string
   jobTitle: string
   role: ApiRole
+  unitKerjaId?: string
   password?: string
 }
 
@@ -64,6 +82,7 @@ export interface UpdateUserRequest {
   division?: string
   jobTitle?: string
   role?: ApiRole
+  unitKerjaId?: string
   isAdmin?: boolean
   photoUrl?: string
 }

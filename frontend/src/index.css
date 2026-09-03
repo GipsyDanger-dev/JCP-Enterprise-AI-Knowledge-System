@@ -846,6 +846,15 @@ button { cursor: pointer; }
 .auth-field select:focus { border-color: var(--brand-600); box-shadow: 0 0 0 3px var(--brand-100); }
 .select-wrapper { position: relative; }
 .select-wrapper select { padding-right: 32px; }
+
+/* Keterangan kecil di bawah field form, mis. penjelasan bahwa unit kerja
+   menentukan dokumen yang terlihat. */
+.field-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted, #8b8b8b);
+}
 .select-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-muted); }
 .auth-error { padding: 10px 12px; border-radius: var(--radius-md); background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; font-size: var(--fs-xs); margin-bottom: 14px; }
 

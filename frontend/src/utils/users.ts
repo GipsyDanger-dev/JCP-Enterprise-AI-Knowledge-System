@@ -11,5 +11,8 @@ export function userInitials(name: string): string {
 }
 
 export function userRoleLabel(role: ApiRole): string {
-  return role === 'SUPER_ADMIN' ? 'Admin' : role.replace(/_/g, ' ')
+  if (role === 'SUPER_ADMIN') return 'Admin'
+  if (role === 'PEGAWAI') return 'Pegawai'
+  // Nilai lama dari sebelum akses berpindah ke unit kerja.
+  return role.replace(/_/g, ' ')
 }

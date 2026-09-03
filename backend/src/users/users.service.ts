@@ -7,6 +7,7 @@ import { PrismaService } from '../database/prisma.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { JABATAN } from '../../prisma/reference-data';
 
 const SAFE_USER_SELECT = {
   id: true,
@@ -16,6 +17,8 @@ const SAFE_USER_SELECT = {
   jobTitle: true,
   displayName: true,
   role: true,
+  unitKerjaId: true,
+  unitKerja: { select: { id: true, code: true, name: true } },
   isAdmin: true,
   isActive: true,
   photoUrl: true,
@@ -38,6 +41,22 @@ export class UsersService {
     });
   }
 
+  /**
+   * Daftar acuan untuk dropdown di form pengguna.
+   *
+   * Unit kerja dibaca dari database (bisa berubah tanpa deploy), sedangkan
+   * jabatan berasal dari konstanta karena murni keterangan dan tidak
+   * memengaruhi hak akses apa pun.
+   */
+  async referenceData() {
+    const unitKerja = await this.prisma.unitKerja.findMany({
+      where: { isActive: true },
+      select: { id: true, code: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    return { unitKerja, jabatan: JABATAN };
+  }
+
   async create(input: CreateUserDto, actor: AuthenticatedUser) {
     const username = input.username.trim().toLowerCase();
     const displayName = input.displayName.trim();
@@ -53,7 +72,8 @@ export class UsersService {
             jobTitle: input.jobTitle.trim(),
             displayName,
             passwordHash,
-            role: input.role ?? 'OPERASIONAL',
+            role: input.role ?? 'PEGAWAI',
+            unitKerjaId: input.unitKerjaId ?? null,
             isActive: true,
           },
           select: SAFE_USER_SELECT,
@@ -87,6 +107,11 @@ export class UsersService {
     if (input.division !== undefined) data.division = input.division.trim();
     if (input.jobTitle !== undefined) data.jobTitle = input.jobTitle.trim();
     if (input.role !== undefined) data.role = input.role;
+    if (input.unitKerjaId !== undefined) {
+      data.unitKerja = input.unitKerjaId
+        ? { connect: { id: input.unitKerjaId } }
+        : { disconnect: true };
+    }
     if (input.isAdmin !== undefined) data.isAdmin = input.isAdmin;
     if (input.photoUrl !== undefined) data.photoUrl = input.photoUrl;
 
