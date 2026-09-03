@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowUpRight, BookOpenCheck, CheckCircle2, ChevronDown, Download, FileText, FolderOpen, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { ArrowUpRight, BookOpenCheck, CheckCircle2, ChevronDown, Download, FileText, FolderOpen, Pencil, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { UploadModal } from '@/components/UploadModal'
@@ -154,7 +154,7 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
           <div className="doc-viewer-actions">
             {requiredReadingId && <button className={completionConfirmed ? 'reading-complete-button' : 'primary-button'} disabled={completionSaving || completionConfirmed || !canComplete} onClick={completeReading}>{completionConfirmed ? <><CheckCircle2 size={17} /> {isId ? 'Terverifikasi selesai' : 'Verified complete'}</> : (completionSaving ? (isId ? 'Memverifikasi...' : 'Verifying...') : (isId ? 'Tandai selesai' : 'Mark complete'))}</button>}
             {doc.status === 'Ready' && (
-              <button className="secondary-button" onClick={() => downloadDocument(doc.id, doc.name, token ?? undefined)}>
+              <button className="secondary-button" onClick={() => downloadDocument(doc.id, doc.filename, token ?? undefined)}>
                 <Download size={15} /> {isId ? 'Unduh' : 'Download'}
               </button>
             )}
@@ -226,8 +226,10 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
 
 export function DocumentsPage() {
   const { token, user } = useAuth()
-  const { documents, role, uploadError, removeDocument, registerUploadedDocument, language } = useWorkspace()
-  const canManage = role === 'admin'
+  const { documents, role, uploadError, removeDocument, updateDocumentMetadata, registerUploadedDocument, language } = useWorkspace()
+  const isPersonal = user?.accountType === 'PERSONAL'
+  const canManage = role === 'admin' || isPersonal
+  const canAssign = role === 'admin' && !isPersonal
   const isId = language === 'id'
   const [searchParams, setSearchParams] = useSearchParams()
   // Non-admin: auto-filter by user's role. Admin: can pick any collection.
@@ -333,6 +335,12 @@ export function DocumentsPage() {
       if (selectedDoc?.id === id) setSelectedDoc(null)
     }
   }
+  const handleRename = async (document: DocumentItem) => {
+    const nextTitle = window.prompt(isId ? 'Judul dokumen baru' : 'New document title', document.name)?.trim()
+    if (!nextTitle || nextTitle === document.name) return
+    await updateDocumentMetadata(document.id, { title: nextTitle })
+    setSelectedDoc((current) => current?.id === document.id ? { ...current, name: nextTitle } : current)
+  }
   const assignReading = async () => {
     if (!token || !assignmentDoc || selectedAssignableEmployeeIds.length === 0) return
     setAssigning(true)
@@ -358,7 +366,7 @@ export function DocumentsPage() {
 
   return (
     <div className="standard-page">
-      <PageHeading eyebrow={isId ? 'Basis pengetahuan' : 'Knowledge base'} title={canManage ? (isId ? 'Dokumen' : 'Documents') : (isId ? 'Perpustakaan pengetahuan' : 'Knowledge library')} detail={canManage ? `${documents.length} ${isId ? 'sumber terhubung ke ruang kerja ini.' : 'sources connected to this workspace.'}` : `${documents.length} ${isId ? 'sumber terpercaya tersedia untuk Anda.' : 'trusted sources available to you.'}`} action={action} />
+      <PageHeading eyebrow={isId ? 'Basis pengetahuan' : 'Knowledge base'} title={isPersonal ? (isId ? 'Perpustakaan pengetahuan' : 'Knowledge library') : canManage ? (isId ? 'Dokumen' : 'Documents') : (isId ? 'Perpustakaan pengetahuan' : 'Knowledge library')} detail={canManage ? `${documents.length} ${isId ? 'sumber terhubung ke ruang kerja ini.' : 'sources connected to this workspace.'}` : `${documents.length} ${isId ? 'sumber terpercaya tersedia untuk Anda.' : 'trusted sources available to you.'}`} action={action} />
       {uploadError && <div className="inline-alert" role="alert"><ShieldAlert size={15} /> {uploadError}</div>}
       <div className="table-toolbar">
         <div className="filter-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isId ? 'Cari dokumen' : 'Search documents'} /></div>
@@ -392,9 +400,9 @@ export function DocumentsPage() {
               <td><StatusBadge status={document.status} /></td>
               <td>{document.chunks ?? '—'}</td>
               <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>
+                <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.filename, token ?? undefined) }}><Download size={15} /></button>
                 {canManage
-                  ? <>{document.status === 'Ready' && <button className="icon-button" title={isId ? 'Jadikan wajib baca' : 'Assign required reading'} onClick={(e) => { e.stopPropagation(); setSelectedDivision(''); setAssignmentError(null); setSelectedEmployeeIds([]); setAssignmentView('assign'); setAssignmentDoc(document) }}><BookOpenCheck size={16} /></button>}<button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
+                  ? <><button className="icon-button" title={isId ? 'Ubah judul' : 'Rename'} onClick={(e) => { e.stopPropagation(); handleRename(document) }}><Pencil size={15} /></button>{canAssign && document.status === 'Ready' && <button className="icon-button" title={isId ? 'Jadikan wajib baca' : 'Assign required reading'} onClick={(e) => { e.stopPropagation(); setSelectedDivision(''); setAssignmentError(null); setSelectedEmployeeIds([]); setAssignmentView('assign'); setAssignmentDoc(document) }}><BookOpenCheck size={16} /></button>}<button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
                   : <button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button>}
               </td>
             </tr>

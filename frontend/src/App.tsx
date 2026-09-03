@@ -44,7 +44,7 @@ export default function App() {
               <Route path="announcements" element={<RequireCompanyAccount><AnnouncementsPage /></RequireCompanyAccount>} />
               <Route path="users" element={<RequireRole role="admin"><UsersPage /></RequireRole>} />
               <Route path="inbox" element={<RequireRole role="admin"><AdminInboxPage /></RequireRole>} />
-              <Route path="messages" element={<MessagingPage />} />
+              <Route path="messages" element={<RequireCompanyAccount><MessagingPage /></RequireCompanyAccount>} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="help" element={<HelpPage />} />
               <Route path="activity" element={<RequireRole role="admin"><ActivityPage /></RequireRole>} />

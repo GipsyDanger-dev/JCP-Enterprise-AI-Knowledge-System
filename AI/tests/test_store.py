@@ -135,6 +135,19 @@ class PgVectorStoreTests(unittest.TestCase):
         self.assertIn("LIMIT %s", sql)
         self.assertEqual(params, [[0.1], "%sop_b.txt%", "%KETENTUAN%", [0.1], 5])
 
+    def test_search_builds_workspace_access_filters(self):
+        with patch_deps(cursor=FakeCursor(rows=[])) as fake:
+            db = PgVectorStore("postgresql://u:p@h/db")
+            db.search(
+                [0.1],
+                top_k=5,
+                filters={"uploaded_by_id": "owner-1", "collection": "PERSONAL"},
+            )
+        sql, params = fake.conn.executed[-1]
+        self.assertIn("d.uploaded_by_id = %s", sql)
+        self.assertIn("d.collection = %s", sql)
+        self.assertEqual(params, [[0.1], "owner-1", "PERSONAL", [0.1], 5])
+
     def test_ask_returns_no_answer_below_threshold(self):
         chunk = {
             "chunk_id": "chunk-1", "document_id": "doc-1", "filename": "sop.txt",

@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { AccountType, MessageRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
@@ -53,12 +53,14 @@ export class ChatService {
     conversationId?: string,
     fromSuggestion?: boolean,
   ) {
-    if (actor.accountType === AccountType.PERSONAL) {
-      throw new ForbiddenException('Personal AI workspace is not available yet');
-    }
     const conversation = await this.resolveConversation(question, actor, conversationId);
     const contextChunkIds = await this.getContextChunkIds(conversation.id);
     const conversationTopic = await this.getConversationTopic(conversation.id);
+    const retrievalFilters = actor.accountType === AccountType.PERSONAL
+      ? { uploaded_by_id: actor.sub }
+      : !actor.isAdmin
+        ? { collection: actor.role }
+        : undefined;
 
     await this.prisma.message.create({
       data: {
@@ -81,6 +83,7 @@ export class ChatService {
           query: question,
           // Only opaque chunk ids cross to the AI service. Previous user/assistant text stays in the database.
           context_chunk_ids: contextChunkIds,
+          filters: retrievalFilters,
           conversation_topic: conversationTopic,
           top_k: 5,
           use_llm: Boolean(process.env.SUMOPOD_API_KEY || process.env.LLM_API_KEY),
@@ -108,7 +111,9 @@ export class ChatService {
         awaitingChoice: result.awaiting_choice ?? false,
       };
     } catch (error) {
-      const answer = 'Maaf, pertanyaan belum dapat diproses sekarang. Coba salah satu pertanyaan berikut tentang dokumen perusahaan:';
+      const answer = actor.accountType === AccountType.PERSONAL
+        ? 'Maaf, pertanyaan belum dapat diproses sekarang. Coba tanyakan kembali tentang dokumen di workspace Personal Anda.'
+        : 'Maaf, pertanyaan belum dapat diproses sekarang. Coba salah satu pertanyaan berikut tentang dokumen perusahaan:';
       const citations: ChatCitation[] = [];
       await this.persistAssistantMessage(conversation.id, answer, citations);
       return {

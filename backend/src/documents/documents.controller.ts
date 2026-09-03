@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   StreamableFile,
   UploadedFile,
@@ -38,6 +39,7 @@ import {
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
 
 @ApiTags('documents')
 @ApiBearerAuth()
@@ -47,7 +49,6 @@ export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   @Post()
-  @AdminOnly()
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_FILE_SIZE, files: 1 } }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload a PDF or DOCX and queue it for processing' })
@@ -65,7 +66,7 @@ export class DocumentsController {
   @ApiBadRequestResponse({ description: 'Missing, invalid, empty, or oversized file' })
   @ApiPayloadTooLargeResponse({ description: 'The uploaded file exceeds the 10 MB limit' })
   @ApiConflictResponse({ description: 'The same file is already active' })
-  @ApiForbiddenResponse({ description: 'Only ADMIN can upload documents' })
+  @ApiForbiddenResponse({ description: 'Only ADMIN or a PERSONAL account can upload documents' })
   create(
     @Body() input: CreateDocumentDto,
     @UploadedFile() file: UploadedDocumentFile,
@@ -97,13 +98,28 @@ export class DocumentsController {
   }
 
   @Get(':id/status')
-  @AdminOnly()
   @ApiOperation({ summary: 'Get the latest processing status for a document' })
   @ApiOkResponse({ description: 'Document and latest job status' })
   @ApiNotFoundResponse({ description: 'Document not found' })
-  @ApiForbiddenResponse({ description: 'Only ADMIN can inspect processing status' })
-  getStatus(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.documentsService.getStatus(id);
+  @ApiForbiddenResponse({ description: 'Only ADMIN or the PERSONAL document owner can inspect status' })
+  getStatus(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.documentsService.getStatus(id, actor);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update document metadata' })
+  @ApiOkResponse({ description: 'Document metadata updated' })
+  @ApiNotFoundResponse({ description: 'Document not found' })
+  @ApiForbiddenResponse({ description: 'Only ADMIN or the PERSONAL document owner can update metadata' })
+  update(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() input: UpdateDocumentDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.documentsService.update(id, input, actor);
   }
 
   @Get(':id/chunks')
@@ -134,11 +150,10 @@ export class DocumentsController {
   }
 
   @Delete(':id')
-  @AdminOnly()
   @ApiOperation({ summary: 'Soft-delete metadata and remove the stored binary file' })
   @ApiOkResponse({ description: 'Document deleted and active processing job stopped' })
   @ApiNotFoundResponse({ description: 'Document not found' })
-  @ApiForbiddenResponse({ description: 'Only ADMIN can delete documents' })
+  @ApiForbiddenResponse({ description: 'Only ADMIN or the PERSONAL document owner can delete documents' })
   remove(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() actor: AuthenticatedUser,

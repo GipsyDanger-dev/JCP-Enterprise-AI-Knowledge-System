@@ -28,7 +28,8 @@ export function toDomainDocument(document: ApiDocument): DocumentItem {
   const version = document.latestVersion ?? document.version
   return {
     id: document.id,
-    name: version?.originalFilename ?? document.title,
+    name: document.title,
+    filename: version?.originalFilename ?? document.title,
     collection: document.collection || 'Knowledge Base',
     updatedAt: document.updatedAt ? formatRelativeTime(document.updatedAt) : 'Baru saja',
     status: toDomainDocumentStatus(document.status),

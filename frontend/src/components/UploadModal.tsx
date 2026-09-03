@@ -15,9 +15,10 @@ interface UploadModalProps {
 }
 
 export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const { language } = useWorkspace()
   const isId = language === 'id'
+  const isPersonal = user?.accountType === 'PERSONAL'
   const fileRef = useRef<HTMLInputElement>(null)
   const COLLECTIONS = [
     { id: 'BENDAHARA', label: 'Bendahara' },
@@ -59,7 +60,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     setUploading(true)
     setError(null)
     try {
-      const document = await uploadDocument(file, token ?? undefined, title, collection)
+      const document = await uploadDocument(file, token ?? undefined, title, isPersonal ? 'PERSONAL' : collection)
       setFile(null)
       setTitle('')
       setCollection('OPERASIONAL')
@@ -120,7 +121,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           />
         </div>
 
-        <div className="upload-field">
+        {!isPersonal && <div className="upload-field">
           <label><FolderOpen size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Koleksi' : 'Collection'}</label>
           <div className="upload-collection-grid">
             {COLLECTIONS.map((col) => (
@@ -135,7 +136,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
 
         {error && <div className="upload-error-msg">{error}</div>}
         </div>

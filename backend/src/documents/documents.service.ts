@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -22,6 +23,7 @@ import { DOCUMENT_STORAGE, DocumentStorage } from './document-storage.interface'
 import { UploadedDocumentFile, validateDocumentFile } from './document-file.validator';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
 
 const normalizeCategoryName = (value: string) => value.trim().replace(/\s+/g, ' ');
 const categoryKey = (value: string) => normalizeCategoryName(value).toLocaleLowerCase('id-ID');
@@ -35,12 +37,17 @@ export class DocumentsService {
   ) {}
 
   async create(input: CreateDocumentDto, uploadedFile: UploadedDocumentFile, actor: AuthenticatedUser) {
+    this.assertCanManageDocuments(actor);
     const file = validateDocumentFile(uploadedFile);
     const checksum = createHash('sha256').update(file.buffer).digest('hex');
     const duplicate = await this.prisma.documentVersion.findFirst({
       where: {
         checksum,
-        document: { deletedAt: null },
+        document: {
+          deletedAt: null,
+          uploadedBy: { accountType: actor.accountType },
+          ...(actor.accountType === AccountType.PERSONAL ? { uploadedById: actor.sub } : {}),
+        },
       },
       select: { documentId: true },
     });
@@ -50,7 +57,9 @@ export class DocumentsService {
     const documentVersionId = randomUUID();
     const processingJobId = randomUUID();
     const title = input.title?.trim() || file.originalname.slice(0, -extname(file.originalname).length);
-    const collection = input.collection?.trim() || 'Umum';
+    const collection = actor.accountType === AccountType.PERSONAL
+      ? 'PERSONAL'
+      : input.collection?.trim() || 'Umum';
 
     await this.prisma.$transaction(async (transaction) => {
       await transaction.document.create({
@@ -198,9 +207,14 @@ export class DocumentsService {
     });
   }
 
-  async getStatus(id: string) {
+  async getStatus(id: string, actor: AuthenticatedUser) {
+    this.assertCanManageDocuments(actor);
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(actor.accountType === AccountType.PERSONAL ? { uploadedById: actor.sub } : {}),
+      },
       select: {
         id: true,
         title: true,
@@ -245,6 +259,41 @@ export class DocumentsService {
           }
         : null,
     };
+  }
+
+  async update(id: string, input: UpdateDocumentDto, actor: AuthenticatedUser) {
+    this.assertCanManageDocuments(actor);
+    const canUpdateCollection = actor.accountType !== AccountType.PERSONAL;
+    if (input.title === undefined && (!canUpdateCollection || input.collection === undefined)) {
+      throw new BadRequestException('At least one field must be provided');
+    }
+
+    const document = await this.prisma.document.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+        ...(actor.accountType === AccountType.PERSONAL ? { uploadedById: actor.sub } : {}),
+      },
+      select: { id: true },
+    });
+    if (!document) throw new NotFoundException('Document not found');
+
+    return this.prisma.document.update({
+      where: { id },
+      data: {
+        ...(input.title !== undefined ? { title: input.title.trim() } : {}),
+        ...(input.collection !== undefined && canUpdateCollection
+          ? { collection: input.collection.trim() }
+          : {}),
+      },
+      select: {
+        id: true,
+        title: true,
+        collection: true,
+        status: true,
+        updatedAt: true,
+      },
+    });
   }
 
   async download(id: string, actor: AuthenticatedUser) {
@@ -312,8 +361,13 @@ export class DocumentsService {
   }
 
   async remove(id: string, actor: AuthenticatedUser) {
+    this.assertCanManageDocuments(actor);
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(actor.accountType === AccountType.PERSONAL ? { uploadedById: actor.sub } : {}),
+      },
       select: { id: true },
     });
     if (!document) throw new NotFoundException('Document not found');
@@ -346,5 +400,11 @@ export class DocumentsService {
     });
 
     return { id, status: DocumentStatus.DELETED, deletedAt };
+  }
+
+  private assertCanManageDocuments(actor: AuthenticatedUser): void {
+    if (actor.accountType !== AccountType.PERSONAL && !actor.isAdmin) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
   }
 }

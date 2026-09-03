@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { AccountType } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 
@@ -8,6 +9,7 @@ export class MessagingService {
 
   /** Get or create a direct conversation between employee and admin */
   async getEmployeeConversation(employeeId: string, actor: AuthenticatedUser) {
+    this.assertCompanyAccount(actor);
     if (!actor.isAdmin && actor.sub !== employeeId) {
       throw new ForbiddenException('You can only access your own conversation');
     }
@@ -184,6 +186,7 @@ export class MessagingService {
   }
 
   private async assertConversationAccess(conversationId: string, actor: AuthenticatedUser) {
+    this.assertCompanyAccount(actor);
     const conversation = await this.prisma.directConversation.findUnique({
       where: { id: conversationId },
       select: { employeeId: true },
@@ -223,6 +226,12 @@ export class MessagingService {
   private async getAdminPhotoUrl() {
     const admin = await this.prisma.user.findFirst({ where: { isAdmin: true, isActive: true }, select: { photoUrl: true } });
     return admin?.photoUrl ?? null;
+  }
+
+  private assertCompanyAccount(actor: AuthenticatedUser): void {
+    if (actor.accountType === AccountType.PERSONAL) {
+      throw new ForbiddenException('Messaging is only available to company accounts');
+    }
   }
 
   private serializeMessage(msg: any) {

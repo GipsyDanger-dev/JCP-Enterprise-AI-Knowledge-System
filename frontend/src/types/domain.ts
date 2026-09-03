@@ -17,6 +17,7 @@ export type DocumentStatus = 'Uploaded' | 'Ready' | 'Processing' | 'Queued' | 'F
 export interface DocumentItem {
   id: string
   name: string
+  filename: string
   collection: string
   updatedAt: string
   status: DocumentStatus

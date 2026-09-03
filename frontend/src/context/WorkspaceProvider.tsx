@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getConversation, queryChat } from '@/api/chat'
 import { errorMessage } from '@/api/client'
-import { deleteDocument, getDocumentStatus, listDocuments, uploadDocument } from '@/api/documents'
+import { deleteDocument, getDocumentStatus, listDocuments, updateDocument, uploadDocument } from '@/api/documents'
 import { listConversations, getEmployeeConversation } from '@/api/messaging'
 import { toDomainDocument, toDomainDocumentStatus, toDomainRole } from '@/api/mappers'
 import type { ApiDocument, ConversationDetail } from '@/api/types'
@@ -120,6 +120,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Polling unread messages + notification
   useEffect(() => {
     if (!user || !token) { setUnreadMessages(0); prevUnreadRef.current = 0; return }
+    if (user.accountType === 'PERSONAL') {
+      setUnreadMessages(0)
+      prevUnreadRef.current = 0
+      return
+    }
     let cancelled = false
     const poll = async () => {
       try {
@@ -193,6 +198,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setDocuments((current) => current.filter((doc) => doc.id !== id))
     } catch (err) {
       setUploadError(errorMessage(err))
+    }
+  }
+
+  const updateDocumentMetadata = async (id: string, input: { title?: string; collection?: string }) => {
+    if (!token) return
+    try {
+      const updated = await updateDocument(id, input, token)
+      setDocuments((current) => current.map((document) => document.id === id
+        ? {
+            ...document,
+            name: updated.title,
+            collection: updated.collection || document.collection,
+            updatedAt: new Date(updated.updatedAt ?? Date.now()).toLocaleString(language === 'id' ? 'id-ID' : 'en-US'),
+          }
+        : document))
+    } catch (err) {
+      setUploadError(errorMessage(err))
+      throw err
     }
   }
 
@@ -283,6 +306,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       isUploading,
       uploadError,
       registerUploadedDocument,
+      updateDocumentMetadata,
       removeDocument,
       language,
       setLanguage,

@@ -21,6 +21,18 @@ export function deleteDocument(id: string, token?: string): Promise<DeleteDocume
   return request<DeleteDocumentResponse>(`/documents/${id}`, { method: 'DELETE', headers: authHeaders(token) })
 }
 
+export function updateDocument(
+  id: string,
+  input: { title?: string; collection?: string },
+  token?: string,
+): Promise<ApiDocument> {
+  return request<ApiDocument>(`/documents/${id}`, {
+    method: 'PATCH',
+    body: input,
+    headers: authHeaders(token),
+  })
+}
+
 export interface DocumentChunk {
   chunkId: string
   pageNumber: number | null

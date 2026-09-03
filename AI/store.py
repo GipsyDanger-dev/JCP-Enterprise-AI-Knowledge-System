@@ -97,29 +97,37 @@ class PgVectorStore:
             for row in rows
         ]
 
-    def document_metadata(self) -> list[dict[str, Any]]:
+    def document_metadata(self, filters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Sifat dokumen yang bisa dicari: halaman, ukuran, tanggal unggah.
 
         Penyaringnya sengaja sama dengan ``search`` supaya pertanyaan metadata
         tidak pernah menyebut dokumen yang tidak bisa ditanyakan isinya.
         """
-        sql = """
+        conditions = [
+            "d.deleted_at IS NULL",
+            "d.status = 'READY'",
+            "dv.version_number = (SELECT MAX(v.version_number) FROM document_versions AS v WHERE v.document_id = d.id)",
+        ]
+        params: list[Any] = []
+        if filters:
+            if filters.get("uploaded_by_id"):
+                conditions.append("d.uploaded_by_id = %s")
+                params.append(filters["uploaded_by_id"])
+            if filters.get("collection"):
+                conditions.append("d.collection = %s")
+                params.append(filters["collection"])
+        sql = f"""
             SELECT dv.original_filename, dv.page_count, dv.file_size,
                    dv.created_at, COUNT(c.chunk_id)::int
             FROM document_versions AS dv
             JOIN documents AS d ON d.id = dv.document_id
             LEFT JOIN chunks AS c ON c.document_version_id = dv.id
-            WHERE d.deleted_at IS NULL
-              AND d.status = 'READY'
-              AND dv.version_number = (
-                  SELECT MAX(v.version_number) FROM document_versions AS v
-                  WHERE v.document_id = d.id
-              )
+            WHERE {" AND ".join(conditions)}
             GROUP BY dv.original_filename, dv.page_count, dv.file_size, dv.created_at
             ORDER BY dv.original_filename
         """
         with psycopg.connect(self.dsn) as conn:
-            rows = conn.execute(sql).fetchall()
+            rows = conn.execute(sql, params).fetchall()
         return [
             {
                 "filename": row[0],
@@ -236,6 +244,14 @@ class PgVectorStore:
         ]
         filter_params: list[Any] = []
         if filters:
+            uploaded_by_id = filters.get("uploaded_by_id")
+            if uploaded_by_id:
+                conditions.append("d.uploaded_by_id = %s")
+                filter_params.append(uploaded_by_id)
+            collection = filters.get("collection")
+            if collection:
+                conditions.append("d.collection = %s")
+                filter_params.append(collection)
             filename = filters.get("filename")
             if filename:
                 conditions.append("dv.original_filename ILIKE %s")
@@ -277,23 +293,38 @@ class PgVectorStore:
             results.append((float(row[8]), chunk))
         return results
 
-    def context_chunks(self, chunk_ids: list[str]) -> list[tuple[float, dict[str, Any]]]:
+    def context_chunks(
+        self,
+        chunk_ids: list[str],
+        filters: dict[str, Any] | None = None,
+    ) -> list[tuple[float, dict[str, Any]]]:
         """Load cited chunks from the prior answer without sending chat history to a provider."""
         ids = list(dict.fromkeys(chunk_ids))[:8]
         if not ids:
             return []
-        sql = """
+        conditions = [
+            "c.chunk_id = ANY(%s)",
+            "d.deleted_at IS NULL",
+            "d.status = 'READY'",
+        ]
+        params: list[Any] = [ids]
+        if filters:
+            if filters.get("uploaded_by_id"):
+                conditions.append("d.uploaded_by_id = %s")
+                params.append(filters["uploaded_by_id"])
+            if filters.get("collection"):
+                conditions.append("d.collection = %s")
+                params.append(filters["collection"])
+        sql = f"""
             SELECT c.chunk_id, d.id, dv.id, dv.original_filename,
                    dv.version_number, c.page_number, c.section_title, c.text
             FROM chunks AS c
             JOIN document_versions AS dv ON dv.id = c.document_version_id
             JOIN documents AS d ON d.id = dv.document_id
-            WHERE c.chunk_id = ANY(%s)
-              AND d.deleted_at IS NULL
-              AND d.status = 'READY'
+            WHERE {" AND ".join(conditions)}
         """
         with psycopg.connect(self.dsn) as conn:
-            rows = conn.execute(sql, (ids,)).fetchall()
+            rows = conn.execute(sql, params).fetchall()
         chunks = {
             row[0]: {
                 "chunk_id": row[0],
@@ -311,7 +342,8 @@ class PgVectorStore:
 
     def _answer_from_matches(self, query: str, matches: list[tuple[float, dict[str, Any]]],
                              use_llm: bool = False, model: str = DEFAULT_MODEL,
-                             api_key: str | None = None, allow_clarify: bool = False) -> dict[str, Any]:
+                             api_key: str | None = None, allow_clarify: bool = False,
+                             filters: dict[str, Any] | None = None) -> dict[str, Any]:
         """Turn retrieved chunks into the answer payload.
 
         Deliberately left outside the retrieval ``try`` blocks: a ProviderError
@@ -325,7 +357,7 @@ class PgVectorStore:
                 query, matches, model=model, api_key=api_key,
                 # Sifat berkas (halaman, ukuran, tanggal) tidak ada di dalam
                 # teks dokumen, jadi ikut dikirim sebagai konteks.
-                documents=self.document_metadata(),
+                documents=self.document_metadata(filters),
                 allow_clarify=allow_clarify,
             )
             if use_llm
@@ -346,7 +378,7 @@ class PgVectorStore:
             ],
         }
 
-    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False) -> dict[str, Any]:
+    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False, filters: dict[str, Any] | None = None) -> dict[str, Any]:
         """TF-IDF fallback when vector search fails or finds nothing."""
         try:
             import psycopg as _psycopg
@@ -356,16 +388,28 @@ class PgVectorStore:
                 return no_answer_response()
             with _psycopg.connect(dsn) as conn:
                 with conn.cursor() as cur:
+                    conditions = [
+                        "d.deleted_at IS NULL",
+                        "d.status = 'READY'",
+                        "dv.version_number = (SELECT MAX(v.version_number) FROM document_versions v WHERE v.document_id = d.id)",
+                    ]
+                    params: list[Any] = []
+                    if filters:
+                        if filters.get("uploaded_by_id"):
+                            conditions.append("d.uploaded_by_id = %s")
+                            params.append(filters["uploaded_by_id"])
+                        if filters.get("collection"):
+                            conditions.append("d.collection = %s")
+                            params.append(filters["collection"])
                     cur.execute(
                         "SELECT c.chunk_id, c.document_version_id, d.id, dv.original_filename, "
                         "dv.version_number, c.page_number, c.section_title, c.text "
                         "FROM chunks c "
                         "JOIN document_versions dv ON dv.id = c.document_version_id "
                         "JOIN documents d ON d.id = dv.document_id "
-                        "WHERE d.deleted_at IS NULL "
-                        "AND d.status = 'READY' "
-                        "AND dv.version_number = (SELECT MAX(v.version_number) FROM document_versions v WHERE v.document_id = d.id) "
-                        "ORDER BY c.created_at"
+                        f"WHERE {' AND '.join(conditions)} "
+                        "ORDER BY c.created_at",
+                        params,
                     )
                     rows = cur.fetchall()
             chunks = []
@@ -387,7 +431,7 @@ class PgVectorStore:
             return no_answer_response()
         return self._answer_from_matches(
             query, matches, use_llm=use_llm, model=model,
-            api_key=api_key, allow_clarify=allow_clarify,
+            api_key=api_key, allow_clarify=allow_clarify, filters=filters,
         )
 
     # ---------- orchestration ----------
@@ -405,7 +449,7 @@ class PgVectorStore:
         allow_clarify: bool = False,
     ) -> dict[str, Any]:
         try:
-            context_matches = self.context_chunks(context_chunk_ids or [])
+            context_matches = self.context_chunks(context_chunk_ids or [], filters=filters)
             query_vector = embed_texts([query], model=self.model, api_key=api_key)[0]
             retrieved_matches = [
                 (score, chunk)
@@ -421,14 +465,14 @@ class PgVectorStore:
             # Only retrieval is guarded here. TF-IDF needs no embeddings, so it is
             # a genuine fallback when the vector path fails.
             print(f"[AI] Vector search failed ({exc}), falling back to TF-IDF")
-            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify)
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters)
         if not matches:
             # Vector search found nothing above threshold, try TF-IDF fallback
             print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
-            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify)
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters)
         return self._answer_from_matches(
             query, matches, use_llm=use_llm, model=model,
-            api_key=api_key, allow_clarify=allow_clarify,
+            api_key=api_key, allow_clarify=allow_clarify, filters=filters,
         )
 
 
