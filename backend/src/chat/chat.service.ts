@@ -3,6 +3,7 @@ import { MessageRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { aiServiceHeaders, aiServiceUrl } from '../config/env.util';
+import { allowedCategoryFilter } from '../documents/document-visibility';
 
 interface AiCitation {
   document_id: string;
@@ -56,6 +57,7 @@ export class ChatService {
     const conversation = await this.resolveConversation(question, actor, conversationId);
     const contextChunkIds = await this.getContextChunkIds(conversation.id);
     const conversationTopic = await this.getConversationTopic(conversation.id);
+    const access = await this.accessScope(actor);
 
     await this.prisma.message.create({
       data: {
@@ -84,6 +86,8 @@ export class ChatService {
           // Hanya pertanyaan yang diketik sendiri yang boleh dibalas dengan
           // pertanyaan balik saat maksudnya terlalu luas.
           allow_clarify: !fromSuggestion,
+          // Batas akses penanya. AI service menolak permintaan tanpa ini.
+          access,
         }),
       });
 
@@ -117,6 +121,23 @@ export class ChatService {
         awaitingChoice: false,
       };
     }
+  }
+
+  /**
+   * Terjemahkan role aktor menjadi daftar kategori yang boleh dibacanya.
+   *
+   * Aturan siapa-boleh-apa sengaja tetap di backend — AI service hanya
+   * menerima hasilnya dan menjalankan penyaring. Dengan begitu hanya ada satu
+   * tempat yang perlu diubah kalau kebijakan aksesnya berubah.
+   */
+  private async accessScope(actor: AuthenticatedUser) {
+    const filter = allowedCategoryFilter(actor);
+    if (filter === null) return { is_admin: true, allowed_category_ids: [] as string[] };
+    const categories = await this.prisma.documentCategory.findMany({
+      where: filter,
+      select: { id: true },
+    });
+    return { is_admin: false, allowed_category_ids: categories.map((category) => category.id) };
   }
 
   private async resolveConversation(

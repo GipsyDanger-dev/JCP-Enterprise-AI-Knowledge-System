@@ -20,6 +20,26 @@ enum UserRole {
   HUMAS
 }
 
+// Jenis produk hukum — mengikuti kategori resmi JDIH Sleman satu lawan satu.
+enum DocumentType {
+  PERATURAN_DAERAH
+  PERATURAN_BUPATI
+  KEPUTUSAN_BUPATI
+  INSTRUKSI_BUPATI
+  RANCANGAN_PUU
+  PERATURAN_DESA
+  PUTUSAN_PENGADILAN
+}
+
+// Status keberlakuan. Dipakai untuk mencegah AI menjawab dengan rancangan
+// atau aturan yang sudah dicabut — kesalahan yang tidak terlihat dari isi teks.
+enum LegalStatus {
+  BERLAKU
+  RANCANGAN
+  DIUBAH
+  DICABUT
+}
+
 enum DocumentStatus {
   UPLOADED
   QUEUED
@@ -67,72 +87,93 @@ enum NotificationType {
 }
 
 model User {
-  id            String         @id @default(uuid()) @db.Uuid
-  email         String?        @unique
-  username      String?        @unique
-  employeeNumber String         @unique @map("employee_number")
-  division      String
-  jobTitle      String         @map("job_title")
-  passwordHash  String         @map("password_hash")
-  displayName   String         @map("display_name")
-  role          UserRole       @default(SUPER_ADMIN)
-  isAdmin       Boolean        @default(false) @map("is_admin")
-  isActive      Boolean        @default(true) @map("is_active")
-  photoUrl      String?        @map("photo_url")
-  lastLoginAt   DateTime?      @map("last_login_at")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  documents     Document[]
-  conversations Conversation[]
+  id                  String               @id @default(uuid()) @db.Uuid
+  email               String?              @unique
+  username            String?              @unique
+  employeeNumber      String               @unique @map("employee_number")
+  division            String
+  jobTitle            String               @map("job_title")
+  passwordHash        String               @map("password_hash")
+  displayName         String               @map("display_name")
+  role                UserRole             @default(SUPER_ADMIN)
+  isAdmin             Boolean              @default(false) @map("is_admin")
+  isActive            Boolean              @default(true) @map("is_active")
+  photoUrl            String?              @map("photo_url")
+  lastLoginAt         DateTime?            @map("last_login_at")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  documents           Document[]
+  conversations       Conversation[]
   directConversations DirectConversation[]
-  auditLogs     AuditLog[]
-  sessions      Session[]
-  requiredReadings RequiredReading[]
-  notifications AppNotification[]
-  announcements Announcement[]
+  auditLogs           AuditLog[]
+  sessions            Session[]
+  requiredReadings    RequiredReading[]
+  notifications       AppNotification[]
+  announcements       Announcement[]
 
   @@map("users")
 }
 
 model Document {
-  id           String            @id @default(uuid()) @db.Uuid
-  title        String
-  collection   String?           @default("Umum")
-  status       DocumentStatus    @default(UPLOADED)
-  uploadedById String            @map("uploaded_by_id") @db.Uuid
-  uploadedBy   User              @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
-  versions     DocumentVersion[]
-  deletedAt    DateTime?         @map("deleted_at")
-  createdAt    DateTime          @default(now()) @map("created_at")
-  updatedAt    DateTime          @updatedAt @map("updated_at")
+  id               String            @id @default(uuid()) @db.Uuid
+  title            String
+  // Dipertahankan sementara supaya frontend lama tidak pecah; digantikan oleh
+  // categoryId dan akan dihapus setelah semua pemakainya pindah.
+  collection       String?           @default("Umum")
+  status           DocumentStatus    @default(UPLOADED)
+  // Sumbu 1 — jenis produk hukum. Bisa diisi otomatis dari folder asal.
+  documentType     DocumentType?     @map("document_type")
+  // Sumbu 2 — subjek/bidang. Inilah yang menentukan siapa boleh melihat.
+  categoryId       String?           @map("category_id") @db.Uuid
+  category         DocumentCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  // Sumbu 3 — status keberlakuan.
+  legalStatus      LegalStatus       @default(BERLAKU) @map("legal_status")
+  // Nomor dan tahun peraturan, untuk pencarian "Perbup No 11 Tahun 2026".
+  // Pencarian vektor buruk untuk pertanyaan bernomor, jadi ini dicari lewat kolom.
+  regulationNumber String?           @map("regulation_number")
+  regulationYear   Int?              @map("regulation_year")
+  uploadedById     String            @map("uploaded_by_id") @db.Uuid
+  uploadedBy       User              @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  versions         DocumentVersion[]
+  deletedAt        DateTime?         @map("deleted_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
   requiredReadings RequiredReading[]
 
   @@index([status])
   @@index([uploadedById])
+  @@index([categoryId, legalStatus])
+  @@index([regulationYear, regulationNumber])
   @@map("documents")
 }
 
 model DocumentCategory {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  key       String   @unique
-  createdAt DateTime @default(now()) @map("created_at")
+  id           String     @id @default(uuid()) @db.Uuid
+  name         String
+  key          String     @unique
+  // Daftar kosong berarti terbuka untuk semua pegawai yang sudah login.
+  // Hak akses sengaja ditempel di kategori: menandai ratusan dokumen satu per
+  // satu terlalu rawan salah, sedangkan kategori cukup ditandai sekali.
+  allowedRoles UserRole[] @map("allowed_roles")
+  documents    Document[]
+  createdAt    DateTime   @default(now()) @map("created_at")
 
   @@index([name])
   @@map("document_categories")
 }
 
 model RequiredReading {
-  id String @id @default(uuid()) @db.Uuid
-  documentId String @map("document_id") @db.Uuid
-  userId String @map("user_id") @db.Uuid
-  progress Int @default(0)
-  assignedAt DateTime @default(now()) @map("assigned_at")
-  dueAt DateTime @map("due_at")
+  id             String    @id @default(uuid()) @db.Uuid
+  documentId     String    @map("document_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  progress       Int       @default(0)
+  assignedAt     DateTime  @default(now()) @map("assigned_at")
+  dueAt          DateTime  @map("due_at")
   lastProgressAt DateTime? @map("last_progress_at")
-  completedAt DateTime? @map("completed_at")
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  completedAt    DateTime? @map("completed_at")
+  document       Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([documentId, userId])
   @@index([userId, completedAt])
   @@index([documentId, completedAt])
@@ -140,15 +181,15 @@ model RequiredReading {
 }
 
 model AppNotification {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @map("user_id") @db.Uuid
-  type NotificationType
-  title String
-  body String?
-  href String?
-  readAt DateTime? @map("read_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt, createdAt])
   @@map("app_notifications")
@@ -203,14 +244,14 @@ model DocumentFile {
 }
 
 model DocumentChunk {
-  chunkId           String          @id @map("chunk_id")
-  documentVersionId String          @map("document_version_id") @db.Uuid
-  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
-  pageNumber        Int?            @map("page_number")
-  sectionTitle      String          @default("") @map("section_title")
-  text              String          @db.Text
+  chunkId           String                       @id @map("chunk_id")
+  documentVersionId String                       @map("document_version_id") @db.Uuid
+  documentVersion   DocumentVersion              @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  pageNumber        Int?                         @map("page_number")
+  sectionTitle      String                       @default("") @map("section_title")
+  text              String                       @db.Text
   embedding         Unsupported("vector(1536)")?
-  createdAt         DateTime        @default(now()) @map("created_at")
+  createdAt         DateTime                     @default(now()) @map("created_at")
 
   @@index([documentVersionId])
   @@map("chunks")
@@ -298,15 +339,15 @@ model AuditLog {
 }
 
 model DirectConversation {
-  id             String          @id @default(uuid()) @db.Uuid
-  employeeId     String          @map("employee_id") @db.Uuid
-  employee       User            @relation(fields: [employeeId], references: [id], onDelete: Restrict)
-  lastMessage    String?         @map("last_message") @db.Text
-  lastMessageAt  DateTime?       @map("last_message_at")
-  unreadCount    Int             @default(0) @map("unread_count")
-  messages       DirectMessage[]
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
+  id            String          @id @default(uuid()) @db.Uuid
+  employeeId    String          @map("employee_id") @db.Uuid
+  employee      User            @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  lastMessage   String?         @map("last_message") @db.Text
+  lastMessageAt DateTime?       @map("last_message_at")
+  unreadCount   Int             @default(0) @map("unread_count")
+  messages      DirectMessage[]
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
 
   @@unique([employeeId])
   @@index([updatedAt])
@@ -314,15 +355,15 @@ model DirectConversation {
 }
 
 model DirectMessage {
-  id              String              @id @default(uuid()) @db.Uuid
-  conversationId  String              @map("conversation_id") @db.Uuid
-  conversation    DirectConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender          String              @db.VarChar(20)
-  senderName      String?             @map("sender_name") @db.VarChar(100)
-  content         String              @db.Text
-  attachments     Json?
-  editedAt        DateTime?           @map("edited_at")
-  createdAt       DateTime            @default(now()) @map("created_at")
+  id             String             @id @default(uuid()) @db.Uuid
+  conversationId String             @map("conversation_id") @db.Uuid
+  conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         String             @db.VarChar(20)
+  senderName     String?            @map("sender_name") @db.VarChar(100)
+  content        String             @db.Text
+  attachments    Json?
+  editedAt       DateTime?          @map("edited_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
 
   @@index([conversationId, createdAt])
   @@map("direct_messages")

@@ -44,7 +44,7 @@ from config import DEFAULT_MODEL, EMBEDDING_MODEL
 from generation.guardrails import QUICK_SUGGESTIONS, is_out_of_scope, out_of_scope_response
 from knowledge_base import KnowledgeBase
 from provider_errors import ProviderError
-from store import PgVectorStore, default_dsn, ingest_to_pg
+from store import AccessScope, PgVectorStore, default_dsn, ingest_to_pg
 
 PROJECT_DIR = Path(__file__).resolve().parent
 DEFAULT_INDEX = PROJECT_DIR / "knowledge_base.json"
@@ -102,6 +102,9 @@ class AskRequest(BaseModel):
     # Dimatikan untuk pertanyaan yang datang dari klik tombol: aplikasi tidak
     # boleh balik bertanya atas saran yang ia usulkan sendiri.
     allow_clarify: bool = False
+    # Batas akses penanya, dihitung backend dari role dan kategori.
+    # Wajib ada: tanpa ini permintaan ditolak, bukan dilayani seluruh korpus.
+    access: dict[str, Any] | None = None
 
 
 class AskResponse(BaseModel):
@@ -269,11 +272,20 @@ def ask(request: AskRequest) -> dict[str, Any]:
     try:
         store = current_store()
         if isinstance(store, PgVectorStore):
+            # Fail closed. Permintaan tanpa batas akses ditolak, bukan dianggap
+            # boleh membaca semuanya — kelalaian di pemanggil tidak boleh
+            # berubah menjadi kebocoran dokumen.
+            scope = AccessScope.from_payload(request.access)
+            if scope is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="access scope is required: sertakan field 'access' pada permintaan",
+                )
             return store.ask(
                 retrieval_query, top_k=request.top_k, use_llm=request.use_llm,
                 model=request.model or DEFAULT_MODEL, filters=request.filters,
                 context_chunk_ids=request.context_chunk_ids,
-                allow_clarify=request.allow_clarify,
+                allow_clarify=request.allow_clarify, scope=scope,
             )
         return store.ask(
             retrieval_query, top_k=request.top_k, use_llm=request.use_llm,

@@ -76,7 +76,7 @@ export class DocumentsController {
 
   @Get()
   @ApiOperation({ summary: 'List document metadata without loading binary content' })
-  @ApiOkResponse({ description: 'ADMIN sees active documents; USER sees only READY documents' })
+  @ApiOkResponse({ description: 'Admin melihat semua dokumen aktif; pegawai hanya dokumen READY pada kategori yang boleh diaksesnya, tanpa rancangan' })
   findAll(@CurrentUser() actor: AuthenticatedUser) {
     return this.documentsService.findAll(actor);
   }
@@ -102,26 +102,33 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'Document and latest job status' })
   @ApiNotFoundResponse({ description: 'Document not found' })
   @ApiForbiddenResponse({ description: 'Only ADMIN can inspect processing status' })
-  getStatus(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.documentsService.getStatus(id);
+  getStatus(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.documentsService.getStatus(id, actor);
   }
 
   @Get(':id/chunks')
   @ApiOperation({ summary: 'Get document chunks for preview' })
   @ApiOkResponse({ description: 'Document chunks with text content' })
-  @ApiNotFoundResponse({ description: 'Document not found' })
-  getChunks(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.documentsService.getChunks(id);
+  @ApiNotFoundResponse({ description: 'Dokumen tidak ada, atau tidak boleh diakses aktor ini' })
+  getChunks(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.documentsService.getChunks(id, actor);
   }
 
   @Get(':id/download')
   @ApiOperation({ summary: 'Download the document binary file' })
   @ApiOkResponse({ description: 'Document binary content' })
-  @ApiNotFoundResponse({ description: 'Document not found' })
+  @ApiNotFoundResponse({ description: 'Dokumen tidak ada, atau tidak boleh diakses aktor ini' })
   async download(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
   ): Promise<StreamableFile> {
-    const file = await this.documentsService.download(id);
+    const file = await this.documentsService.download(id, actor);
     return new StreamableFile(file.content, {
       type: file.mimeType,
       disposition: `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`,

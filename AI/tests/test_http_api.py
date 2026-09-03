@@ -83,6 +83,44 @@ class HttpApiTests(unittest.TestCase):
         response = self.client.delete("/documents/nggak_ada.pdf")
         self.assertEqual(response.status_code, 404)
 
+    # ---------- batas akses wajib ----------
+
+    def _pg_store_stub(self):
+        """Tiruan PgVectorStore: jalur inilah yang dipakai di produksi."""
+        from store import PgVectorStore
+
+        class StubStore(PgVectorStore):
+            def __init__(self):  # sengaja tanpa koneksi database
+                self.calls = []
+
+            def ask(self, *_args, **kwargs):
+                self.calls.append(kwargs.get("scope"))
+                return {"answer": "ok", "citations": [], "grounded": True}
+
+        return StubStore()
+
+    def test_ask_tanpa_access_ditolak(self):
+        """Fail closed: lupa mengirim batas akses tidak boleh berarti boleh semuanya."""
+        store = self._pg_store_stub()
+        with mock.patch("http_api.current_store", return_value=store):
+            response = self.client.post("/ask", json={"query": "Apa syarat pendirian koperasi menurut perda?"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("access", response.json()["detail"])
+        self.assertEqual(store.calls, [], "store.ask tidak boleh terpanggil tanpa batas akses")
+
+    def test_ask_dengan_access_meneruskan_scope(self):
+        store = self._pg_store_stub()
+        with mock.patch("http_api.current_store", return_value=store):
+            response = self.client.post("/ask", json={
+                "query": "Apa syarat pendirian koperasi menurut perda?",
+                "access": {"is_admin": False, "allowed_category_ids": ["cat-a"]},
+            })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(store.calls), 1)
+        scope = store.calls[0]
+        self.assertFalse(scope.is_admin)
+        self.assertEqual(scope.allowed_category_ids, ("cat-a",))
+
     def test_provider_http_error_maps_to_safe_502(self):
         secret = "sk-provider-secret-value"
 

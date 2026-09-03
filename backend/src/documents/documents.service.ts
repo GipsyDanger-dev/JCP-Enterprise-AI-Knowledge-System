@@ -21,6 +21,7 @@ import { DOCUMENT_STORAGE, DocumentStorage } from './document-storage.interface'
 import { UploadedDocumentFile, validateDocumentFile } from './document-file.validator';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
+import { documentVisibilityWhere } from './document-visibility';
 
 const normalizeCategoryName = (value: string) => value.trim().replace(/\s+/g, ' ');
 const categoryKey = (value: string) => normalizeCategoryName(value).toLocaleLowerCase('id-ID');
@@ -151,16 +152,18 @@ export class DocumentsService {
 
   async findAll(actor: AuthenticatedUser) {
     const documents = await this.prisma.document.findMany({
-      where: {
-        deletedAt: null,
-        ...(!actor.isAdmin ? { status: DocumentStatus.READY, collection: actor.role } : {}),
-      },
+      where: documentVisibilityWhere(actor),
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         title: true,
         collection: true,
         status: true,
+        documentType: true,
+        legalStatus: true,
+        regulationNumber: true,
+        regulationYear: true,
+        category: { select: { id: true, name: true } },
         createdAt: true,
         updatedAt: true,
         uploadedBy: {
@@ -195,9 +198,9 @@ export class DocumentsService {
     });
   }
 
-  async getStatus(id: string) {
+  async getStatus(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, ...documentVisibilityWhere(actor) },
       select: {
         id: true,
         title: true,
@@ -244,9 +247,9 @@ export class DocumentsService {
     };
   }
 
-  async download(id: string) {
+  async download(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, ...documentVisibilityWhere(actor) },
       select: {
         versions: {
           orderBy: { versionNumber: 'desc' },
@@ -265,9 +268,9 @@ export class DocumentsService {
     };
   }
 
-  async getChunks(id: string) {
+  async getChunks(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, ...documentVisibilityWhere(actor) },
       select: {
         id: true,
         title: true,
@@ -302,7 +305,7 @@ export class DocumentsService {
 
   async remove(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, ...documentVisibilityWhere(actor) },
       select: { id: true },
     });
     if (!document) throw new NotFoundException('Document not found');

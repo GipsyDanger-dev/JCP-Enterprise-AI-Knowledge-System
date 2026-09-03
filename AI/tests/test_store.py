@@ -3,7 +3,7 @@ from contextlib import ExitStack, contextmanager
 from unittest import mock
 
 import store
-from store import PgVectorStore
+from store import AccessScope, PgVectorStore
 
 
 class FakeCursor:
@@ -114,7 +114,7 @@ class PgVectorStoreTests(unittest.TestCase):
         )
         with patch_deps(cursor=FakeCursor(rows=[row])):
             db = PgVectorStore("postgresql://u:p@h/db")
-            results = db.search([0.1, 0.2, 0.3], top_k=5)
+            results = db.search([0.1, 0.2, 0.3], top_k=5, scope=AccessScope.unrestricted())
         self.assertEqual(len(results), 1)
         score, chunk = results[0]
         self.assertAlmostEqual(score, 0.71)
@@ -124,10 +124,67 @@ class PgVectorStoreTests(unittest.TestCase):
         self.assertEqual(chunk["filename"], "sop.txt")
         self.assertEqual(chunk["section_title"], "SOP")
 
+    # ---------- batas akses ----------
+
+    def test_scope_pegawai_menyaring_rancangan_dan_kategori(self):
+        """Pegawai biasa: hanya READY, bukan rancangan, dan kategori yang diizinkan."""
+        scope = AccessScope(is_admin=False, allowed_category_ids=("cat-a", "cat-b"))
+        conditions, params = scope.conditions()
+        joined = " AND ".join(conditions)
+        self.assertIn("d.deleted_at IS NULL", joined)
+        self.assertIn("d.status = 'READY'", joined)
+        self.assertIn("d.legal_status <> 'RANCANGAN'", joined)
+        self.assertIn("d.category_id = ANY(%s::uuid[])", joined)
+        self.assertEqual(params, [["cat-a", "cat-b"]])
+
+    def test_scope_tanpa_kategori_tidak_membuka_semuanya(self):
+        """Daftar kategori kosong berarti nyaris tidak melihat apa pun, bukan melihat semua."""
+        conditions, params = AccessScope(is_admin=False).conditions()
+        self.assertIn("d.category_id = ANY(%s::uuid[])", " AND ".join(conditions))
+        self.assertEqual(params, [[]])
+
+    def test_scope_dari_payload_kosong_bernilai_none(self):
+        """Permintaan tanpa batas akses harus bisa dibedakan, supaya bisa ditolak."""
+        self.assertIsNone(AccessScope.from_payload(None))
+        self.assertIsNone(AccessScope.from_payload("bukan dict"))
+        scope = AccessScope.from_payload({"is_admin": False, "allowed_category_ids": ["x"]})
+        self.assertEqual(scope, AccessScope(is_admin=False, allowed_category_ids=("x",)))
+
+    def test_search_menyertakan_penyaring_akses_di_sql(self):
+        scope = AccessScope(is_admin=False, allowed_category_ids=("cat-a",))
+        with patch_deps(cursor=FakeCursor(rows=[])) as fake:
+            db = PgVectorStore("postgresql://u:p@h/db")
+            db.search([0.1], top_k=5, scope=scope)
+        sql, params = fake.conn.executed[-1]
+        self.assertIn("d.legal_status <> 'RANCANGAN'", sql)
+        self.assertIn("d.category_id = ANY(%s::uuid[])", sql)
+        # daftar kategori harus mendahului vektor query, sesuai urutan %s di SQL
+        self.assertEqual(params[1], ["cat-a"])
+
+    def test_context_chunks_ikut_disaring(self):
+        """Chunk dari jawaban lama tetap dicek: hak akses bisa dicabut belakangan."""
+        scope = AccessScope(is_admin=False, allowed_category_ids=("cat-a",))
+        with patch_deps(cursor=FakeCursor(rows=[])) as fake:
+            db = PgVectorStore("postgresql://u:p@h/db")
+            db.context_chunks(["chunk-1"], scope=scope)
+        sql, _ = fake.conn.executed[-1]
+        self.assertIn("d.legal_status <> 'RANCANGAN'", sql)
+        self.assertIn("d.category_id = ANY(%s::uuid[])", sql)
+
+    def test_document_metadata_ikut_disaring(self):
+        """Daftar berkas dikirim ke LLM sebagai konteks, jadi tidak boleh bocor judulnya."""
+        scope = AccessScope(is_admin=False, allowed_category_ids=("cat-a",))
+        with patch_deps(cursor=FakeCursor(rows=[])) as fake:
+            db = PgVectorStore("postgresql://u:p@h/db")
+            db.document_metadata(scope=scope)
+        sql, _ = fake.conn.executed[-1]
+        self.assertIn("d.legal_status <> 'RANCANGAN'", sql)
+        self.assertIn("d.category_id = ANY(%s::uuid[])", sql)
+
     def test_search_builds_metadata_filters(self):
         with patch_deps(cursor=FakeCursor(rows=[])) as fake:
             db = PgVectorStore("postgresql://u:p@h/db")
-            db.search([0.1], top_k=5, filters={"filename": "sop_b.txt", "section_title": "KETENTUAN"})
+            db.search([0.1], top_k=5, filters={"filename": "sop_b.txt", "section_title": "KETENTUAN"}, scope=AccessScope.unrestricted())
         sql, params = fake.conn.executed[-1]
         self.assertIn("dv.original_filename ILIKE %s", sql)
         self.assertIn("c.section_title ILIKE %s", sql)
@@ -146,7 +203,7 @@ class PgVectorStoreTests(unittest.TestCase):
             db = PgVectorStore("postgresql://u:p@h/db")
             with mock.patch("store.embed_texts", return_value=[[1.0, 0.0]]), \
                  mock.patch.object(PgVectorStore, "search", return_value=[(0.20, chunk)]):
-                result = db.ask("presiden")
+                result = db.ask("presiden", scope=AccessScope.unrestricted())
         self.assertFalse(result["grounded"])
         self.assertEqual(result["answer"], "Informasi tidak ditemukan pada dokumen yang tersedia.")
         self.assertEqual(result["citations"], [])
@@ -162,7 +219,7 @@ class PgVectorStoreTests(unittest.TestCase):
             db = PgVectorStore("postgresql://u:p@h/db")
             with mock.patch("store.embed_texts", return_value=[[1.0, 0.0]]), \
                  mock.patch.object(PgVectorStore, "search", return_value=[(0.71, chunk)]):
-                result = db.ask("biaya hotel")
+                result = db.ask("biaya hotel", scope=AccessScope.unrestricted())
         self.assertTrue(result["grounded"])
         self.assertEqual(result["citations"][0]["document_version_id"], "version-1")
 

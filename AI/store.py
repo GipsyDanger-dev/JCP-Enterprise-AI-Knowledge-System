@@ -15,6 +15,7 @@ removes its chunks when that version is deleted.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +45,58 @@ from retrieval.embeddings import embed_texts
 
 VECTOR_MINIMUM_SCORE = 0.45
 DATABASE_URL_ENV = "DATABASE_URL"
+
+
+@dataclass(frozen=True)
+class AccessScope:
+    """Batas akses satu penanya, cerminan ``documentVisibilityWhere`` di backend.
+
+    Keputusan siapa-boleh-melihat-apa tetap milik backend: ia yang tahu role,
+    kategori, dan aturannya. Yang menyeberang ke sini hanya hasilnya, berupa
+    daftar id kategori. AI service tinggal menjalankan penyaringnya.
+
+    Penyaringnya selalu masuk ke klausa WHERE, bukan disaring setelah baris
+    terambil, supaya chunk terlarang tidak pernah sempat menyentuh prompt LLM.
+    Semua jalur pengambilan wajib menerima objek ini sebagai argumen — sengaja
+    tanpa nilai default supaya jalur baru gagal keras, bukan diam-diam terbuka.
+    """
+
+    is_admin: bool = False
+    allowed_category_ids: tuple[str, ...] = ()
+
+    @classmethod
+    def unrestricted(cls) -> "AccessScope":
+        """Untuk pemakaian CLI/ingest lokal, bukan untuk permintaan pengguna."""
+        return cls(is_admin=True)
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any] | None) -> "AccessScope | None":
+        """None berarti permintaan tidak membawa batas akses — penelepon wajib menolaknya."""
+        if not isinstance(payload, dict):
+            return None
+        ids = payload.get("allowed_category_ids") or []
+        if not isinstance(ids, list):
+            return None
+        return cls(
+            is_admin=bool(payload.get("is_admin")),
+            allowed_category_ids=tuple(str(i) for i in ids),
+        )
+
+    def conditions(self, alias: str = "d") -> tuple[list[str], list[Any]]:
+        """Potongan WHERE plus parameternya, untuk ditempel ke setiap query."""
+        if self.is_admin:
+            return [f"{alias}.deleted_at IS NULL"], []
+        return (
+            [
+                f"{alias}.deleted_at IS NULL",
+                f"{alias}.status = 'READY'",
+                # Rancangan tidak pernah dijawab: angkanya belum final, dan
+                # jawaban yang mengutipnya tetap terlihat meyakinkan.
+                f"{alias}.legal_status <> 'RANCANGAN'",
+                f"({alias}.category_id IS NULL OR {alias}.category_id = ANY(%s::uuid[]))",
+            ],
+            [list(self.allowed_category_ids)],
+        )
 
 
 def _require_deps() -> None:
@@ -97,20 +150,20 @@ class PgVectorStore:
             for row in rows
         ]
 
-    def document_metadata(self) -> list[dict[str, Any]]:
+    def document_metadata(self, *, scope: AccessScope) -> list[dict[str, Any]]:
         """Sifat dokumen yang bisa dicari: halaman, ukuran, tanggal unggah.
 
         Penyaringnya sengaja sama dengan ``search`` supaya pertanyaan metadata
         tidak pernah menyebut dokumen yang tidak bisa ditanyakan isinya.
         """
-        sql = """
+        access_conditions, access_params = scope.conditions()
+        sql = f"""
             SELECT dv.original_filename, dv.page_count, dv.file_size,
                    dv.created_at, COUNT(c.chunk_id)::int
             FROM document_versions AS dv
             JOIN documents AS d ON d.id = dv.document_id
             LEFT JOIN chunks AS c ON c.document_version_id = dv.id
-            WHERE d.deleted_at IS NULL
-              AND d.status = 'READY'
+            WHERE {' AND '.join(access_conditions)}
               AND dv.version_number = (
                   SELECT MAX(v.version_number) FROM document_versions AS v
                   WHERE v.document_id = d.id
@@ -119,7 +172,7 @@ class PgVectorStore:
             ORDER BY dv.original_filename
         """
         with psycopg.connect(self.dsn) as conn:
-            rows = conn.execute(sql).fetchall()
+            rows = conn.execute(sql, access_params).fetchall()
         return [
             {
                 "filename": row[0],
@@ -226,15 +279,17 @@ class PgVectorStore:
         query_vector: list[float],
         top_k: int = 5,
         filters: dict[str, Any] | None = None,
+        *,
+        scope: AccessScope,
     ) -> list[tuple[float, dict[str, Any]]]:
         """Cosine search joined to authoritative backend document metadata."""
+        access_conditions, access_params = scope.conditions()
         conditions = [
             "c.embedding IS NOT NULL",
-            "d.deleted_at IS NULL",
-            "d.status = 'READY'",
+            *access_conditions,
             "dv.version_number = (SELECT MAX(v.version_number) FROM document_versions AS v WHERE v.document_id = d.id)",
         ]
-        filter_params: list[Any] = []
+        filter_params: list[Any] = list(access_params)
         if filters:
             filename = filters.get("filename")
             if filename:
@@ -277,23 +332,27 @@ class PgVectorStore:
             results.append((float(row[8]), chunk))
         return results
 
-    def context_chunks(self, chunk_ids: list[str]) -> list[tuple[float, dict[str, Any]]]:
+    def context_chunks(
+        self, chunk_ids: list[str], *, scope: AccessScope
+    ) -> list[tuple[float, dict[str, Any]]]:
         """Load cited chunks from the prior answer without sending chat history to a provider."""
         ids = list(dict.fromkeys(chunk_ids))[:8]
         if not ids:
             return []
-        sql = """
+        # Ikut disaring meski id-nya berasal dari percakapan pengguna sendiri:
+        # hak akses bisa dicabut setelah jawaban lama dibuat.
+        access_conditions, access_params = scope.conditions()
+        sql = f"""
             SELECT c.chunk_id, d.id, dv.id, dv.original_filename,
                    dv.version_number, c.page_number, c.section_title, c.text
             FROM chunks AS c
             JOIN document_versions AS dv ON dv.id = c.document_version_id
             JOIN documents AS d ON d.id = dv.document_id
             WHERE c.chunk_id = ANY(%s)
-              AND d.deleted_at IS NULL
-              AND d.status = 'READY'
+              AND {' AND '.join(access_conditions)}
         """
         with psycopg.connect(self.dsn) as conn:
-            rows = conn.execute(sql, (ids,)).fetchall()
+            rows = conn.execute(sql, [ids, *access_params]).fetchall()
         chunks = {
             row[0]: {
                 "chunk_id": row[0],
@@ -311,7 +370,8 @@ class PgVectorStore:
 
     def _answer_from_matches(self, query: str, matches: list[tuple[float, dict[str, Any]]],
                              use_llm: bool = False, model: str = DEFAULT_MODEL,
-                             api_key: str | None = None, allow_clarify: bool = False) -> dict[str, Any]:
+                             api_key: str | None = None, allow_clarify: bool = False,
+                             *, scope: AccessScope) -> dict[str, Any]:
         """Turn retrieved chunks into the answer payload.
 
         Deliberately left outside the retrieval ``try`` blocks: a ProviderError
@@ -325,7 +385,7 @@ class PgVectorStore:
                 query, matches, model=model, api_key=api_key,
                 # Sifat berkas (halaman, ukuran, tanggal) tidak ada di dalam
                 # teks dokumen, jadi ikut dikirim sebagai konteks.
-                documents=self.document_metadata(),
+                documents=self.document_metadata(scope=scope),
                 allow_clarify=allow_clarify,
             )
             if use_llm
@@ -346,7 +406,7 @@ class PgVectorStore:
             ],
         }
 
-    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False) -> dict[str, Any]:
+    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False, *, scope: AccessScope) -> dict[str, Any]:
         """TF-IDF fallback when vector search fails or finds nothing."""
         try:
             import psycopg as _psycopg
@@ -356,16 +416,19 @@ class PgVectorStore:
                 return no_answer_response()
             with _psycopg.connect(dsn) as conn:
                 with conn.cursor() as cur:
+                    # Jalur cadangan ini memuat seluruh chunk sekaligus, jadi
+                    # justru di sini penyaring akses paling wajib ada.
+                    access_conditions, access_params = scope.conditions()
                     cur.execute(
                         "SELECT c.chunk_id, c.document_version_id, d.id, dv.original_filename, "
                         "dv.version_number, c.page_number, c.section_title, c.text "
                         "FROM chunks c "
                         "JOIN document_versions dv ON dv.id = c.document_version_id "
                         "JOIN documents d ON d.id = dv.document_id "
-                        "WHERE d.deleted_at IS NULL "
-                        "AND d.status = 'READY' "
+                        "WHERE " + " AND ".join(access_conditions) + " "
                         "AND dv.version_number = (SELECT MAX(v.version_number) FROM document_versions v WHERE v.document_id = d.id) "
-                        "ORDER BY c.created_at"
+                        "ORDER BY c.created_at",
+                        access_params,
                     )
                     rows = cur.fetchall()
             chunks = []
@@ -387,7 +450,7 @@ class PgVectorStore:
             return no_answer_response()
         return self._answer_from_matches(
             query, matches, use_llm=use_llm, model=model,
-            api_key=api_key, allow_clarify=allow_clarify,
+            api_key=api_key, allow_clarify=allow_clarify, scope=scope,
         )
 
     # ---------- orchestration ----------
@@ -403,13 +466,15 @@ class PgVectorStore:
         filters: dict[str, Any] | None = None,
         context_chunk_ids: list[str] | None = None,
         allow_clarify: bool = False,
+        *,
+        scope: AccessScope,
     ) -> dict[str, Any]:
         try:
-            context_matches = self.context_chunks(context_chunk_ids or [])
+            context_matches = self.context_chunks(context_chunk_ids or [], scope=scope)
             query_vector = embed_texts([query], model=self.model, api_key=api_key)[0]
             retrieved_matches = [
                 (score, chunk)
-                for score, chunk in self.search(query_vector, top_k, filters=filters)
+                for score, chunk in self.search(query_vector, top_k, filters=filters, scope=scope)
                 if score >= minimum_score
             ]
             seen = {chunk["chunk_id"] for _, chunk in context_matches}
@@ -421,14 +486,14 @@ class PgVectorStore:
             # Only retrieval is guarded here. TF-IDF needs no embeddings, so it is
             # a genuine fallback when the vector path fails.
             print(f"[AI] Vector search failed ({exc}), falling back to TF-IDF")
-            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify)
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, scope=scope)
         if not matches:
             # Vector search found nothing above threshold, try TF-IDF fallback
             print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
-            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify)
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, scope=scope)
         return self._answer_from_matches(
             query, matches, use_llm=use_llm, model=model,
-            api_key=api_key, allow_clarify=allow_clarify,
+            api_key=api_key, allow_clarify=allow_clarify, scope=scope,
         )
 
 
