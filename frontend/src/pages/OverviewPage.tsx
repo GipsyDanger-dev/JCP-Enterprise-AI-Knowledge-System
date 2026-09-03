@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpRight, BookOpen, ChevronRight, Database, FileText, Library, MessageSquareText, Send, ShieldAlert, Sparkles, Upload } from 'lucide-react'
+import { ArrowUpRight, BookOpen, ChevronRight, Database, FileText, Library, Megaphone, MessageSquareText, Send, ShieldAlert, Sparkles, Upload } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { UploadModal } from '@/components/UploadModal'
 import { Collection } from '@/components/Collection'
@@ -14,6 +14,7 @@ import { quickQuestions } from '@/types/domain'
 import { listConversations } from '@/api/chat'
 import { useAuth } from '@/hooks/useAuth'
 import { listMyRequiredReadings, requiredReadingReport, type RequiredReading, type RequiredReadingReport } from '@/api/requiredReadings'
+import { listAnnouncements, type Announcement } from '@/api/announcements'
 
 export function OverviewPage() {
   const { role, language } = useWorkspace()
@@ -75,8 +76,11 @@ function EmployeeOverview({ isId }: { isId: boolean }) {
   const { question, setQuestion, onAsk, askQuestion, language, chatHistory, documents } = useWorkspace()
   const [conversationCount, setConversationCount] = useState(0)
   const [requiredReadings, setRequiredReadings] = useState<RequiredReading[]>([])
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
   useEffect(() => { if (token) listConversations(token).then((items) => setConversationCount(items.length)).catch(() => setConversationCount(0)) }, [token])
   useEffect(() => { if (token) listMyRequiredReadings(token).then(setRequiredReadings).catch(() => setRequiredReadings([])) }, [token])
+  useEffect(() => { if (token) listAnnouncements(token).then(setAnnouncements).catch(() => setAnnouncements([])) }, [token])
+  const pendingRequiredReadings = requiredReadings.filter((reading) => reading.completedAt === null && reading.progress < 100)
   const answer = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].answer : ''
   const latestCitation = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].citations[0] : null
   const docsLabel = isId ? 'dokumen' : 'documents'
@@ -94,6 +98,10 @@ function EmployeeOverview({ isId }: { isId: boolean }) {
 
       <div className="employee-dashboard-grid">
         <div className="employee-primary-column">
+          {announcements.length > 0 && <section className="home-announcements">
+            <SectionHeading title={isId ? 'Pengumuman terbaru' : 'Latest announcements'} detail={isId ? 'Informasi terbaru dari perusahaan' : 'The latest updates from your company'} action={<button className="link-button" onClick={() => navigate('/announcements')}>{isId ? 'Lihat semua' : 'View all'} <ArrowUpRight size={15} /></button>} />
+            <div className="home-announcement-list">{announcements.slice(0, 2).map((announcement) => <button key={announcement.id} className="home-announcement" onClick={() => navigate('/announcements')}><span><Megaphone size={18} /></span><div><strong>{announcement.title}</strong><p>{announcement.body}</p></div><ArrowUpRight size={16} /></button>)}</div>
+          </section>}
           <section>
             <SectionHeading title={isId ? 'Lanjutkan dari yang terakhir' : 'Continue where you left off'} detail={isId ? 'Jawaban dan dokumen terbaru' : 'Recent answers and documents'} action={<button className="link-button" onClick={() => navigate('/chat')}>{isId ? 'Lihat riwayat' : 'View history'} <ArrowUpRight size={15} /></button>} />
             <div className="recent-grid">
@@ -102,12 +110,12 @@ function EmployeeOverview({ isId }: { isId: boolean }) {
             </div>
           </section>
 
-          <section className="required-section">
+          {pendingRequiredReadings.length > 0 && <section className="required-section">
             <SectionHeading title={isId ? 'Wajib baca' : 'Required reading'} detail={isId ? 'Kebijakan yang ditugaskan untuk Anda' : 'Policies assigned to you'} />
             <div className="required-list">
-              {requiredReadings.length === 0 ? <p className="empty-row">{isId ? 'Tidak ada dokumen wajib baca.' : 'No required reading assigned.'}</p> : requiredReadings.map((reading) => <RequiredRead key={reading.id} title={reading.document.title} category={reading.document.collection ?? (isId ? 'Tanpa kategori' : 'Uncategorized')} status={reading.progress === 100 ? (isId ? 'Selesai' : 'Complete') : `${reading.progress}%`} progress={reading.progress} onClick={() => navigate(`/documents?doc=${encodeURIComponent(reading.documentId)}&reading=${encodeURIComponent(reading.id)}`)} />)}
+              {pendingRequiredReadings.map((reading) => <RequiredRead key={reading.id} title={reading.document.title} category={reading.document.collection ?? (isId ? 'Tanpa kategori' : 'Uncategorized')} status={`${reading.progress}%`} progress={reading.progress} onClick={() => navigate(`/documents?doc=${encodeURIComponent(reading.documentId)}&reading=${encodeURIComponent(reading.id)}`)} />)}
             </div>
-          </section>
+          </section>}
         </div>
 
         <aside className="employee-sidebar">

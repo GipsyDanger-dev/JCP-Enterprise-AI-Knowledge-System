@@ -12,3 +12,4 @@ backend/tmp/
 __pycache__/
 .venv/
 *.py[cod]
+.codebase-memory/
