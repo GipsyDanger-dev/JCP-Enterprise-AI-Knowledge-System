@@ -16,6 +16,18 @@ import { useAuth } from '@/hooks/useAuth'
 import { listMyRequiredReadings, requiredReadingReport, type RequiredReading, type RequiredReadingReport } from '@/api/requiredReadings'
 import { listAnnouncements, type Announcement } from '@/api/announcements'
 
+function greeting(isId: boolean, hour = new Date().getHours()) {
+  if (isId) {
+    if (hour >= 1 && hour < 11) return 'Selamat pagi,'
+    if (hour >= 11 && hour < 15) return 'Selamat siang,'
+    if (hour >= 15 && hour < 18) return 'Selamat sore,'
+    return 'Selamat malam,'
+  }
+  if (hour >= 1 && hour < 12) return 'Good morning,'
+  if (hour >= 12 && hour < 18) return 'Good afternoon,'
+  return 'Good evening,'
+}
+
 export function OverviewPage() {
   const { role, language } = useWorkspace()
   const isId = language === 'id'
@@ -38,7 +50,7 @@ function AdminOverview({ isId }: { isId: boolean }) {
   return (
     <div className="overview-layout">
       <section className="overview-main">
-        <PageHeading eyebrow={new Date().toLocaleDateString(isId ? 'id-ID' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })} title={<>{isId ? 'Selamat pagi,' : 'Good morning,'} <span>{user?.displayName ?? (isId ? 'Admin' : 'Admin')}.</span></>} detail={isId ? 'Pengetahuan perusahaan Anda sudah terbaru dan siap digunakan.' : 'Your company knowledge is up to date and ready to use.'} action={<><button className="secondary-button" onClick={() => navigate('/chat')}><MessageSquareText size={17} /> {isId ? 'Tanya AI' : 'Ask AI'}</button><button className="primary-button" onClick={() => setShowUpload(true)}><Upload size={17} /> {isId ? 'Unggah' : 'Upload'}</button></>} />
+        <PageHeading eyebrow={new Date().toLocaleDateString(isId ? 'id-ID' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })} title={<>{greeting(isId)} <span>{user?.displayName ?? (isId ? 'Admin' : 'Admin')}.</span></>} detail={isId ? 'Pengetahuan perusahaan Anda sudah terbaru dan siap digunakan.' : 'Your company knowledge is up to date and ready to use.'} action={<><button className="secondary-button" onClick={() => navigate('/chat')}><MessageSquareText size={17} /> {isId ? 'Tanya AI' : 'Ask AI'}</button><button className="primary-button" onClick={() => setShowUpload(true)}><Upload size={17} /> {isId ? 'Unggah' : 'Upload'}</button></>} />
         {uploadError && <div className="inline-alert" role="alert"><ShieldAlert size={15} /> {uploadError}</div>}
         <div className="metrics-grid">
           <Metric icon={FileText} value={readyCount} label={isId ? 'Dokumen siap' : 'Ready documents'} note={isId ? '+2 minggu ini' : '+2 this week'} />
@@ -86,7 +98,7 @@ function EmployeeOverview({ isId }: { isId: boolean }) {
   const docsLabel = isId ? 'dokumen' : 'documents'
   return (
     <div className="employee-page">
-      <PageHeading eyebrow={new Date().toLocaleDateString(isId ? 'id-ID' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })} title={<>{isId ? 'Selamat pagi,' : 'Good morning,'} <span>{user?.displayName ?? (isId ? 'Pengguna' : 'User')}.</span></>} detail={isId ? 'Temukan jawaban terpercaya dan terus belajar dari pengetahuan perusahaan.' : 'Find trusted answers and continue learning from company knowledge.'} action={<button className="secondary-button" onClick={() => navigate('/documents')}><Library size={17} /> {isId ? 'Jelajahi perpustakaan' : 'Browse library'}</button>} />
+      <PageHeading eyebrow={new Date().toLocaleDateString(isId ? 'id-ID' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })} title={<>{greeting(isId)} <span>{user?.displayName ?? (isId ? 'Pengguna' : 'User')}.</span></>} detail={isId ? 'Temukan jawaban terpercaya dan terus belajar dari pengetahuan perusahaan.' : 'Find trusted answers and continue learning from company knowledge.'} action={<button className="secondary-button" onClick={() => navigate('/documents')}><Library size={17} /> {isId ? 'Jelajahi perpustakaan' : 'Browse library'}</button>} />
 
       <section className="employee-ask">
         <div className="employee-ask-copy"><span><Sparkles size={19} /></span><div><small>ENTERPRISE AI</small><h2>{isId ? 'Apa yang bisa kami bantu cari hari ini?' : 'What can we help you find today?'}</h2></div></div>
