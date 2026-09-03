@@ -13,7 +13,7 @@ const formatPublishedAt = (value: string, isId: boolean) => new Date(value).toLo
 
 export function AnnouncementsPage() {
   const { token } = useAuth()
-  const { language, role } = useWorkspace()
+  const { language, role, markAnnouncementsSeen } = useWorkspace()
   const isId = language === 'id'
   const canManage = role === 'admin'
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
@@ -37,6 +37,9 @@ export function AnnouncementsPage() {
   }, [token])
 
   useEffect(() => { loadAnnouncements() }, [loadAnnouncements])
+
+  // Membuka halaman ini berarti pengumuman sudah dibaca — badge dibersihkan.
+  useEffect(() => { markAnnouncementsSeen() }, [markAnnouncementsSeen])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()

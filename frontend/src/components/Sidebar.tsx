@@ -5,7 +5,7 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import { LogoMark } from '@/components/Logo'
 
 export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: boolean; collapsed: boolean; onToggle: () => void; onClose: () => void }) {
-  const { person, navigation, language, unreadMessages } = useWorkspace()
+  const { person, navigation, language, unreadMessages, unreadAnnouncements } = useWorkspace()
   const { user, logout } = useAuth()
   const isId = language === 'id'
   const isAdmin = user?.isAdmin ?? false
@@ -29,13 +29,16 @@ export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: 
       {collapsed && <div className="sidebar-user-avatar">{user?.photoUrl ? <img className="avatar" src={user.photoUrl} alt="" style={{ objectFit: 'cover' }} /> : <span className="avatar">{person.initials}</span>}</div>}
       <nav aria-label="Primary navigation">
         {!collapsed && <p>{isId ? 'Ruang kerja' : 'Workspace'}</p>}
-        {navigation.map(({ id, label, icon: Icon }) => (
-          <NavLink key={id} to={id === 'overview' ? '/' : `/${id}`} end={id === 'overview'} onClick={onClose}
-            title={collapsed ? label : undefined}
-            className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
-            <><Icon size={18} />{!collapsed && <span>{label}</span>}</>
-          </NavLink>
-        ))}
+        {navigation.map(({ id, label, icon: Icon }) => {
+          const badge = id === 'announcements' ? unreadAnnouncements : 0
+          return (
+            <NavLink key={id} to={id === 'overview' ? '/' : `/${id}`} end={id === 'overview'} onClick={onClose}
+              title={collapsed ? label : undefined}
+              className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
+              <><Icon size={18} />{!collapsed && <span>{label}</span>}{badge > 0 && <span className="nav-badge">{badge > 99 ? '99+' : badge}</span>}</>
+            </NavLink>
+          )
+        })}
         {!collapsed && <p style={{ marginTop: 16 }}>{isId ? 'Riwayat' : 'History'}</p>}
         {isAdmin
           ? <NavLink to="/inbox" title={collapsed ? (isId ? 'Kotak masuk' : 'Inbox') : undefined} className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} onClick={onClose}><MessageCircle size={18} />{!collapsed && <span>{isId ? 'Kotak masuk' : 'Inbox'}</span>}{unreadMessages > 0 && <span className="nav-badge">{unreadMessages}</span>}</NavLink>
