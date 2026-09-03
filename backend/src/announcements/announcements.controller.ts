@@ -19,6 +19,14 @@ export class AnnouncementsController {
   @Get()
   list(@CurrentUser() actor: AuthenticatedUser) { return this.announcements.list(actor); }
 
+  /** Jumlah pengumuman yang belum dibaca — dipakai badge di sidebar. */
+  @Get('unread')
+  unreadCount(@CurrentUser() actor: AuthenticatedUser) { return this.announcements.unreadCount(actor.sub); }
+
+  /** Dipanggil saat pengguna membuka halaman pengumuman. */
+  @Post('read')
+  markRead(@CurrentUser() actor: AuthenticatedUser) { return this.announcements.markRead(actor.sub); }
+
   @Post()
   @AdminOnly()
   create(@Body() input: CreateAnnouncementDto, @CurrentUser() actor: AuthenticatedUser) { return this.announcements.create(input, actor); }
