@@ -1,4 +1,4 @@
-import { DocumentStatus, LegalStatus, Prisma } from '@prisma/client';
+import { DocumentStatus, LegalStatus, Prisma, UserRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 /**
@@ -26,6 +26,16 @@ export function documentVisibilityWhere(actor: AuthenticatedUser): Prisma.Docume
     deletedAt: null,
     status: DocumentStatus.READY,
     legalStatus: { not: LegalStatus.RANCANGAN },
+    // Penanda per dokumen. Hanya mempersempit: dokumen tanpa penanda ikut
+    // aturan kategori, dokumen bertanda hanya lolos untuk unit kerja itu.
+    AND: [
+      {
+        OR: [
+          { unitKerjaId: null },
+          ...(actor.unitKerjaId ? [{ unitKerjaId: actor.unitKerjaId }] : []),
+        ],
+      },
+    ],
     OR: [
       // Belum berkategori, atau kategorinya tidak dibatasi unit kerja mana pun.
       { categoryId: null },
@@ -53,4 +63,24 @@ export function allowedCategoryFilter(actor: AuthenticatedUser): Prisma.Document
       ...(actor.unitKerjaId ? [{ units: { some: { id: actor.unitKerjaId } } }] : []),
     ],
   };
+}
+
+/**
+ * Apakah aktor boleh mengelola (unggah/ubah/hapus) dokumen pada unit kerja ini.
+ *
+ * Gagal tertutup: ADMIN_UNIT yang belum ditempatkan di unit kerja mana pun
+ * tidak bisa mengelola apa pun, bukan malah bisa mengelola semuanya.
+ */
+export function canManageForUnit(actor: AuthenticatedUser, unitKerjaId: string | null | undefined): boolean {
+  if (actor.isAdmin) return true;
+  if (actor.role !== UserRole.ADMIN_UNIT) return false;
+  if (!actor.unitKerjaId) return false;
+  // Tanpa unit tujuan berarti dokumen untuk semua orang — itu keputusan
+  // tingkat organisasi, bukan wewenang admin satu unit.
+  return unitKerjaId === actor.unitKerjaId;
+}
+
+/** Aktor yang boleh mengunggah dokumen sama sekali. */
+export function canUploadDocuments(actor: AuthenticatedUser): boolean {
+  return actor.isAdmin || (actor.role === UserRole.ADMIN_UNIT && Boolean(actor.unitKerjaId));
 }
