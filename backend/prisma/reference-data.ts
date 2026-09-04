@@ -3,13 +3,23 @@
  *  DATA ACUAN — VERSI SEMENTARA, BUKAN DARI SUMBER RESMI
  * ============================================================================
  *
- * Daftar unit kerja di bawah ini DIKARANG untuk keperluan pengembangan. Bentuknya
- * dibuat menyerupai susunan perangkat daerah pada umumnya, tetapi BELUM
- * dicocokkan dengan Perbup Susunan Organisasi dan Tata Kerja Kabupaten Sleman.
+ * Daftar unit kerja di bawah ini DIKARANG untuk keperluan pengembangan dan
+ * BELUM dicocokkan dengan Perbup Susunan Organisasi dan Tata Kerja Kabupaten
+ * Sleman.
+ *
+ * Bentuknya sengaja dibuat SATU-LAWAN-SATU dengan kategori dokumen: setiap
+ * dinas punya tepat satu kategori, dan sebaliknya. Alasannya praktis — orang
+ * yang menambah pengguna cukup memilih dinasnya dan langsung tahu dokumen apa
+ * yang akan terlihat, tanpa perlu menghafal OPD mana saja yang dititipkan ke
+ * satu kategori. Relasinya di skema tetap banyak-ke-banyak, jadi kalau nanti
+ * ada dinas yang perlu membaca lebih dari satu kategori, cukup tambahkan
+ * kodenya di `units` di bawah tanpa mengubah kode program.
  *
  * Cara menggantinya kalau daftar resmi sudah didapat:
  *   1. ubah isi UNIT_KERJA dan KATEGORI_DOKUMEN di file ini
- *   2. jalankan `npm run prisma:seed`
+ *   2. bila ada kode unit yang dihapus/diganti, catat di PEMETAAN_UNIT_LAMA
+ *      supaya pengguna lama ikut dipindahkan, bukan malah kehilangan aksesnya
+ *   3. jalankan `npm run prisma:seed`
  *
  * Tidak perlu migration dan tidak perlu mengubah kode lain — inilah alasan
  * daftar ini disimpan sebagai baris tabel, bukan sebagai enum di skema.
@@ -22,32 +32,68 @@ export interface UnitKerjaSeed {
 
 /** Unit kerja / OPD. `code` dipakai sebagai kunci, jadi jangan diubah sembarangan. */
 export const UNIT_KERJA: UnitKerjaSeed[] = [
-  { code: 'SETDA', name: 'Sekretariat Daerah' },
-  { code: 'SETWAN', name: 'Sekretariat DPRD' },
-  { code: 'INSPEKTORAT', name: 'Inspektorat' },
-  { code: 'BAPPEDA', name: 'Badan Perencanaan Pembangunan Daerah' },
-  { code: 'BKAD', name: 'Badan Keuangan dan Aset Daerah' },
-  { code: 'BKPP', name: 'Badan Kepegawaian, Pendidikan dan Pelatihan' },
-  { code: 'DISKUKMPP', name: 'Dinas Koperasi, UKM, Perindustrian dan Perdagangan' },
-  { code: 'DPMPTSP', name: 'Dinas Penanaman Modal dan Pelayanan Terpadu Satu Pintu' },
-  { code: 'DISDIK', name: 'Dinas Pendidikan' },
-  { code: 'DINKES', name: 'Dinas Kesehatan' },
-  { code: 'DINSOS', name: 'Dinas Sosial' },
-  { code: 'DPUPKP', name: 'Dinas Pekerjaan Umum, Perumahan dan Kawasan Permukiman' },
-  { code: 'DLH', name: 'Dinas Lingkungan Hidup' },
-  { code: 'DPPP', name: 'Dinas Pertanian, Pangan dan Perikanan' },
-  { code: 'DISBUD', name: 'Dinas Kebudayaan' },
-  { code: 'DISPAR', name: 'Dinas Pariwisata' },
-  { code: 'DUKCAPIL', name: 'Dinas Kependudukan dan Pencatatan Sipil' },
-  { code: 'DISHUB', name: 'Dinas Perhubungan' },
-  { code: 'DISKOMINFO', name: 'Dinas Komunikasi dan Informatika' },
-  { code: 'DPMK', name: 'Dinas Pemberdayaan Masyarakat dan Kalurahan' },
-  { code: 'SATPOLPP', name: 'Satuan Polisi Pamong Praja' },
+  { code: 'HUKUM', name: 'Dinas Hukum & Peradilan' },
+  { code: 'KEBUDAYAAN', name: 'Dinas Kebudayaan' },
+  { code: 'KEPEGAWAIAN', name: 'Dinas Kepegawaian & ASN' },
+  { code: 'KEUANGAN', name: 'Dinas Keuangan & Anggaran Daerah' },
+  { code: 'KOPERASI', name: 'Dinas Koperasi, UMKM & Ekonomi' },
+  { code: 'LINGKUNGAN', name: 'Dinas Lingkungan & Sarana Prasarana' },
+  { code: 'PAJAK', name: 'Dinas Pajak & Retribusi' },
+  { code: 'PELAYANAN', name: 'Dinas Pelayanan Publik & Informasi' },
+  { code: 'KALURAHAN', name: 'Dinas Pemerintahan Kalurahan' },
+  { code: 'PERENCANAAN', name: 'Dinas Perencanaan & Pembangunan' },
+  { code: 'PERTANIAN', name: 'Dinas Pertanian' },
+  { code: 'SOSIAL', name: 'Dinas Sosial, Kesehatan & Pendidikan' },
 ];
+
+/**
+ * Kode unit kerja yang sudah tidak ada lagi, dan penggantinya.
+ *
+ * Dipakai seed untuk memindahkan pengguna serta penanda dokumen sebelum baris
+ * lamanya dihapus. Tanpa ini `onDelete: SetNull` akan membuat unitKerjaId
+ * pengguna menjadi NULL — dan pegawai tanpa unit kerja hanya melihat kategori
+ * yang terbuka untuk semua orang, jadi akses mereka hilang diam-diam.
+ *
+ * Isinya susunan OPD versi pertama, sebelum daftar unit disamakan dengan
+ * kategori. Aman dibiarkan meski barisnya sudah tidak ada di database.
+ */
+export const PEMETAAN_UNIT_LAMA: Record<string, string> = {
+  SETDA: 'HUKUM',
+  SETWAN: 'HUKUM',
+  SATPOLPP: 'HUKUM',
+  INSPEKTORAT: 'KEUANGAN',
+  BKAD: 'KEUANGAN',
+  BAPPEDA: 'PERENCANAAN',
+  BKPP: 'KEPEGAWAIAN',
+  DISKUKMPP: 'KOPERASI',
+  DPMPTSP: 'KOPERASI',
+  DISDIK: 'SOSIAL',
+  DINKES: 'SOSIAL',
+  DINSOS: 'SOSIAL',
+  DPUPKP: 'LINGKUNGAN',
+  DLH: 'LINGKUNGAN',
+  DISHUB: 'LINGKUNGAN',
+  DPPP: 'PERTANIAN',
+  DISBUD: 'KEBUDAYAAN',
+  DISPAR: 'KEBUDAYAAN',
+  DUKCAPIL: 'PELAYANAN',
+  DISKOMINFO: 'PELAYANAN',
+  DPMK: 'KALURAHAN',
+};
 
 export interface KategoriSeed {
   name: string;
-  /** Unit kerja yang boleh membacanya. Daftar KOSONG = terbuka untuk semua pegawai. */
+  /**
+   * Unit kerja yang boleh membacanya. Daftar KOSONG = terbuka untuk semua pegawai.
+   *
+   * Semua kategori sengaja dibiarkan kosong: isi JDIH adalah peraturan daerah
+   * yang memang publik, dan mengunci kategori berarti mengunci puluhan dokumen
+   * sekaligus tanpa ada yang pernah memutuskannya per dokumen. Pembatasan
+   * ditetapkan sadar lewat penanda unit kerja pada masing-masing dokumen
+   * (`documents.unit_kerja_id`), yang bisa dipasang dan dilepas admin dari
+   * antarmuka. Mekanisme ini tetap ada bila suatu saat memang ada kategori yang
+   * seluruh isinya rahasia bagi satu dinas.
+   */
   units: string[];
 }
 
@@ -55,21 +101,22 @@ export interface KategoriSeed {
  * Kategori/subjek dokumen. Daftar ini disusun dari hasil pembacaan 152 dokumen
  * JDIH Sleman yang sudah dikumpulkan, jadi proporsinya mengikuti isi korpus
  * yang nyata — bukan daftar teoretis.
+ *
+ * Kategori di sini murni penanda subjek untuk pencarian dan filter. Tidak ada
+ * satu pun yang membatasi akses.
  */
 export const KATEGORI_DOKUMEN: KategoriSeed[] = [
-  { name: 'Koperasi, UMKM & Ekonomi', units: ['DISKUKMPP', 'DPMPTSP', 'BAPPEDA'] },
-  { name: 'Keuangan & Anggaran Daerah', units: ['BKAD', 'SETDA', 'INSPEKTORAT', 'BAPPEDA'] },
-  { name: 'Pajak & Retribusi', units: ['BKAD', 'DPMPTSP'] },
-  { name: 'Kepegawaian & ASN', units: ['BKPP', 'SETDA'] },
-  { name: 'Pemerintahan Kalurahan', units: ['DPMK', 'SETDA'] },
-  { name: 'Perencanaan & Pembangunan', units: ['BAPPEDA', 'SETDA'] },
-  { name: 'Sosial, Kesehatan & Pendidikan', units: ['DINSOS', 'DINKES', 'DISDIK'] },
-  { name: 'Lingkungan & Sarana Prasarana', units: ['DLH', 'DPUPKP', 'DISHUB'] },
-  { name: 'Kebudayaan', units: ['DISBUD', 'DISPAR'] },
-  { name: 'Pertanian', units: ['DPPP'] },
-  { name: 'Hukum & Peradilan', units: ['SETDA', 'INSPEKTORAT'] },
-  // Sengaja terbuka: peraturan pelayanan publik dan keterbukaan informasi
-  // memang ditujukan untuk semua pegawai, bukan satu bidang tertentu.
+  { name: 'Koperasi, UMKM & Ekonomi', units: [] },
+  { name: 'Keuangan & Anggaran Daerah', units: [] },
+  { name: 'Pajak & Retribusi', units: [] },
+  { name: 'Kepegawaian & ASN', units: [] },
+  { name: 'Pemerintahan Kalurahan', units: [] },
+  { name: 'Perencanaan & Pembangunan', units: [] },
+  { name: 'Sosial, Kesehatan & Pendidikan', units: [] },
+  { name: 'Lingkungan & Sarana Prasarana', units: [] },
+  { name: 'Kebudayaan', units: [] },
+  { name: 'Pertanian', units: [] },
+  { name: 'Hukum & Peradilan', units: [] },
   { name: 'Pelayanan Publik & Informasi', units: [] },
 ];
 

@@ -1,6 +1,6 @@
 import { PrismaClient, UserRole } from '@prisma/client';
 import { hashPassword } from '../src/auth/password.util';
-import { KATEGORI_DEMO_LAMA, KATEGORI_DOKUMEN, UNIT_KERJA } from './reference-data';
+import { KATEGORI_DEMO_LAMA, KATEGORI_DOKUMEN, PEMETAAN_UNIT_LAMA, UNIT_KERJA } from './reference-data';
 
 const prisma = new PrismaClient();
 
@@ -92,8 +92,57 @@ async function seedUnitKerjaDanKategori(): Promise<void> {
   }
 }
 
+/**
+ * Pindahkan pengguna dan penanda dokumen dari unit kerja yang sudah dihapus ke
+ * penggantinya, lalu buang baris lamanya.
+ *
+ * Dijalankan SEBELUM baris lama dihapus, bukan sesudah: kolom unitKerjaId
+ * memakai `onDelete: SetNull`, jadi menghapus duluan akan mengosongkan unit
+ * kerja penggunanya — dan pegawai tanpa unit kerja hanya melihat kategori yang
+ * terbuka untuk semua orang. Aksesnya hilang tanpa pesan kesalahan apa pun.
+ */
+async function pindahkanUnitLama(): Promise<void> {
+  const lama = await prisma.unitKerja.findMany({
+    where: { code: { in: Object.keys(PEMETAAN_UNIT_LAMA) } },
+    select: { id: true, code: true },
+  });
+  if (lama.length === 0) return;
+
+  const pengganti = await prisma.unitKerja.findMany({
+    where: { code: { in: UNIT_KERJA.map((unit) => unit.code) } },
+    select: { id: true, code: true, name: true },
+  });
+  const perKode = new Map(pengganti.map((unit) => [unit.code, unit]));
+
+  for (const unit of lama) {
+    const kodeTujuan = PEMETAAN_UNIT_LAMA[unit.code];
+    const tujuan = perKode.get(kodeTujuan);
+    if (!tujuan) {
+      throw new Error(`Pengganti "${kodeTujuan}" untuk unit lama "${unit.code}" tidak ada di UNIT_KERJA`);
+    }
+    // `division` ikut disetel: teksnya cuma label tampilan, tetapi label yang
+    // menyebut dinas lain daripada unit kerja sebenarnya jauh lebih
+    // membingungkan daripada tidak ada label sama sekali.
+    const pegawai = await prisma.user.updateMany({
+      where: { unitKerjaId: unit.id },
+      data: { unitKerjaId: tujuan.id, division: tujuan.name },
+    });
+    const dokumen = await prisma.document.updateMany({
+      where: { unitKerjaId: unit.id },
+      data: { unitKerjaId: tujuan.id },
+    });
+    if (pegawai.count > 0 || dokumen.count > 0) {
+      console.log(`  ${unit.code} -> ${tujuan.code}: ${pegawai.count} pengguna, ${dokumen.count} dokumen`);
+    }
+  }
+
+  await prisma.unitKerja.deleteMany({ where: { id: { in: lama.map((unit) => unit.id) } } });
+  console.log(`Menghapus ${lama.length} unit kerja versi lama`);
+}
+
 async function main(): Promise<void> {
   await seedUnitKerjaDanKategori();
+  await pindahkanUnitLama();
 
   const adminEmail = requiredEnvironment('SEED_ADMIN_EMAIL').toLowerCase();
   const userEmail = requiredEnvironment('SEED_USER_EMAIL').toLowerCase();
@@ -103,8 +152,8 @@ async function main(): Promise<void> {
   await upsertUser(
     UserRole.SUPER_ADMIN, true,
     'SEED_ADMIN_EMAIL', 'SEED_ADMIN_PASSWORD',
-    'Local Admin', 'ADM-0001', 'Sekretariat Daerah', 'Kepala Subbagian',
-    'SETDA',
+    'Local Admin', 'ADM-0001', 'Dinas Hukum & Peradilan', 'Kepala Subbagian',
+    'HUKUM',
   );
 
   // Pegawai contoh, sengaja ditempatkan di Dinas Koperasi: dengan begitu batas
@@ -113,8 +162,8 @@ async function main(): Promise<void> {
   await upsertUser(
     UserRole.PEGAWAI, false,
     'SEED_USER_EMAIL', 'SEED_USER_PASSWORD',
-    'Nadia Putri', 'EMP-0001', 'Dinas Koperasi, UKM, Perindustrian dan Perdagangan',
-    'Staf / Pelaksana', 'DISKUKMPP',
+    'Nadia Putri', 'EMP-0001', 'Dinas Koperasi, UMKM & Ekonomi',
+    'Staf / Pelaksana', 'KOPERASI',
   );
 }
 
