@@ -120,6 +120,7 @@ model User {
   requiredReadings    RequiredReading[]
   notifications       AppNotification[]
   announcements       Announcement[]
+  announcementReads   AnnouncementRead[]
 
   @@map("users")
 }
@@ -240,10 +241,30 @@ model Announcement {
   updatedAt   DateTime @updatedAt @map("updated_at")
   createdById String   @map("created_by_id") @db.Uuid
   createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  reads       AnnouncementRead[]
 
   @@index([isActive, publishedAt])
   @@index([createdById])
   @@map("announcements")
+}
+
+/// Bukti baca per pengumuman.
+///
+/// Tidak bisa disimpulkan dari AppNotification: notifikasi hanya mencatat
+/// "sudah dilihat" untuk satu tipe, tanpa menyebut pengumuman yang mana, dan
+/// baris notifikasi ikut terhapus bersama penggunanya. Atasan yang menagih
+/// tindak lanjut butuh jawaban per pengumuman, jadi disimpan tersendiri.
+model AnnouncementRead {
+  id             String       @id @default(uuid()) @db.Uuid
+  announcementId String       @map("announcement_id") @db.Uuid
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String       @map("user_id") @db.Uuid
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt         DateTime     @default(now()) @map("read_at")
+
+  @@unique([announcementId, userId])
+  @@index([userId])
+  @@map("announcement_reads")
 }
 
 model DocumentVersion {

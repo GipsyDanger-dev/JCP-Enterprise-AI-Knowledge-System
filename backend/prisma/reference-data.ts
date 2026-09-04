@@ -135,6 +135,21 @@ export const JABATAN: string[] = [
   'Staf / Pelaksana',
 ];
 
+/**
+ * Jabatan yang boleh menerbitkan pengumuman dan melihat siapa saja yang sudah
+ * membacanya, di luar admin.
+ *
+ * Ditaruh berdampingan dengan JABATAN supaya isinya tidak bisa lepas dari
+ * nomenklatur yang dipakai form pengguna: jabatan yang salah tulis di sini
+ * tidak akan pernah cocok dengan jabatan siapa pun, dan wewenangnya hilang
+ * diam-diam. Perbandingannya sendiri mengabaikan besar-kecil huruf dan spasi
+ * di tepi, karena jabatan pengguna lama masih berupa teks bebas.
+ */
+export const JABATAN_PENERBIT_PENGUMUMAN: string[] = [
+  'Kepala Perangkat Daerah',
+  'Sekretaris',
+];
+
 /** Kategori demo bawaan template lama; dihapus saat seed bila belum dipakai dokumen. */
 export const KATEGORI_DEMO_LAMA = [
   'finance', 'it & security', 'legal', 'marketing', 'operations', 'people',

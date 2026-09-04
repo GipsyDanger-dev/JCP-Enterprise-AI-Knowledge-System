@@ -1,8 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { AdminOnly } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AnnouncementsService } from './announcements.service';
@@ -23,15 +22,34 @@ export class AnnouncementsController {
   @Get('unread')
   unreadCount(@CurrentUser() actor: AuthenticatedUser) { return this.announcements.unreadCount(actor.sub); }
 
+  /** Wewenang penerbitan milik pengguna ini; dipakai UI untuk menampilkan tombolnya. */
+  @Get('permissions')
+  @ApiOperation({ summary: 'Apakah pengguna ini boleh menerbitkan pengumuman' })
+  permissions(@CurrentUser() actor: AuthenticatedUser) { return this.announcements.permissions(actor); }
+
   /** Dipanggil saat pengguna membuka halaman pengumuman. */
   @Post('read')
   markRead(@CurrentUser() actor: AuthenticatedUser) { return this.announcements.markRead(actor.sub); }
 
+  /** Laporan siapa sudah dan belum membaca satu pengumuman. */
+  @Get(':id/readers')
+  @ApiOperation({ summary: 'Daftar pegawai yang sudah dan belum membaca pengumuman' })
+  @ApiOkResponse({ description: 'Pembaca beserta waktu bacanya, dan yang belum membaca' })
+  @ApiForbiddenResponse({ description: 'Bukan admin maupun jabatan yang berhak menerbitkan pengumuman' })
+  readers(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @CurrentUser() actor: AuthenticatedUser) {
+    return this.announcements.readers(id, actor);
+  }
+
+  // Tanpa @AdminOnly: jabatan pimpinan (lihat JABATAN_PENERBIT_PENGUMUMAN) juga
+  // boleh menerbitkan. Batasnya ditegakkan di service karena bergantung pada
+  // jabatan pengguna, bukan sekadar flag admin yang dikenali RolesGuard.
   @Post()
-  @AdminOnly()
+  @ApiForbiddenResponse({ description: 'Bukan admin maupun jabatan yang berhak menerbitkan pengumuman' })
   create(@Body() input: CreateAnnouncementDto, @CurrentUser() actor: AuthenticatedUser) { return this.announcements.create(input, actor); }
 
   @Patch(':id')
-  @AdminOnly()
-  update(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() input: UpdateAnnouncementDto) { return this.announcements.update(id, input); }
+  @ApiForbiddenResponse({ description: 'Bukan penerbitnya sendiri maupun admin' })
+  update(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() input: UpdateAnnouncementDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.announcements.update(id, input, actor);
+  }
 }
