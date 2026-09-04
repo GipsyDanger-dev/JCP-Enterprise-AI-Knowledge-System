@@ -11,7 +11,15 @@ export interface JwtPayload {
   sid: string;
 }
 
-export interface AuthenticatedUser extends JwtPayload {}
+export interface AuthenticatedUser extends JwtPayload {
+  /**
+   * Nomenklatur jabatan pemiliknya. Sengaja tidak ikut ditandatangani di token:
+   * diisi ulang dari database oleh JwtAuthGuard, sama seperti unitKerjaId,
+   * supaya pencabutan wewenang menerbitkan pengumuman langsung berlaku tanpa
+   * menunggu yang bersangkutan login ulang.
+   */
+  jobTitle?: string | null;
+}
 
 export interface AuthenticatedRequest {
   headers: {

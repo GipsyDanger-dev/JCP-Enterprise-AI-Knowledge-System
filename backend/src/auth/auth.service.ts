@@ -21,6 +21,7 @@ export class AuthService {
     // `email` is checked only for existing accounts created before username support.
     const user = await this.prisma.user.findFirst({
       where: { OR: [{ username }, { email: username }] },
+      include: { unitKerja: { select: { id: true, code: true, name: true } } },
     });
     const passwordIsValid = user ? await verifyPassword(input.password, user.passwordHash) : false;
 
@@ -74,6 +75,8 @@ export class AuthService {
         division: user.division,
         jobTitle: user.jobTitle,
         role: user.role,
+        unitKerjaId: user.unitKerjaId,
+        unitKerja: user.unitKerja,
         isAdmin: user.isAdmin,
       },
     };
@@ -99,7 +102,10 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { unitKerja: { select: { id: true, code: true, name: true } } },
+    });
     if (!user) return { sub: userId, username: '', employeeNumber: '', division: '', jobTitle: '', role: 'OPERASIONAL', isAdmin: false };
     return {
       sub: user.id,
@@ -109,6 +115,10 @@ export class AuthService {
       division: user.division,
       jobTitle: user.jobTitle,
       role: user.role,
+      // Ikut dikirim supaya klien tahu unit kerjanya sendiri — dipakai dialog
+      // unggah untuk menandai dokumen atas nama unit yang benar.
+      unitKerjaId: user.unitKerjaId,
+      unitKerja: user.unitKerja,
       isAdmin: user.isAdmin,
       photoUrl: user.photoUrl,
     };

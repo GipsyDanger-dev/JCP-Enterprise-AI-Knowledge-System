@@ -30,6 +30,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             division: profile.division,
             jobTitle: profile.jobTitle,
             role: profile.role,
+            // Unit kerja ikut dipulihkan: tanpa ini dialog unggah kehilangan
+            // unit penggunanya setiap kali halaman dimuat ulang.
+            unitKerjaId: profile.unitKerjaId ?? null,
+            unitKerja: profile.unitKerja ?? null,
             isAdmin: (profile as any).isAdmin ?? false,
             photoUrl: (profile as any).photoUrl,
           })

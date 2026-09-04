@@ -59,7 +59,8 @@ export interface MeResponse {
   division: string
   jobTitle: string
   role: ApiRole
-  unitKerjaId?: string
+  unitKerjaId?: string | null
+  unitKerja?: ApiUnitKerja | null
   isAdmin?: boolean
   photoUrl?: string | null
 }
