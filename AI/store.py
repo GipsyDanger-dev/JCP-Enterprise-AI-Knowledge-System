@@ -53,7 +53,8 @@ class AccessScope:
 
     Keputusan siapa-boleh-melihat-apa tetap milik backend: ia yang tahu role,
     kategori, dan aturannya. Yang menyeberang ke sini hanya hasilnya, berupa
-    daftar id kategori. AI service tinggal menjalankan penyaringnya.
+    daftar id kategori dan unit kerja penanya. AI service tinggal menjalankan
+    penyaringnya.
 
     Penyaringnya selalu masuk ke klausa WHERE, bukan disaring setelah baris
     terambil, supaya chunk terlarang tidak pernah sempat menyentuh prompt LLM.
@@ -63,6 +64,9 @@ class AccessScope:
 
     is_admin: bool = False
     allowed_category_ids: tuple[str, ...] = ()
+    #: Unit kerja penanya. None berarti belum ditempatkan di unit mana pun,
+    #: sehingga dokumen bertanda unit tidak satu pun boleh dibacanya.
+    unit_kerja_id: str | None = None
 
     @classmethod
     def unrestricted(cls) -> "AccessScope":
@@ -77,26 +81,39 @@ class AccessScope:
         ids = payload.get("allowed_category_ids") or []
         if not isinstance(ids, list):
             return None
+        unit = payload.get("unit_kerja_id")
         return cls(
             is_admin=bool(payload.get("is_admin")),
             allowed_category_ids=tuple(str(i) for i in ids),
+            unit_kerja_id=str(unit) if unit else None,
         )
 
     def conditions(self, alias: str = "d") -> tuple[list[str], list[Any]]:
         """Potongan WHERE plus parameternya, untuk ditempel ke setiap query."""
         if self.is_admin:
             return [f"{alias}.deleted_at IS NULL"], []
-        return (
-            [
-                f"{alias}.deleted_at IS NULL",
-                f"{alias}.status = 'READY'",
-                # Rancangan tidak pernah dijawab: angkanya belum final, dan
-                # jawaban yang mengutipnya tetap terlihat meyakinkan.
-                f"{alias}.legal_status <> 'RANCANGAN'",
-                f"({alias}.category_id IS NULL OR {alias}.category_id = ANY(%s::uuid[]))",
-            ],
-            [list(self.allowed_category_ids)],
-        )
+        conditions = [
+            f"{alias}.deleted_at IS NULL",
+            f"{alias}.status = 'READY'",
+            # Rancangan tidak pernah dijawab: angkanya belum final, dan
+            # jawaban yang mengutipnya tetap terlihat meyakinkan.
+            f"{alias}.legal_status <> 'RANCANGAN'",
+            f"({alias}.category_id IS NULL OR {alias}.category_id = ANY(%s::uuid[]))",
+        ]
+        params: list[Any] = [list(self.allowed_category_ids)]
+        # Penanda unit kerja per dokumen, cerminan klausa yang sama di
+        # ``documentVisibilityWhere``. Dokumen tanpa penanda terbuka untuk
+        # semua; yang bertanda hanya untuk unit itu. Tanpa klausa ini, mengunci
+        # dokumen hanya menyembunyikannya dari daftar sementara isinya tetap
+        # bisa dikutip AI ke siapa saja.
+        if self.unit_kerja_id:
+            conditions.append(
+                f"({alias}.unit_kerja_id IS NULL OR {alias}.unit_kerja_id = %s::uuid)"
+            )
+            params.append(self.unit_kerja_id)
+        else:
+            conditions.append(f"{alias}.unit_kerja_id IS NULL")
+        return conditions, params
 
 
 def _require_deps() -> None:

@@ -143,12 +143,37 @@ class PgVectorStoreTests(unittest.TestCase):
         self.assertIn("d.category_id = ANY(%s::uuid[])", " AND ".join(conditions))
         self.assertEqual(params, [[]])
 
+    def test_scope_menegakkan_penanda_unit_kerja_dokumen(self):
+        """Dokumen bertanda unit hanya untuk unit itu; yang tanpa tanda untuk semua."""
+        scope = AccessScope(is_admin=False, allowed_category_ids=("cat-a",), unit_kerja_id="unit-1")
+        conditions, params = scope.conditions()
+        joined = " AND ".join(conditions)
+        self.assertIn("d.unit_kerja_id IS NULL OR d.unit_kerja_id = %s::uuid", joined)
+        # Unit menyusul kategori, sesuai urutan %s pada SQL yang dirangkai.
+        self.assertEqual(params, [["cat-a"], "unit-1"])
+
+    def test_scope_tanpa_unit_kerja_hanya_dokumen_terbuka(self):
+        """Pegawai yang belum ditempatkan tidak mewarisi dokumen unit mana pun."""
+        conditions, params = AccessScope(is_admin=False, allowed_category_ids=("cat-a",)).conditions()
+        self.assertIn("d.unit_kerja_id IS NULL", " AND ".join(conditions))
+        self.assertEqual(params, [["cat-a"]])
+
+    def test_scope_admin_tidak_dibatasi_unit_kerja(self):
+        """Admin melihat seluruh dokumen aktif, termasuk yang ditandai unit lain."""
+        conditions, params = AccessScope(is_admin=True, unit_kerja_id="unit-1").conditions()
+        self.assertEqual(conditions, ["d.deleted_at IS NULL"])
+        self.assertEqual(params, [])
+
     def test_scope_dari_payload_kosong_bernilai_none(self):
         """Permintaan tanpa batas akses harus bisa dibedakan, supaya bisa ditolak."""
         self.assertIsNone(AccessScope.from_payload(None))
         self.assertIsNone(AccessScope.from_payload("bukan dict"))
         scope = AccessScope.from_payload({"is_admin": False, "allowed_category_ids": ["x"]})
         self.assertEqual(scope, AccessScope(is_admin=False, allowed_category_ids=("x",)))
+        scope = AccessScope.from_payload(
+            {"is_admin": False, "allowed_category_ids": ["x"], "unit_kerja_id": "unit-1"}
+        )
+        self.assertEqual(scope.unit_kerja_id, "unit-1")
 
     def test_search_menyertakan_penyaring_akses_di_sql(self):
         scope = AccessScope(is_admin=False, allowed_category_ids=("cat-a",))

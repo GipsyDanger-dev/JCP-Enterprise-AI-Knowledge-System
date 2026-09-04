@@ -124,20 +124,31 @@ export class ChatService {
   }
 
   /**
-   * Terjemahkan role aktor menjadi daftar kategori yang boleh dibacanya.
+   * Terjemahkan aktor menjadi batas akses yang dikirim ke AI service.
    *
    * Aturan siapa-boleh-apa sengaja tetap di backend — AI service hanya
    * menerima hasilnya dan menjalankan penyaring. Dengan begitu hanya ada satu
    * tempat yang perlu diubah kalau kebijakan aksesnya berubah.
+   *
+   * Unit kerja aktor ikut dikirim, bukan hanya daftar kategori: penanda unit
+   * pada dokumen adalah cara utama mengunci dokumen, dan kunci yang tidak
+   * ditegakkan di jalur tanya-jawab sama saja dengan tidak ada — isinya tetap
+   * bisa dikutip AI untuk unit lain meski dokumennya tak muncul di daftar.
    */
   private async accessScope(actor: AuthenticatedUser) {
     const filter = allowedCategoryFilter(actor);
-    if (filter === null) return { is_admin: true, allowed_category_ids: [] as string[] };
+    if (filter === null) {
+      return { is_admin: true, allowed_category_ids: [] as string[], unit_kerja_id: null };
+    }
     const categories = await this.prisma.documentCategory.findMany({
       where: filter,
       select: { id: true },
     });
-    return { is_admin: false, allowed_category_ids: categories.map((category) => category.id) };
+    return {
+      is_admin: false,
+      allowed_category_ids: categories.map((category) => category.id),
+      unit_kerja_id: actor.unitKerjaId ?? null,
+    };
   }
 
   private async resolveConversation(
