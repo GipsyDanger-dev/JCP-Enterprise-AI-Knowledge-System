@@ -220,6 +220,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /**
+   * Terapkan hasil perubahan akses dari dialog admin ke daftar yang sedang
+   * tampil, tanpa memuat ulang seluruh dokumen. Backend tetap sumber
+   * kebenarannya: yang disimpan di sini adalah dokumen yang ia kembalikan.
+   */
+  const applyDocumentAccess = (document: ApiDocument) => {
+    setDocuments((current) => current.map((item) => (
+      item.id === document.id
+        ? {
+            ...item,
+            collection: document.collection || item.collection,
+            categoryId: document.category?.id ?? null,
+            unitKerja: document.unitKerja ? { id: document.unitKerja.id, name: document.unitKerja.name } : null,
+          }
+        : item
+    )))
+  }
+
   const removeDocument = async (id: string) => {
     if (!token) return
     try {
@@ -317,6 +335,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       isUploading,
       uploadError,
       registerUploadedDocument,
+      applyDocumentAccess,
       removeDocument,
       language,
       setLanguage,

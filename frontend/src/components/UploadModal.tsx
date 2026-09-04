@@ -28,9 +28,11 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
   const [categoryId, setCategoryId] = useState('')
-  // Bawaannya dibatasi ke unit kerja sendiri: lebih aman salah terlalu sempit
-  // daripada dokumen internal ikut terbaca unit lain karena lupa mencentang.
-  const [restrictToUnit, setRestrictToUnit] = useState(true)
+  // Bawaannya terbuka. Isi JDIH adalah peraturan daerah yang memang publik,
+  // jadi mengunci harus jadi keputusan sadar admin — bukan sesuatu yang
+  // terjadi diam-diam pada setiap unggahan. Admin unit tidak punya pilihan
+  // ini: dokumennya selalu bertanda unitnya sendiri (ditegakkan server).
+  const [restrictToUnit, setRestrictToUnit] = useState(false)
   const [unitKerjaId, setUnitKerjaId] = useState('')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -83,9 +85,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
         // Admin unit tidak mengirim id apa pun: server yang mengisikan unit
         // kerjanya sendiri, sehingga nilai dari klien tidak bisa dipakai
         // menandai dokumen atas nama unit lain.
-        unitKerjaId: isSuperAdmin
-          ? (restrictToUnit ? unitKerjaId || undefined : undefined)
-          : (restrictToUnit ? ownUnit?.id : undefined),
+        unitKerjaId: isSuperAdmin ? (restrictToUnit ? unitKerjaId || undefined : undefined) : undefined,
       })
       setFile(null)
       setTitle('')
@@ -104,7 +104,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     setFile(null)
     setTitle('')
     setCategoryId('')
-    setRestrictToUnit(true)
+    setRestrictToUnit(false)
     setUnitKerjaId('')
     setError(null)
     onClose()
@@ -174,8 +174,8 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           )}
           <p className="field-hint">
             {isId
-              ? 'Kategori menentukan unit kerja mana yang boleh membaca dokumen ini.'
-              : 'The category decides which work units may read this document.'}
+              ? 'Kategori adalah penanda subjek untuk pencarian dan filter, bukan pembatas akses.'
+              : 'The category is a subject label for search and filtering, not an access boundary.'}
           </p>
         </div>
 
@@ -184,9 +184,12 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           <label className="upload-restrict-toggle">
             <input
               type="checkbox"
-              checked={restrictToUnit}
+              checked={isSuperAdmin ? restrictToUnit : true}
               onChange={(event) => setRestrictToUnit(event.target.checked)}
-              disabled={uploading}
+              // Admin unit tidak bisa melepasnya: server tetap menandai
+              // dokumennya dengan unitnya sendiri, jadi centang yang bisa
+              // dilepas hanya akan berbohong soal apa yang terjadi.
+              disabled={uploading || !isSuperAdmin}
             />
             <span>
               {isSuperAdmin
@@ -213,9 +216,13 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           )}
 
           <p className="field-hint">
-            {isId
-              ? 'Pembatasan ini hanya mempersempit akses dari kategori, tidak pernah memperluasnya. Lepaskan centang bila dokumen boleh dibaca semua unit yang berhak atas kategorinya.'
-              : 'This only narrows the access granted by the category, never widens it. Uncheck it when every unit entitled to the category may read the document.'}
+            {isSuperAdmin
+              ? (isId
+                  ? 'Tanpa centang, dokumen terbuka untuk semua pegawai — ini bawaannya. Centang hanya bila isinya memang khusus satu unit kerja. Pilihan ini bisa diubah kapan saja lewat tombol atur akses di daftar dokumen.'
+                  : 'Left unchecked, the document is open to every employee — that is the default. Check it only when the content really belongs to one work unit. You can change this later from the access button in the document list.')
+              : (isId
+                  ? 'Dokumen yang Anda unggah selalu ditandai untuk unit kerja Anda. Hanya super admin yang dapat membukanya untuk seluruh pegawai.'
+                  : 'Documents you upload are always tagged for your work unit. Only a super admin can open them to every employee.')}
           </p>
         </div>
 

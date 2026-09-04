@@ -36,6 +36,8 @@ export interface WorkspaceContextValue {
   isUploading: boolean
   uploadError: string | null
   registerUploadedDocument: (document: ApiDocument) => void
+  /** Segarkan kategori dan penanda unit kerja satu dokumen setelah diubah admin. */
+  applyDocumentAccess: (document: ApiDocument) => void
   removeDocument: (id: string) => Promise<void>
   language: Language
   setLanguage: (lang: Language) => void

@@ -857,6 +857,91 @@ button { cursor: pointer; }
 }
 .upload-restrict-toggle input { width: 15px; height: 15px; cursor: pointer; }
 
+/* Manajemen dokumen: satu baris per dokumen dengan pilihan unit kerjanya,
+   plus centang untuk mengubah beberapa sekaligus. */
+.doc-access-modal { max-width: 780px; width: 100%; }
+.doc-access-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.doc-access-filters .filter-search { flex: 1 1 220px; }
+.doc-access-filters .select-wrapper { flex: 0 1 200px; }
+.doc-access-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+.doc-access-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft, #ececec);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+.doc-access-row.is-selected { border-color: var(--brand-600); }
+.doc-access-check { width: 15px; height: 15px; flex: 0 0 auto; cursor: pointer; }
+.doc-access-name { flex: 1 1 240px; min-width: 0; }
+.doc-access-name strong {
+  display: block;
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-access-name small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted, #8b8b8b);
+}
+.doc-access-control { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.doc-access-control .select-wrapper { min-width: 210px; }
+.doc-access-error { flex: 1 1 100%; margin: 4px 0 0; font-size: 12px; color: #b91c1c; }
+
+/* Baris tombol: centang pilih-semua di kiri, tindakan massal di tengah,
+   Tutup di kanan. */
+.doc-access-actions { flex-wrap: wrap; gap: 10px; align-items: center; }
+.doc-access-select-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: 13px;
+  cursor: pointer;
+}
+.doc-access-select-all input { width: 15px; height: 15px; cursor: pointer; }
+.doc-access-bulk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.doc-access-bulk .select-wrapper { min-width: 200px; }
+.doc-access-foot { margin-top: 10px; }
+
+/* Penanda pada baris dokumen: terkunci untuk satu unit kerja. Dokumen tanpa
+   penanda terbuka untuk semua pegawai, jadi sengaja tidak diberi label apa pun
+   — hanya yang dibatasi yang perlu menjelaskan dirinya. */
+.doc-unit-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #e5e5e5);
+  background: var(--surface-muted, #f5f5f4);
+  color: var(--text-muted, #8b8b8b);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 /* Keterangan kecil di bawah field form, mis. penjelasan bahwa unit kerja
    menentukan dokumen yang terlihat. */
 .field-hint {

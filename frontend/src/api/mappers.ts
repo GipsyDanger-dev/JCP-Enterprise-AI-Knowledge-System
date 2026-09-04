@@ -33,6 +33,8 @@ export function toDomainDocument(document: ApiDocument): DocumentItem {
     updatedAt: document.updatedAt ? formatRelativeTime(document.updatedAt) : 'Baru saja',
     status: toDomainDocumentStatus(document.status),
     chunks: version?.chunkCount ?? null,
+    categoryId: document.category?.id ?? null,
+    unitKerja: document.unitKerja ? { id: document.unitKerja.id, name: document.unitKerja.name } : null,
   }
 }
 

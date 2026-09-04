@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   StreamableFile,
   UploadedFile,
@@ -38,6 +39,7 @@ import {
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
+import { UpdateDocumentAccessDto } from './dto/update-document-access.dto';
 
 @ApiTags('documents')
 @ApiBearerAuth()
@@ -98,6 +100,23 @@ export class DocumentsController {
   @ApiForbiddenResponse({ description: 'Only ADMIN can create document categories' })
   createCategory(@Body() input: CreateDocumentCategoryDto) {
     return this.documentsService.createCategory(input);
+  }
+
+  // Tanpa @AdminOnly, sama seperti unggah: ADMIN_UNIT boleh mengatur dokumen
+  // unitnya sendiri. Batas wewenangnya ditegakkan di service, karena baru bisa
+  // dinilai setelah unit kerja dokumen sekarang dan unit tujuannya diketahui.
+  @Patch(':id/access')
+  @ApiOperation({ summary: 'Ubah kategori dan penanda unit kerja sebuah dokumen' })
+  @ApiOkResponse({ description: 'Kategori dan penanda unit kerja tersimpan' })
+  @ApiBadRequestResponse({ description: 'Unit kerja tidak dikenal atau sudah tidak aktif' })
+  @ApiNotFoundResponse({ description: 'Dokumen tidak ada, atau tidak boleh diakses aktor ini' })
+  @ApiForbiddenResponse({ description: 'Dokumen atau unit tujuan di luar wewenang aktor' })
+  updateAccess(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() input: UpdateDocumentAccessDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.documentsService.updateAccess(id, input, actor);
   }
 
   // Pengunggah perlu memantau proses dokumennya sendiri, jadi bukan hanya

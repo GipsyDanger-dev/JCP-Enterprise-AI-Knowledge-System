@@ -27,6 +27,25 @@ export function uploadDocument(file: File, token?: string, options: UploadDocume
   return request<ApiDocument>('/documents', { method: 'POST', body: form, headers: authHeaders(token) })
 }
 
+/**
+ * Ubah kategori dan penanda unit kerja dokumen yang sudah terunggah.
+ *
+ * `null` berarti dilepas (kategori dikosongkan / kunci unit dibuka), sedangkan
+ * field yang tidak disertakan berarti nilainya dibiarkan apa adanya.
+ */
+export interface DocumentAccessInput {
+  categoryId?: string | null
+  unitKerjaId?: string | null
+}
+
+export function updateDocumentAccess(id: string, input: DocumentAccessInput, token?: string): Promise<ApiDocument> {
+  return request<ApiDocument>(`/documents/${id}/access`, {
+    method: 'PATCH',
+    body: input,
+    headers: authHeaders(token),
+  })
+}
+
 /** Hanya kategori yang benar-benar bisa diakses pengguna yang sedang login. */
 export function listDocumentCategories(token?: string): Promise<ApiDocumentCategory[]> {
   return request<ApiDocumentCategory[]>('/documents/categories', { headers: authHeaders(token) })

@@ -21,6 +21,14 @@ export interface DocumentItem {
   updatedAt: string
   status: DocumentStatus
   chunks: number | null
+  /** Kategori/subjek. Null bila dokumen belum dikategorikan. */
+  categoryId: string | null
+  /**
+   * Unit kerja yang dikunci untuk dokumen ini. Null berarti terbuka untuk
+   * semua pegawai. Dibawa sampai UI supaya dialog akses bisa menampilkan
+   * keadaan sekarang tanpa memuat ulang dokumennya satu per satu.
+   */
+  unitKerja: { id: string; name: string } | null
 }
 
 export type IconType = ComponentType<{ size?: number | string }>
