@@ -19,8 +19,8 @@ percakapan.
 | AI Service | Ingestion, retrieval, generation, citation, dan evaluasi tersedia |
 | Integrasi Backend–AI | Backend meneruskan file ke endpoint ingestion AI |
 
-Untuk runtime nyata, sistem memerlukan credential Neon (PostgreSQL dengan
-pgvector) dan SumoPod. Credential tidak disediakan oleh repository.
+Database PostgreSQL + pgvector berjalan lokal melalui Docker Compose. Runtime
+AI tetap memerlukan credential SumoPod yang tidak disediakan oleh repository.
 
 ## Tech stack
 
@@ -47,21 +47,26 @@ JCP-Enterprise-AI-Knowledge-System/
 └── README.md
 ```
 
-## Menjalankan lokal tanpa Docker
+## Menjalankan lokal dengan Docker
 
-Prasyarat: Node.js, Python 3, dependensi masing-masing service sudah terpasang,
-database Neon dengan ekstensi `vector`, serta API key SumoPod yang aktif.
+Prasyarat: Docker Desktop aktif serta `.env` sudah berisi secret aplikasi,
+credential PostgreSQL lokal, Google OAuth Client ID, dan API key SumoPod.
 
 ```powershell
 Copy-Item .env.example .env
-# Isi .env, lalu jalankan migration, optional seed, dan seluruh service native.
-powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1 -Seed
+# Isi .env, lalu bangun dan jalankan PostgreSQL, Backend, AI, dan Frontend.
+docker compose up --build
 ```
 
-Skrip membaca `.env` hanya ke process environment, tidak mencetak credential,
-menjalankan Prisma migration/seed, lalu menyalakan AI API, Backend, dan Frontend.
-Gunakan `-Seed` saat pertama kali menyiapkan akun uji; berikutnya parameter itu
-boleh dihilangkan.
+Backend otomatis menjalankan Prisma migration saat container dimulai. Pada
+terminal kedua, buat akun awal satu kali dengan:
+
+```powershell
+docker compose exec backend npm run prisma:seed
+```
+
+Untuk menjalankan aplikasi native sementara database tetap di Docker, gunakan
+`powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1 -Seed`.
 
 Jika port `5173` sedang dipakai, isi `FRONTEND_PORT` dengan port kosong di
 `.env` sebelum menjalankan launcher.
@@ -86,7 +91,7 @@ menyajikannya melalui Nginx. Karena nilainya masuk saat build, perubahan
 | AI Service | http://localhost:8001 (hanya mode lokal `start-local.ps1`) |
 | AI health | http://localhost:8001/health |
 | AI Swagger | http://localhost:8001/docs |
-| PostgreSQL | Neon (sesuai `DATABASE_URL`) |
+| PostgreSQL | `127.0.0.1:5432` (container `postgres`) |
 
 Hentikan service lokal dengan:
 
@@ -94,8 +99,8 @@ Hentikan service lokal dengan:
 powershell -ExecutionPolicy Bypass -File .\scripts\stop-local.ps1
 ```
 
-Docker Compose dipakai pada tahap deployment VPS, bukan sebagai prasyarat
-runtime lokal.
+Hentikan seluruh runtime Docker dengan `docker compose down`. Data PostgreSQL
+tetap tersimpan di named volume `postgres_local_data`.
 
 ## Environment
 
@@ -103,7 +108,10 @@ Salin `.env.example` menjadi `.env`. Jangan commit `.env` atau credential asli.
 
 | Variable | Kegunaan |
 | --- | --- |
-| `DATABASE_URL` | Koneksi PostgreSQL bersama |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Credential PostgreSQL lokal di Docker |
+| `POSTGRES_PORT` | Port PostgreSQL pada host; default `5432` |
+| `DATABASE_URL` | Koneksi Backend native ke PostgreSQL lokal |
+| `AI_DATABASE_URL` | Koneksi AI native ke PostgreSQL lokal |
 | `JWT_SECRET` | Penandatanganan JWT Backend |
 | `GOOGLE_CLIENT_ID` | OAuth Web Client ID untuk memverifikasi Google ID token di Backend |
 | `VITE_GOOGLE_CLIENT_ID` | OAuth Web Client ID publik untuk Google Identity Services di Frontend |

@@ -13,7 +13,7 @@ function Import-LocalEnvironment {
   param([string]$Path)
 
   if (-not (Test-Path $Path)) {
-    throw "Buat .env dari .env.example lalu isi credential Neon dan SumoPod. File tidak ditemukan: $Path"
+    throw "Buat .env dari .env.example lalu isi konfigurasi lokal dan SumoPod. File tidak ditemukan: $Path"
   }
 
   foreach ($line in Get-Content $Path) {
@@ -73,7 +73,7 @@ Import-LocalEnvironment -Path $envFile
 # WORKER_TOKEN dipakai dua arah: guard /internal/* di backend dan header
 # X-Worker-Token saat backend memanggil AI service. Tanpa itu, AI service
 # menolak semua request selain /health.
-Require-Environment -Names @('DATABASE_URL', 'SUMOPOD_API_KEY', 'JWT_SECRET', 'WORKER_TOKEN', 'GOOGLE_CLIENT_ID', 'VITE_GOOGLE_CLIENT_ID')
+Require-Environment -Names @('DATABASE_URL', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DB', 'SUMOPOD_API_KEY', 'JWT_SECRET', 'WORKER_TOKEN', 'GOOGLE_CLIENT_ID', 'VITE_GOOGLE_CLIENT_ID')
 
 if (-not $env:AI_DATABASE_URL) { $env:AI_DATABASE_URL = $env:DATABASE_URL }
 if (-not $env:AI_SERVICE_URL) { $env:AI_SERVICE_URL = 'http://127.0.0.1:8001' }
@@ -86,6 +86,19 @@ if ($Seed) {
 }
 
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
+# Runtime native tetap memakai PostgreSQL lokal yang dikelola Docker Compose.
+& docker compose --project-directory $projectRoot up -d postgres
+if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL Docker gagal dijalankan.' }
+
+for ($attempt = 1; $attempt -le 30; $attempt++) {
+  & docker compose --project-directory $projectRoot exec -T postgres `
+    pg_isready -U $env:POSTGRES_USER -d $env:POSTGRES_DB *> $null
+  if ($LASTEXITCODE -eq 0) { break }
+  if ($attempt -eq 30) { throw 'PostgreSQL Docker belum siap.' }
+  Start-Sleep -Seconds 1
+}
+
 $prisma = Join-Path $projectRoot 'backend\node_modules\.bin\prisma.cmd'
 $prismaSchema = Join-Path $projectRoot 'backend\prisma\schema.prisma'
 if (-not (Test-Path $prisma)) {

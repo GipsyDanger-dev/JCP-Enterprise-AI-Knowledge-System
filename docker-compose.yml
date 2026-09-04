@@ -1,14 +1,31 @@
-# Database dipakai dari Neon lewat DATABASE_URL, sama seperti
-# docker-compose.prod.yml. Tidak ada PostgreSQL lokal di sini.
+# PostgreSQL + pgvector berjalan lokal di Docker. Backend dan AI memakai
+# hostname internal `postgres`; host Windows memakai 127.0.0.1:POSTGRES_PORT.
 services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jcp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-jcp_enterprise_ai}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
   backend:
     build: ./backend
     command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run start:dev"
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      # Default ke service name Docker: tanpa `:-`, .env yang tidak memuat baris
-      # AI_SERVICE_URL akan mengirim string kosong ke container.
-      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-api:8000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jcp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jcp_enterprise_ai}?schema=public
+      # Antar-container selalu memakai DNS service Docker, bukan localhost host.
+      AI_SERVICE_URL: http://ai-api:8000
       SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
@@ -27,6 +44,9 @@ services:
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$$BACKEND_PORT/health | grep -qi 'ok'"]
       interval: 5s
@@ -48,9 +68,8 @@ services:
       # memakai default yang tertanam di AI/config.py, apa pun isi .env.
       SUMOPOD_BASE_URL: ${SUMOPOD_BASE_URL:-https://ai.sumopod.com/v1}
       AI_CHAT_MODEL: ${AI_CHAT_MODEL:-deepseek-v4-pro}
-      # Tetap memakai database yang sama, tetapi tanpa query parameter Prisma
-      # `schema=public` yang tidak dikenali oleh psycopg/libpq.
-      DATABASE_URL: ${AI_DATABASE_URL}
+      # psycopg memakai koneksi internal Docker tanpa parameter khusus Prisma.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jcp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jcp_enterprise_ai}
       # Shared secret yang sama dengan backend: AI service menolak semua request
       # (selain /health) yang tidak membawa header X-Worker-Token yang cocok.
       WORKER_TOKEN: ${WORKER_TOKEN}
@@ -59,6 +78,9 @@ services:
     # Untuk debugging manual: `docker compose exec ai-api ...`.
     expose:
       - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       # python dipakai langsung karena image slim tidak punya curl/wget, dan host
       # sudah tidak bisa mengecek /health sendiri setelah port mapping dilepas.
@@ -87,5 +109,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  postgres_local_data:
   backend_node_modules:
   frontend_node_modules:

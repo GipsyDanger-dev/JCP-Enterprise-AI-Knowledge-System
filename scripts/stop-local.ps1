@@ -14,3 +14,5 @@ foreach ($name in @('frontend', 'backend', 'ai-api')) {
 }
 
 Write-Host 'Local runtime dihentikan.'
+& docker compose --project-directory $projectRoot stop postgres | Out-Null
+Write-Host 'PostgreSQL Docker dihentikan.'
