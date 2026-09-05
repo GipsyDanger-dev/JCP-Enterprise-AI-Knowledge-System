@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from config import EMBEDDING_MODEL, SUMOPOD_API_KEY_ENV, SUMOPOD_BASE_URL
+from config import AI_PROVIDER_API_KEY_ENV, AI_PROVIDER_BASE_URL, EMBEDDING_MODEL
 from provider_errors import (
     ProviderConfigurationError,
     ProviderHttpError,
@@ -26,9 +26,11 @@ from retrieval.filters import match_metadata
 
 
 def _api_key(api_key: str | None) -> str:
-    key = api_key or os.environ.get(SUMOPOD_API_KEY_ENV)
+    key = api_key or os.environ.get(AI_PROVIDER_API_KEY_ENV)
     if not key:
-        raise ProviderConfigurationError(SUMOPOD_API_KEY_ENV)
+        raise ProviderConfigurationError(AI_PROVIDER_API_KEY_ENV)
+    if not AI_PROVIDER_BASE_URL:
+        raise ProviderConfigurationError("AI_PROVIDER_BASE_URL")
     return key
 
 
@@ -38,7 +40,7 @@ def embed_texts(
     api_key: str | None = None,
     batch_size: int = 64,
 ) -> list[list[float]]:
-    """Embed a list of texts via SumoPod /v1/embeddings (batched)."""
+    """Embed a list of texts via an OpenAI-compatible /v1/embeddings API."""
     if not texts:
         return []
     key = _api_key(api_key)
@@ -47,7 +49,7 @@ def embed_texts(
         batch = texts[start:start + batch_size]
         payload = json.dumps({"model": model, "input": batch}).encode("utf-8")
         request = urllib.request.Request(
-            f"{SUMOPOD_BASE_URL}/embeddings",
+            f"{AI_PROVIDER_BASE_URL}/embeddings",
             data=payload,
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             method="POST",

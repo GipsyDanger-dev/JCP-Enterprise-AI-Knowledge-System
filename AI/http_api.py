@@ -303,7 +303,7 @@ def ingest_documents(request: IngestRequest) -> dict[str, Any]:
                 store,
                 str(request.document_version_id),
                 embed=request.embed,
-                api_key=os.environ.get("SUMOPOD_API_KEY"),
+                api_key=os.environ.get("AI_PROVIDER_API_KEY"),
             )
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error

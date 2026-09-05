@@ -35,7 +35,7 @@ Panduan lengkap untuk menjalankan dan mendeplai seluruh service.
                                       │ HTTP
                            ┌──────────▼───────────────────┐
                            │      SumoPod API (LLM)       │
-                           │   https://ai.sumopod.com     │
+                           │   OpenAI-compatible provider │
                            └──────────────────────────────┘
 ```
 
@@ -121,12 +121,13 @@ npm run start:dev
 ```bash
 cd AI
 # Windows PowerShell:
-$env:SUMOPOD_API_KEY="sk-your-key-here"
+$env:AI_PROVIDER_API_KEY="provider-key"
+$env:AI_PROVIDER_BASE_URL="https://provider.example/v1"
 $env:WORKER_TOKEN="same-token-as-backend"
 python -m uvicorn http_api:app --host 127.0.0.1 --port 8001
 
 # Linux/Mac:
-SUMOPOD_API_KEY=sk-your-key-here WORKER_TOKEN=same-token-as-backend python -m uvicorn http_api:app --host 127.0.0.1 --port 8001
+AI_PROVIDER_API_KEY=provider-key AI_PROVIDER_BASE_URL=https://provider.example/v1 WORKER_TOKEN=same-token-as-backend python -m uvicorn http_api:app --host 127.0.0.1 --port 8001
 # → http://localhost:8001
 ```
 
@@ -204,7 +205,8 @@ docker compose down
 | `DATABASE_URL` | Koneksi native dari host ke PostgreSQL Docker | `postgresql://jcp:pass@127.0.0.1:5432/jcp_enterprise_ai?schema=public` |
 | `JWT_SECRET` | Secret key for JWT signing | `your-random-secret-min-32-chars` |
 | `WORKER_TOKEN` | Shared secret backend ↔ AI service (`X-Worker-Token` header) | `long-random-string` |
-| `SUMOPOD_API_KEY` | SumoPod API key for LLM/embeddings | `sk-xxxxxxxxxxxx` |
+| `AI_PROVIDER_API_KEY` | API key provider AI OpenAI-compatible | `provider-key` |
+| `AI_PROVIDER_BASE_URL` | Base URL provider AI | `https://provider.example/v1` |
 
 ### Optional Variables
 
@@ -214,8 +216,9 @@ docker compose down
 | `FRONTEND_PORT` | `5173` | Vite dev server port (dibaca `vite.config.ts`) |
 | `POSTGRES_PORT` | `5432` | Port PostgreSQL yang hanya dipublikasikan ke loopback host |
 | `JWT_EXPIRES_IN` | `24h` | JWT token expiration |
-| `SUMOPOD_BASE_URL` | `https://ai.sumopod.com/v1` | Endpoint provider LLM/embedding |
-| `AI_CHAT_MODEL` | `deepseek-v4-pro` | Model chat default AI service |
+| `AI_CHAT_MODEL` | `auto` | Model chat default AI service |
+| `AI_EMBEDDINGS_ENABLED` | `false` | Aktifkan hanya bila provider menyediakan endpoint embedding |
+| `AI_EMBEDDING_MODEL` | `text-embedding-3-small` | Model embedding apabila endpoint embedding tersedia |
 | `AI_SERVICE_URL` | `http://localhost:8001` | AI engine URL from backend (Docker: `http://ai-api:8000`) |
 | `VITE_API_BASE_URL` | `http://localhost:8000` | Backend URL from frontend |
 | `VITE_USE_MOCK_AUTH` | `false` | Enable mock API (dev only) |

@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from config import DEFAULT_MODEL, SUMOPOD_API_KEY_ENV, SUMOPOD_BASE_URL
+from config import AI_PROVIDER_API_KEY_ENV, AI_PROVIDER_BASE_URL, DEFAULT_MODEL
 from generation.guardrails import CLARIFY_MARKER
 from generation.prompts import build_messages
 from provider_errors import (
@@ -66,9 +66,11 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
                     documents: list[dict[str, Any]] | None = None,
                     allow_clarify: bool = False) -> str:
     """Ask a SumoPod LLM to answer using intact page/section contexts only."""
-    key = api_key or os.environ.get(SUMOPOD_API_KEY_ENV)
+    key = api_key or os.environ.get(AI_PROVIDER_API_KEY_ENV)
     if not key:
-        raise ProviderConfigurationError(SUMOPOD_API_KEY_ENV)
+        raise ProviderConfigurationError(AI_PROVIDER_API_KEY_ENV)
+    if not AI_PROVIDER_BASE_URL:
+        raise ProviderConfigurationError("AI_PROVIDER_BASE_URL")
     body_fields: dict[str, Any] = {
         "model": model,
         "messages": build_messages(query, matches, documents, allow_clarify),
@@ -81,7 +83,7 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
         body_fields["response_format"] = {"type": "json_object"}
     payload = json.dumps(body_fields).encode("utf-8")
     request = urllib.request.Request(
-        f"{SUMOPOD_BASE_URL}/chat/completions",
+        f"{AI_PROVIDER_BASE_URL}/chat/completions",
         data=payload,
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
         method="POST",

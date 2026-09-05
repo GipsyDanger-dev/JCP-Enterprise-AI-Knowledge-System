@@ -51,13 +51,13 @@ class LlmModeTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(RuntimeError) as ctx:
                 self.kb.ask("Berapa maksimal biaya hotel Manager?", use_llm=True)
-        self.assertIn("SUMOPOD_API_KEY", str(ctx.exception))
+        self.assertIn("AI_PROVIDER_API_KEY", str(ctx.exception))
 
     def test_generate_answer_missing_key_message(self):
         with mock.patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(RuntimeError) as ctx:
                 generate_answer("q", [])
-        self.assertIn("SUMOPOD_API_KEY", str(ctx.exception))
+        self.assertIn("AI_PROVIDER_API_KEY", str(ctx.exception))
 
     def test_llm_answer_hides_internal_chunk_coordinates(self):
         class FakeResponse:
@@ -70,7 +70,10 @@ class LlmModeTests(unittest.TestCase):
             def read(self):
                 return json.dumps({"choices": [{"message": {"content": "Maksimal Rp900.000 [7db293d7-e271-473e-9d0d-431972042f04-1 - Biaya hotel]"}}]}).encode()
 
-        with mock.patch.dict(os.environ, {"SUMOPOD_API_KEY": "sk-test"}, clear=False), \
+        with mock.patch.dict(os.environ, {
+            "AI_PROVIDER_API_KEY": "sk-test",
+            "AI_PROVIDER_BASE_URL": "https://provider.test/v1",
+        }, clear=False), \
              mock.patch("generation.llm.urllib.request.urlopen", return_value=FakeResponse()):
             result = self.kb.ask("Berapa maksimal biaya hotel Manager?", use_llm=True)
         self.assertTrue(result["grounded"])

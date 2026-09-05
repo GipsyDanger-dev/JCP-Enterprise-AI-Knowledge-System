@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
-from config import SUMOPOD_API_KEY_ENV
+from config import AI_PROVIDER_API_KEY_ENV
 from retrieval.tfidf import TfidfRetriever
 from retrieval.embeddings import VectorRetriever
 
 
 def _has_api_key(api_key: str | None) -> bool:
-    return bool(api_key or os.environ.get(SUMOPOD_API_KEY_ENV))
+    import os
+    return bool(api_key or os.environ.get(AI_PROVIDER_API_KEY_ENV))
 
 
 def build_retriever(knowledge_base: Any, mode: str = "auto", api_key: str | None = None):

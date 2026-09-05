@@ -26,7 +26,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-jcp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jcp_enterprise_ai}?schema=public
       # Antar-container selalu memakai DNS service Docker, bukan localhost host.
       AI_SERVICE_URL: http://ai-api:8000
-      SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
+      AI_PROVIDER_API_KEY: ${AI_PROVIDER_API_KEY:-}
+      # Default false agar provider chat-only tetap dapat mengindeks dokumen
+      # dengan TF-IDF lokal. Aktifkan hanya jika /v1/embeddings tersedia.
+      AI_EMBEDDINGS_ENABLED: ${AI_EMBEDDINGS_ENABLED:-false}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
@@ -63,11 +66,11 @@ services:
       - ./AI:/app
       - ./backend/tmp:/app/tmp
     environment:
-      SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
-      # Endpoint dan model provider ikut dari .env: tanpa ini container selalu
-      # memakai default yang tertanam di AI/config.py, apa pun isi .env.
-      SUMOPOD_BASE_URL: ${SUMOPOD_BASE_URL:-https://ai.sumopod.com/v1}
-      AI_CHAT_MODEL: ${AI_CHAT_MODEL:-deepseek-v4-pro}
+      AI_PROVIDER_API_KEY: ${AI_PROVIDER_API_KEY:-}
+      # Provider harus kompatibel dengan format OpenAI /v1.
+      AI_PROVIDER_BASE_URL: ${AI_PROVIDER_BASE_URL:-}
+      AI_CHAT_MODEL: ${AI_CHAT_MODEL:-auto}
+      AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-text-embedding-3-small}
       # psycopg memakai koneksi internal Docker tanpa parameter khusus Prisma.
       DATABASE_URL: postgresql://${POSTGRES_USER:-jcp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jcp_enterprise_ai}
       # Shared secret yang sama dengan backend: AI service menolak semua request

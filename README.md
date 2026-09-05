@@ -117,7 +117,10 @@ Salin `.env.example` menjadi `.env`. Jangan commit `.env` atau credential asli.
 | `VITE_GOOGLE_CLIENT_ID` | OAuth Web Client ID publik untuk Google Identity Services di Frontend |
 | `AI_SERVICE_URL` | URL AI dari Backend; lokal `http://127.0.0.1:8001`, Docker `http://ai-api:8000` |
 | `WORKER_TOKEN` | Shared secret Backend <-> AI Service (header `X-Worker-Token`) |
-| `SUMOPOD_API_KEY` | Akses embedding/LLM AI Service |
+| `AI_PROVIDER_API_KEY` | API key provider AI yang kompatibel OpenAI |
+| `AI_PROVIDER_BASE_URL` | Base URL provider AI, misalnya `https://provider.example/v1` |
+| `AI_CHAT_MODEL` | ID model chat sesuai daftar model provider |
+| `AI_EMBEDDINGS_ENABLED` | Isi `false` bila provider tidak menyediakan `/v1/embeddings` |
 | `VITE_API_BASE_URL` | Base URL Backend dari browser lokal |
 
 ## Database dan seed

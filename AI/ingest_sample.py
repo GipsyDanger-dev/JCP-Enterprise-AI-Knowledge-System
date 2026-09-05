@@ -43,7 +43,7 @@ def main():
 
     print(f"🔍 Found {len(sample_files)} sample document(s)\n")
 
-    api_key = os.environ.get("SUMOPOD_API_KEY")
+    api_key = os.environ.get("AI_PROVIDER_API_KEY")
 
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         # Check pgvector

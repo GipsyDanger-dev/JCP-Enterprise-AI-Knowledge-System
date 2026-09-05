@@ -151,11 +151,12 @@ dalam `input_dir`. Endpoint belum terhubung langsung dengan file `bytea` Backend
 
 ## LLM dan embedding
 
-LLM dan embedding menggunakan gateway OpenAI-compatible SumoPod. API key hanya
-dibaca dari environment:
+LLM dan embedding menggunakan provider yang kompatibel dengan format OpenAI.
+API key dan base URL hanya dibaca dari environment:
 
 ```powershell
-$env:SUMOPOD_API_KEY="sk-xxxx"
+$env:AI_PROVIDER_API_KEY="provider-key"
+$env:AI_PROVIDER_BASE_URL="https://provider.example/v1"
 ```
 
 Jangan menyimpan atau commit API key ke repository.
@@ -165,7 +166,7 @@ Contoh:
 ```powershell
 python ai_engine.py ingest sample_docs --embed
 python ai_engine.py ask "Berapa biaya hotel Manager?" --retriever vector
-python ai_engine.py ask "Berapa biaya hotel Manager?" --llm --model deepseek-v4-pro
+python ai_engine.py ask "Berapa biaya hotel Manager?" --llm --model your-chat-model
 ```
 
 `--retriever auto` memilih vector jika embedding dan API key tersedia; jika

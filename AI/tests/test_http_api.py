@@ -101,7 +101,7 @@ class HttpApiTests(unittest.TestCase):
     def test_missing_provider_configuration_maps_to_safe_503(self):
         class FailingStore:
             def ask(self, *_args, **_kwargs):
-                raise ProviderConfigurationError("SUMOPOD_API_KEY")
+                raise ProviderConfigurationError("AI_PROVIDER_API_KEY")
 
         with mock.patch("http_api.current_store", return_value=FailingStore()):
             response = self.client.post("/ask", json={"query": "policy"})

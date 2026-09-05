@@ -86,7 +86,7 @@ export class ChatService {
           filters: retrievalFilters,
           conversation_topic: conversationTopic,
           top_k: 5,
-          use_llm: Boolean(process.env.SUMOPOD_API_KEY || process.env.LLM_API_KEY),
+          use_llm: Boolean(process.env.AI_PROVIDER_API_KEY),
           // Hanya pertanyaan yang diketik sendiri yang boleh dibalas dengan
           // pertanyaan balik saat maksudnya terlalu luas.
           allow_clarify: !fromSuggestion,

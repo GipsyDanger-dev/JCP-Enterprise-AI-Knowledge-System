@@ -95,7 +95,9 @@ export class DocumentProcessorService implements OnModuleInit {
         body: JSON.stringify({
           input_dir: tmpDir,
           document_version_id: versionId,
-          embed: true,
+          // Provider yang hanya mendukung chat tetap dapat mengindeks dokumen
+          // memakai TF-IDF lokal dengan AI_EMBEDDINGS_ENABLED=false.
+          embed: process.env.AI_EMBEDDINGS_ENABLED !== 'false',
         }),
       });
 
