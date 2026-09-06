@@ -450,8 +450,8 @@ button { cursor: pointer; }
 
 /* ============ Konten & Heading ============ */
 .page-content { min-height: calc(100vh - 86px); }
-.overview-layout { display: grid; grid-template-columns: 1fr; max-width: 1100px; margin: 0 auto; }
-.overview-main { padding: 42px clamp(28px, 4vw, 58px) 56px; min-width: 0; }
+.overview-layout { display: grid; grid-template-columns: 1fr; width: 100%; margin: 0; }
+.overview-main { padding: 42px clamp(28px, 5vw, 70px) 56px; min-width: 0; }
 
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 22px; margin-bottom: 27px; }
 .page-heading > div:first-child { max-width: 610px; }
@@ -547,7 +547,7 @@ button { cursor: pointer; }
 .agent-composer button, .chat-composer button { width: 32px; height: 32px; border: 0; border-radius: var(--radius-md); background: var(--brand-600); color: var(--on-dark); display: grid; place-items: center; }
 
 /* ============ Dashboard Employee ============ */
-.employee-page { max-width: 1240px; margin: 0 auto; padding: 42px clamp(28px, 5vw, 68px) 58px; }
+.employee-page { width: 100%; margin: 0; padding: 42px clamp(28px, 5vw, 70px) 58px; }
 .employee-page > .page-heading { margin-bottom: 24px; }
 .employee-ask { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--bg-card); padding: 24px; background-image: radial-gradient(var(--brand-200) .65px, transparent .65px); background-size: 12px 12px; }
 .employee-ask::after { content: ""; position: absolute; inset: 0 0 0 58%; background: var(--overlay-warm); pointer-events: none; }
@@ -622,7 +622,7 @@ button { cursor: pointer; }
 .quick-library .collection-icon { width: 30px; height: 30px; }
 
 /* ============ Halaman standar & Tabel ============ */
-.standard-page, .chat-page { padding: 42px clamp(28px, 5vw, 70px) 56px; }
+.standard-page, .chat-page { width: 100%; padding: 42px clamp(28px, 5vw, 70px) 56px; }
 .table-toolbar { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
 .filter-search { min-width: 240px; height: 36px; border: 1px solid var(--border-strong); background: var(--bg-card); border-radius: var(--radius-md); padding: 0 10px; display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
 .filter-search input { border: 0; outline: 0; min-width: 0; flex: 1; font-size: var(--fs-sm); }
@@ -641,7 +641,7 @@ button { cursor: pointer; }
 .person-cell small { color: var(--text-faint); font-size: var(--fs-2xs); margin-top: 3px; }
 
 /* ============ Chat ============ */
-.chat-page { width: min(1080px, 100%); margin: 0 auto; height: calc(100dvh - 58px); min-height: 520px; display: flex; flex-direction: column; overflow: hidden; padding: 22px 28px 18px; }
+.chat-page { margin: 0; height: calc(100dvh - 58px); min-height: 520px; display: flex; flex-direction: column; overflow: hidden; padding: 22px clamp(28px, 5vw, 70px) 18px; }
 .chat-workspace-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding: 0 4px 16px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0; }
 .chat-page .page-heading { margin: 0; text-align: left; }
 .chat-page .page-heading > div:first-child { max-width: 100%; }
@@ -1397,7 +1397,7 @@ button { cursor: pointer; }
 }
 
 /* ============ Announcements ============ */
-.announcements-page { max-width: 1100px; }
+.announcements-page { width: 100%; }
 .announcement-composer { margin: 0 0 20px; border: 1px solid var(--border); border-radius: 8px; padding: 20px; background: var(--surface); }
 .announcement-composer-head { display: flex; align-items: center; gap: 9px; margin-bottom: 18px; color: var(--text-strong); }
 .announcement-composer-head svg, .announcement-icon { color: var(--accent); }
