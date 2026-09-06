@@ -7,7 +7,7 @@ strings between themselves.
 
 import os
 
-SUMOPOD_BASE_URL = "https://ai.sumopod.com/v1"
+SUMOPOD_BASE_URL = os.environ.get("SUMOPOD_BASE_URL", "https://ai.sumopod.com/v1").rstrip("/")
 SUMOPOD_API_KEY_ENV = "SUMOPOD_API_KEY"
 
 # Chat model used for --llm grounded answers through SumoPod.
