@@ -12,14 +12,30 @@ Frontend React/Vite tidak boleh memanggil AI Service secara langsung.
 | Konteks | Base URL |
 | --- | --- |
 | Backend di Docker Compose | `http://ai-api:8000` |
-| Akses dari host ke container | `http://localhost:8001` |
-| AI dijalankan langsung tanpa Docker | `http://localhost:8000` |
+| Akses dari host ke container | tidak tersedia — `ai-api` tanpa port mapping |
+| AI dijalankan langsung tanpa Docker (`start-local.ps1`) | `http://localhost:8001` |
 
 - Format request/response: JSON UTF-8.
 - Swagger FastAPI: `GET /docs` pada base URL yang sesuai.
-- Auth antar-service belum tersedia.
+- Auth antar-service: header `X-Worker-Token` wajib pada semua endpoint kecuali
+  `/health` (lihat bagian Autentikasi).
 - Jangan mengekspos AI Service langsung ke publik.
 - `AI_SERVICE_URL` Backend di Docker harus bernilai `http://ai-api:8000`.
+
+## Autentikasi
+
+Backend dan AI Service memakai satu shared secret, `WORKER_TOKEN`, dan header yang
+sama seperti kontrak worker Backend: `X-Worker-Token`.
+
+| Kondisi | Respons |
+| --- | --- |
+| Header cocok dengan `WORKER_TOKEN` | Request diproses |
+| Header hilang atau salah | `401 {"detail": "Valid worker token required"}` |
+| `WORKER_TOKEN` tidak di-set di AI Service | `503 {"detail": "WORKER_TOKEN is not configured"}` |
+| Path `/health` | Selalu terbuka, untuk healthcheck container |
+
+Perbandingan token memakai `hmac.compare_digest` atas hash SHA-256, sama seperti
+`WorkerTokenGuard` di Backend.
 
 ## Status integrasi
 

@@ -18,13 +18,14 @@ Endpoints (full OpenAPI docs at /docs):
 from __future__ import annotations
 
 import os
+import hmac
 import re
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 try:
-    from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+    from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
     from pydantic import BaseModel
 except ImportError:  # pragma: no cover - optional dependency
     raise RuntimeError(
@@ -35,12 +36,23 @@ from config import DEFAULT_MODEL, EMBEDDING_MODEL
 from generation.guardrails import QUICK_SUGGESTIONS, is_out_of_scope, out_of_scope_response
 from knowledge_base import KnowledgeBase
 from provider_errors import ProviderError
-from store import PgVectorStore, default_dsn, ingest_file_to_pg, ingest_to_pg
+from store import AccessScope, PgVectorStore, default_dsn, ingest_file_to_pg, ingest_to_pg
 
 PROJECT_DIR = Path(__file__).resolve().parent
 DEFAULT_INDEX = PROJECT_DIR / "knowledge_base.json"
 
+def require_worker_token(request: Request, x_worker_token: str | None = Header(default=None)) -> None:
+    if request.url.path == "/health":
+        return
+    expected = (os.environ.get("WORKER_TOKEN") or "").strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="WORKER_TOKEN is not configured")
+    if not x_worker_token or not hmac.compare_digest(x_worker_token.encode(), expected.encode()):
+        raise HTTPException(status_code=401, detail="Valid worker token required")
+
+
 app = FastAPI(
+    dependencies=[Depends(require_worker_token)],
     title="Enterprise AI — AI Service",
     description="Grounded retrieval engine: ingest, ask, citations. "
                 "Citation selalu berasal dari metadata halaman/section, bukan dari LLM.",
@@ -49,6 +61,8 @@ app = FastAPI(
 
 
 class AskRequest(BaseModel):
+    allow_clarify: bool = False
+    access: dict[str, Any] | None = None
     query: str
     context_chunk_ids: list[str] = []
     conversation_topic: str | None = None
@@ -60,6 +74,7 @@ class AskRequest(BaseModel):
 
 
 class AskResponse(BaseModel):
+    awaiting_choice: bool = False
     answer: str
     citations: list[dict[str, Any]]
     grounded: bool
@@ -223,10 +238,14 @@ def ask(request: AskRequest) -> dict[str, Any]:
     try:
         store = current_store()
         if isinstance(store, PgVectorStore):
+            scope = AccessScope.from_payload(request.access)
+            if scope is None:
+                raise HTTPException(status_code=400, detail="access scope is required")
             return store.ask(
                 retrieval_query, top_k=request.top_k, use_llm=request.use_llm,
                 model=request.model or DEFAULT_MODEL, filters=request.filters,
                 context_chunk_ids=request.context_chunk_ids,
+                allow_clarify=request.allow_clarify, scope=scope,
             )
         return store.ask(
             retrieval_query, top_k=request.top_k, use_llm=request.use_llm,
@@ -324,7 +343,7 @@ async def ingest_file(
     import tempfile
     from knowledge_base import ingest
     with tempfile.TemporaryDirectory() as tmp_dir:
-        target = Path(tmp_dir) / file.filename
+        target = Path(tmp_dir) / Path(file.filename.replace("\\", "/")).name
         target.write_bytes(content)
         try:
             ingest(Path(tmp_dir), DEFAULT_INDEX, embed=embed)

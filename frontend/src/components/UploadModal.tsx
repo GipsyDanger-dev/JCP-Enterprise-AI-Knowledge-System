@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, FileText, FolderOpen, LoaderCircle, Plus, Upload, X } from 'lucide-react'
-import { uploadDocument } from '@/api/documents'
-import { createDocumentCategory, listDocumentCategories } from '@/api/documentCategories'
+import { Building2, FileText, FolderOpen, LoaderCircle, Upload, X } from 'lucide-react'
+import { listDocumentCategories, uploadDocument } from '@/api/documents'
+import { getUserReferenceData } from '@/api/users'
 import { errorMessage } from '@/api/client'
-import type { ApiDocument, ApiDocumentCategory } from '@/api/types'
+import type { ApiDocument, ApiDocumentCategory, ApiUnitKerja } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
@@ -13,40 +13,43 @@ interface UploadModalProps {
   open: boolean
   onClose: () => void
   onUploaded: (document: ApiDocument) => void
-  onCategoryCreated?: (category: ApiDocumentCategory) => void
 }
 
-export function UploadModal({ open, onClose, onUploaded, onCategoryCreated }: UploadModalProps) {
-  const { token } = useAuth()
+export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
+  const { token, user } = useAuth()
   const { language } = useWorkspace()
   const isId = language === 'id'
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Kategori dibaca dari server dan sudah tersaring untuk pengguna ini, jadi
+  // tidak mungkin mengunggah ke kategori yang unit kerjanya sendiri tak berhak.
+  const [categories, setCategories] = useState<ApiDocumentCategory[]>([])
+  const [unitKerjaList, setUnitKerjaList] = useState<ApiUnitKerja[]>([])
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
-  const [collection, setCollection] = useState('')
-  const [division, setDivision] = useState('')
-  const [categories, setCategories] = useState<ApiDocumentCategory[]>([])
-  const [categoriesLoading, setCategoriesLoading] = useState(false)
-  const [showCategoryForm, setShowCategoryForm] = useState(false)
-  const [newCategoryName, setNewCategoryName] = useState('')
-  const [creatingCategory, setCreatingCategory] = useState(false)
+  const [categoryId, setCategoryId] = useState('')
+  // Bawaannya terbuka. Isi JDIH adalah peraturan daerah yang memang publik,
+  // jadi mengunci harus jadi keputusan sadar admin — bukan sesuatu yang
+  // terjadi diam-diam pada setiap unggahan. Admin unit tidak punya pilihan
+  // ini: dokumennya selalu bertanda unitnya sendiri (ditegakkan server).
+  const [restrictToUnit, setRestrictToUnit] = useState(false)
+  const [unitKerjaId, setUnitKerjaId] = useState('')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const isSuperAdmin = user?.isAdmin ?? false
+  const ownUnit = user?.unitKerja ?? null
+
   useEffect(() => {
-    if (!open || !token) return
-    let active = true
-    setCategoriesLoading(true)
-    listDocumentCategories(token)
-      .then((items) => {
-        if (!active) return
-        setCategories(items)
-        setCollection((current) => items.some((item) => item.name === current) ? current : (items[0]?.name ?? ''))
-      })
-      .catch((err) => { if (active) setError(errorMessage(err)) })
-      .finally(() => { if (active) setCategoriesLoading(false) })
-    return () => { active = false }
-  }, [open, token])
+    if (!open) return
+    listDocumentCategories(token ?? undefined).then(setCategories).catch(() => setCategories([]))
+    // Hanya super admin yang boleh memilih unit kerja selain miliknya sendiri.
+    if (isSuperAdmin) {
+      getUserReferenceData(token ?? undefined)
+        .then((data) => setUnitKerjaList(data.unitKerja))
+        .catch(() => setUnitKerjaList([]))
+    }
+  }, [open, token, isSuperAdmin])
 
   if (!open) return null
 
@@ -72,15 +75,21 @@ export function UploadModal({ open, onClose, onUploaded, onCategoryCreated }: Up
   }
 
   const handleUpload = async () => {
-    if (!file || !collection) return
+    if (!file) return
     setUploading(true)
     setError(null)
     try {
-      const document = await uploadDocument(file, token ?? undefined, title, collection, division)
+      const document = await uploadDocument(file, token ?? undefined, {
+        title,
+        categoryId: categoryId || undefined,
+        // Admin unit tidak mengirim id apa pun: server yang mengisikan unit
+        // kerjanya sendiri, sehingga nilai dari klien tidak bisa dipakai
+        // menandai dokumen atas nama unit lain.
+        unitKerjaId: isSuperAdmin ? (restrictToUnit ? unitKerjaId || undefined : undefined) : undefined,
+      })
       setFile(null)
       setTitle('')
-      setCollection(categories[0]?.name ?? '')
-      setDivision('')
+      setCategoryId('')
       onUploaded(document)
       onClose()
     } catch (err) {
@@ -94,31 +103,11 @@ export function UploadModal({ open, onClose, onUploaded, onCategoryCreated }: Up
     if (uploading) return
     setFile(null)
     setTitle('')
-    setCollection(categories[0]?.name ?? '')
-    setDivision('')
-    setShowCategoryForm(false)
-    setNewCategoryName('')
+    setCategoryId('')
+    setRestrictToUnit(false)
+    setUnitKerjaId('')
     setError(null)
     onClose()
-  }
-
-  const handleCreateCategory = async () => {
-    const name = newCategoryName.trim()
-    if (!name) return
-    setCreatingCategory(true)
-    setError(null)
-    try {
-      const category = await createDocumentCategory(name, token ?? undefined)
-      setCategories((items) => [...items, category].sort((a, b) => a.name.localeCompare(b.name)))
-      setCollection(category.name)
-      setNewCategoryName('')
-      setShowCategoryForm(false)
-      onCategoryCreated?.(category)
-    } catch (err) {
-      setError(errorMessage(err))
-    } finally {
-      setCreatingCategory(false)
-    }
   }
 
   return (
@@ -161,40 +150,80 @@ export function UploadModal({ open, onClose, onUploaded, onCategoryCreated }: Up
         </div>
 
         <div className="upload-field">
-          <label><FolderOpen size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Koleksi' : 'Collection'}</label>
-          <div className="upload-collection-grid">
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                className={`upload-collection-chip ${collection === category.name ? 'active' : ''}`}
-                onClick={() => setCollection(category.name)}
+          <label><FolderOpen size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Kategori' : 'Category'}</label>
+          {categories.length === 0 ? (
+            <p className="field-hint">
+              {isId
+                ? 'Belum ada kategori yang tersedia untuk unit kerja Anda.'
+                : 'No category is available for your work unit.'}
+            </p>
+          ) : (
+            <div className="upload-collection-grid">
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={`upload-collection-chip ${categoryId === category.id ? 'active' : ''}`}
+                  onClick={() => setCategoryId(categoryId === category.id ? '' : category.id)}
+                  disabled={uploading}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="field-hint">
+            {isId
+              ? 'Kategori adalah penanda subjek untuk pencarian dan filter, bukan pembatas akses.'
+              : 'The category is a subject label for search and filtering, not an access boundary.'}
+          </p>
+        </div>
+
+        <div className="upload-field">
+          <label><Building2 size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Batasi ke unit kerja' : 'Restrict to work unit'}</label>
+          <label className="upload-restrict-toggle">
+            <input
+              type="checkbox"
+              checked={isSuperAdmin ? restrictToUnit : true}
+              onChange={(event) => setRestrictToUnit(event.target.checked)}
+              // Admin unit tidak bisa melepasnya: server tetap menandai
+              // dokumennya dengan unitnya sendiri, jadi centang yang bisa
+              // dilepas hanya akan berbohong soal apa yang terjadi.
+              disabled={uploading || !isSuperAdmin}
+            />
+            <span>
+              {isSuperAdmin
+                ? (isId ? 'Hanya untuk satu unit kerja tertentu' : 'Only for one specific work unit')
+                : (isId
+                    ? `Hanya untuk ${ownUnit?.name ?? 'unit kerja saya'}`
+                    : `Only for ${ownUnit?.name ?? 'my work unit'}`)}
+            </span>
+          </label>
+
+          {isSuperAdmin && restrictToUnit && (
+            <div className="select-wrapper" style={{ marginTop: 8 }}>
+              <select
+                value={unitKerjaId}
+                onChange={(event) => setUnitKerjaId(event.target.value)}
                 disabled={uploading}
               >
-                {collection === category.name && <Check size={13} />}
-                {category.name}
-              </button>
-            ))}
-            <button type="button" className="upload-collection-add" onClick={() => setShowCategoryForm((shown) => !shown)} disabled={uploading || categoriesLoading}><Plus size={14} /> {isId ? 'Tambah kategori' : 'Add category'}</button>
-          </div>
-          {categoriesLoading && <small className="upload-category-help">{isId ? 'Memuat kategori...' : 'Loading categories...'}</small>}
-          {!categoriesLoading && categories.length === 0 && <small className="upload-category-help">{isId ? 'Belum ada kategori. Tambahkan kategori pertama.' : 'No categories yet. Add the first category.'}</small>}
-          {showCategoryForm && <div className="upload-category-create">
-            <input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} maxLength={100} placeholder={isId ? 'Nama kategori baru' : 'New category name'} disabled={creatingCategory || uploading} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); handleCreateCategory() } }} />
-            <button type="button" className="secondary-button" onClick={() => { setShowCategoryForm(false); setNewCategoryName('') }} disabled={creatingCategory}>{isId ? 'Batal' : 'Cancel'}</button>
-            <button type="button" className="primary-button" onClick={handleCreateCategory} disabled={creatingCategory || newCategoryName.trim().length < 2}>{creatingCategory ? (isId ? 'Menyimpan...' : 'Saving...') : (isId ? 'Simpan' : 'Save')}</button>
-          </div>}
-        </div>        <div className="upload-field">
-          <label>{isId ? 'Batasi ke divisi (opsional)' : 'Restrict to division (optional)'}</label>
-          <input
-            id="upload-division"
-            value={division}
-            onChange={(event) => setDivision(event.target.value)}
-            placeholder={isId ? 'Kosongkan agar terlihat semua karyawan' : 'Leave empty so all employees can see it'}
-            disabled={uploading}
-            maxLength={100}
-          />
-          <small className="upload-category-help">{isId ? 'Hanya karyawan di divisi ini yang dapat melihat dokumen.' : 'Only employees in this division will be able to see the document.'}</small>
+                <option value="">{isId ? '— Pilih unit kerja —' : '— Select work unit —'}</option>
+                {unitKerjaList.map((unit) => (
+                  <option key={unit.id} value={unit.id}>{unit.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <p className="field-hint">
+            {isSuperAdmin
+              ? (isId
+                  ? 'Tanpa centang, dokumen terbuka untuk semua pegawai — ini bawaannya. Centang hanya bila isinya memang khusus satu unit kerja. Pilihan ini bisa diubah kapan saja lewat tombol atur akses di daftar dokumen.'
+                  : 'Left unchecked, the document is open to every employee — that is the default. Check it only when the content really belongs to one work unit. You can change this later from the access button in the document list.')
+              : (isId
+                  ? 'Dokumen yang Anda unggah selalu ditandai untuk unit kerja Anda. Hanya super admin yang dapat membukanya untuk seluruh pegawai.'
+                  : 'Documents you upload are always tagged for your work unit. Only a super admin can open them to every employee.')}
+          </p>
         </div>
 
         {error && <div className="upload-error-msg">{error}</div>}
@@ -202,7 +231,7 @@ export function UploadModal({ open, onClose, onUploaded, onCategoryCreated }: Up
 
         <div className="modal-actions">
           <button className="secondary-button" onClick={handleClose} disabled={uploading}>{isId ? 'Batal' : 'Cancel'}</button>
-          <button className="primary-button" onClick={handleUpload} disabled={!file || !collection || uploading}>
+          <button className="primary-button" onClick={handleUpload} disabled={!file || uploading}>
             {uploading ? <><LoaderCircle size={15} className="spin" /> {isId ? 'Mengunggah…' : 'Uploading…'}</> : <><Upload size={15} /> {isId ? 'Unggah' : 'Upload'}</>}
           </button>
         </div>

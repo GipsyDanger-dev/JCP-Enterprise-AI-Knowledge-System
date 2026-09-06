@@ -148,6 +148,7 @@ jobs:
       DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
       JWT_SECRET: test-jwt-secret-key-for-ci-only
       AI_SERVICE_URL: http://localhost:8001
+      WORKER_TOKEN: ci-worker-token
       SUMOPOD_API_KEY: ${{ secrets.SUMOPOD_API_KEY }}
 
     steps:
@@ -315,7 +316,7 @@ jobs:
             
             # Verify health
             curl -f http://localhost:8000/health || exit 1
-            curl -f http://localhost:8001/health || exit 1
+            docker compose exec -T ai-api python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
             
             echo "✅ Deployment successful"
 

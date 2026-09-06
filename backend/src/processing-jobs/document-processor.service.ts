@@ -2,13 +2,14 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { DocumentStorage, DOCUMENT_STORAGE } from '../documents/document-storage.interface';
 import { Inject } from '@nestjs/common';
+import { aiServiceUrl, workerToken } from '../config/env.util';
 
 const POLL_INTERVAL_MS = 3000;
 
 @Injectable()
 export class DocumentProcessorService implements OnModuleInit {
   private readonly logger = new Logger(DocumentProcessorService.name);
-  private readonly aiBaseUrl = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
+  private readonly aiBaseUrl = aiServiceUrl();
   private processing = false;
 
   constructor(
@@ -85,6 +86,7 @@ export class DocumentProcessorService implements OnModuleInit {
 
       const ingestResponse = await fetch(`${this.aiBaseUrl}/ingest-file`, {
         method: 'POST',
+        headers: { 'X-Worker-Token': workerToken() },
         body: form,
       });
 
@@ -132,4 +134,4 @@ export class DocumentProcessorService implements OnModuleInit {
       this.processing = false;
     }
   }
-}
+}

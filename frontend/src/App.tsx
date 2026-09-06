@@ -42,12 +42,12 @@ export default function App() {
               <Route path="documents" element={<DocumentsPage />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="announcements" element={<AnnouncementsPage />} />
-              <Route path="users" element={<RequireRole role="ADMIN"><UsersPage /></RequireRole>} />
-              <Route path="inbox" element={<RequireRole role="ADMIN"><AdminInboxPage /></RequireRole>} />
+              <Route path="users" element={<RequireRole role="admin"><UsersPage /></RequireRole>} />
+              <Route path="inbox" element={<RequireRole role="admin"><AdminInboxPage /></RequireRole>} />
               <Route path="messages" element={<MessagingPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="help" element={<HelpPage />} />
-              <Route path="activity" element={<RequireRole role="ADMIN"><ActivityPage /></RequireRole>} />
+              <Route path="activity" element={<RequireRole role="admin"><ActivityPage /></RequireRole>} />
               <Route path="history" element={<HistoryPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

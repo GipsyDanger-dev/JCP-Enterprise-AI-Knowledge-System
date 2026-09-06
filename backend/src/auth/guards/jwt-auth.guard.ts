@@ -12,8 +12,7 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const token = this.extractBearerToken(request.headers.authorization)
-      ?? this.extractQueryToken(request.query?.token);
+    const token = this.extractBearerToken(request.headers.authorization);
     if (!token) throw new UnauthorizedException('Authentication required');
 
     try {
@@ -33,13 +32,17 @@ export class JwtAuthGuard implements CanActivate {
         data: { lastActiveAt: new Date() }
       }).catch(() => {});
 
+      // unitKerjaId dan jobTitle sengaja dibaca ulang dari database, bukan
+      // diambil dari payload token: pemindahan pegawai ke unit lain — atau
+      // penurunan jabatannya — langsung berlaku pada permintaan berikutnya,
+      // tanpa menunggu yang bersangkutan login ulang.
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, email: true, username: true, role: true, isActive: true, displayName: true, division: true },
+        select: { id: true, email: true, username: true, role: true, isAdmin: true, isActive: true, displayName: true, unitKerjaId: true, jobTitle: true, division: true },
       });
 
       if (!user?.isActive) throw new UnauthorizedException('Authentication required');
-      request.user = { sub: user.id, username: user.username ?? user.email ?? '', role: user.role, displayName: user.displayName, division: user.division, sid: payload.sid };
+      request.user = { sub: user.id, username: user.username ?? user.email ?? '', role: user.role, isAdmin: user.isAdmin, unitKerjaId: user.unitKerjaId, jobTitle: user.jobTitle, division: user.division, displayName: user.displayName, sid: payload.sid };
       return true;
     } catch {
       throw new UnauthorizedException('Authentication required');
@@ -49,10 +52,5 @@ export class JwtAuthGuard implements CanActivate {
   private extractBearerToken(authorization?: string): string | undefined {
     const [type, token] = authorization?.trim().split(/\s+/) ?? [];
     return type?.toLowerCase() === 'bearer' ? token : undefined;
-  }
-
-  private extractQueryToken(value: string | string[] | undefined): string | undefined {
-    if (Array.isArray(value)) return value[0];
-    return value;
   }
 }

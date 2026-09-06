@@ -29,7 +29,7 @@ export class MessagingController {
 
   /** Admin: list all conversations */
   @Get('conversations')
-  @Roles(UserRole.ADMIN)
+  @Roles('admin')
   listConversations() {
     return this.messagingService.listConversations();
   }

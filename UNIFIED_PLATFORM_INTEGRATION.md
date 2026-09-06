@@ -1,6 +1,6 @@
 # Unified Platform Integration
 
-Status: in progress; product decisions pending. No production migration or deployment authorized.
+Status: integration in progress. No production migration or deployment authorized.
 
 ## Agreed Behavior
 
@@ -53,15 +53,14 @@ not the final conflict count for the combined result.
   foundation, retaining the existing provider default and removing trailing slashes.
   This is deployment configuration, not workspace-specific personalization.
 
-## Pending Product Decisions
+## Confirmed Product Decisions
 
-1. Does the platform owner create organizations and their first administrator, or
-   can organizations register themselves? Awaiting user response.
-2. Is an account bound to one personal/organization space, or can one identity have
-   personal space plus organization memberships? Awaiting user response.
-
-These decisions affect identity uniqueness, session context, provisioning, and
-database relationships. Do not finalize those contracts before the response.
+1. Only the platform owner creates organizations and their first administrator.
+2. Every account belongs to exactly one workspace. Personal registration creates
+   a private workspace for that account only. Organization administrators create
+   separate employee accounts in their organization. Login routes directly to the
+   account's workspace; no workspace switcher.
+3. Additional AI-engine tasks will be specified after this integration is finished.
 
 ## Integration and Verification Gates
 

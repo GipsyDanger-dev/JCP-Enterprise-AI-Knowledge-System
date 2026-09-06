@@ -8,7 +8,21 @@ export interface ApiErrorBody {
 }
 
 /* ============ Auth & Users ============ */
-export type ApiRole = 'ADMIN' | 'USER' | 'SUPER_ADMIN' | 'BENDAHARA' | 'SEKRETARIS' | 'OPERASIONAL' | 'HUMAS' | 'DINAS_PENDIDIKAN' | 'DINAS_KESEHATAN' | 'DINAS_PUPR' | 'DINAS_SOSIAL' | 'DISDUKCAPIL' | 'SATPOL_PP' | 'DINAS_PERHUBUNGAN' | 'DINAS_LINGKUNGAN_HIDUP' | 'DPMPTSP' | 'DINAS_KOPERASI_UKM' | 'DINAS_PARIWISATA' | 'DINAS_PERTANIAN' | 'DINAS_PERIKANAN' | 'DISPERINDAG' | 'DISNAKER' | 'BAPPEDA' | 'BKAD' | 'BAPENDA' | 'BKPSDM' | 'BPBD' | 'SETDA' | 'INSPEKTORAT'
+// SUPER_ADMIN dan PEGAWAI adalah tingkat wewenang yang dipakai sekarang.
+// Sisanya nilai lama yang masih mungkin tersimpan di akun lawas.
+export type ApiRole = 'SUPER_ADMIN' | 'ADMIN_UNIT' | 'PEGAWAI' | 'ADMIN' | 'USER' | 'BENDAHARA' | 'SEKRETARIS' | 'OPERASIONAL' | 'HUMAS'
+
+export interface ApiUnitKerja {
+  id: string
+  code: string
+  name: string
+}
+
+/** Daftar acuan untuk dropdown pada form pengguna. */
+export interface ApiUserReferenceData {
+  unitKerja: ApiUnitKerja[]
+  jabatan: string[]
+}
 
 export interface ApiUser {
   id: string
@@ -18,6 +32,9 @@ export interface ApiUser {
   division: string
   jobTitle: string
   role: ApiRole
+  unitKerjaId?: string | null
+  unitKerja?: ApiUnitKerja | null
+  isAdmin?: boolean
   isActive?: boolean
   photoUrl?: string | null
 }
@@ -30,7 +47,7 @@ export interface LoginRequest {
 export interface LoginResponse {
   accessToken: string
   tokenType: 'Bearer'
-  user: ApiUser
+  user: ApiUser & { isAdmin?: boolean }
 }
 
 /** Response aktual GET /auth/me adalah payload JWT secara langsung. */
@@ -42,6 +59,9 @@ export interface MeResponse {
   division: string
   jobTitle: string
   role: ApiRole
+  unitKerjaId?: string | null
+  unitKerja?: ApiUnitKerja | null
+  isAdmin?: boolean
   photoUrl?: string | null
 }
 
@@ -52,6 +72,7 @@ export interface CreateUserRequest {
   division: string
   jobTitle: string
   role: ApiRole
+  unitKerjaId?: string
   password?: string
 }
 
@@ -62,6 +83,8 @@ export interface UpdateUserRequest {
   division?: string
   jobTitle?: string
   role?: ApiRole
+  unitKerjaId?: string
+  isAdmin?: boolean
   photoUrl?: string
 }
 
@@ -97,10 +120,13 @@ export interface ApiProcessingJob {
 }
 
 export interface ApiDocument {
+  division?: string | null
   id: string
   title: string
   collection?: string
-  division?: string | null
+  category?: { id: string; name: string } | null
+  /** Bila terisi, dokumen ini hanya untuk unit kerja tersebut. */
+  unitKerja?: ApiUnitKerja | null
   status: ApiDocumentStatus
   createdAt?: string
   updatedAt?: string
@@ -148,6 +174,7 @@ export interface Citation {
 export interface ChatQueryRequest {
   question: string
   conversationId?: string
+  fromSuggestion?: boolean
 }
 
 export interface ChatQueryResponse {
@@ -156,6 +183,7 @@ export interface ChatQueryResponse {
   message?: string
   citations: Citation[]
   suggestions?: string[]
+  awaitingChoice?: boolean
 }
 
 export interface ApiDocumentCategory {
@@ -209,7 +237,7 @@ export interface MessageAttachment {
 export interface DirectMessage {
   id: string
   conversationId: string
-  sender: MessageSender
+  sender: MessageSender
   senderName: string | null
   content: string
   attachments: MessageAttachment[] | null

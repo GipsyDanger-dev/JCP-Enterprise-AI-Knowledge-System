@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { MessageRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
+import { aiServiceHeaders, aiServiceUrl } from '../config/env.util';
+import { allowedCategoryFilter } from '../documents/document-visibility';
 
 interface AiCitation {
   document_id: string;
@@ -19,6 +21,7 @@ interface AiAskResult {
   citations: AiCitation[];
   grounded: boolean;
   suggestions?: string[];
+  awaiting_choice?: boolean;
 }
 
 export interface ChatCitation {
@@ -41,7 +44,7 @@ const QUICK_SUGGESTIONS = [
 
 @Injectable()
 export class ChatService {
-  private readonly aiBaseUrl = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
+  private readonly aiBaseUrl = aiServiceUrl();
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -49,10 +52,12 @@ export class ChatService {
     question: string,
     actor: AuthenticatedUser,
     conversationId?: string,
+    fromSuggestion?: boolean,
   ) {
     const conversation = await this.resolveConversation(question, actor, conversationId);
     const contextChunkIds = await this.getContextChunkIds(conversation.id);
     const conversationTopic = await this.getConversationTopic(conversation.id);
+    const access = await this.accessScope(actor);
 
     await this.prisma.message.create({
       data: {
@@ -70,7 +75,7 @@ export class ChatService {
     try {
       const response = await fetch(`${this.aiBaseUrl}/ask`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: aiServiceHeaders(),
         body: JSON.stringify({
           query: question,
           // Only opaque chunk ids cross to the AI service. Previous user/assistant text stays in the database.
@@ -78,6 +83,11 @@ export class ChatService {
           conversation_topic: conversationTopic,
           top_k: 5,
           use_llm: Boolean(process.env.SUMOPOD_API_KEY || process.env.LLM_API_KEY),
+          // Hanya pertanyaan yang diketik sendiri yang boleh dibalas dengan
+          // pertanyaan balik saat maksudnya terlalu luas.
+          allow_clarify: !fromSuggestion,
+          // Batas akses penanya. AI service menolak permintaan tanpa ini.
+          access,
         }),
       });
 
@@ -94,6 +104,9 @@ export class ChatService {
         answer: result.answer,
         citations,
         suggestions: result.suggestions ?? [],
+        // Antarmuka mengunci kolom ketik selama ini bernilai true, supaya
+        // pengguna menuntaskan dulu pertanyaan balik dari AI.
+        awaitingChoice: result.awaiting_choice ?? false,
       };
     } catch (error) {
       const answer = 'Maaf, pertanyaan belum dapat diproses sekarang. Coba salah satu pertanyaan berikut tentang dokumen perusahaan:';
@@ -104,8 +117,38 @@ export class ChatService {
         answer,
         citations,
         suggestions: QUICK_SUGGESTIONS,
+        // Kegagalan bukan pertanyaan balik: kolom ketik harus tetap terbuka.
+        awaitingChoice: false,
       };
     }
+  }
+
+  /**
+   * Terjemahkan aktor menjadi batas akses yang dikirim ke AI service.
+   *
+   * Aturan siapa-boleh-apa sengaja tetap di backend — AI service hanya
+   * menerima hasilnya dan menjalankan penyaring. Dengan begitu hanya ada satu
+   * tempat yang perlu diubah kalau kebijakan aksesnya berubah.
+   *
+   * Unit kerja aktor ikut dikirim, bukan hanya daftar kategori: penanda unit
+   * pada dokumen adalah cara utama mengunci dokumen, dan kunci yang tidak
+   * ditegakkan di jalur tanya-jawab sama saja dengan tidak ada — isinya tetap
+   * bisa dikutip AI untuk unit lain meski dokumennya tak muncul di daftar.
+   */
+  private async accessScope(actor: AuthenticatedUser) {
+    const filter = allowedCategoryFilter(actor);
+    if (filter === null) {
+      return { is_admin: true, allowed_category_ids: [] as string[], unit_kerja_id: null };
+    }
+    const categories = await this.prisma.documentCategory.findMany({
+      where: filter,
+      select: { id: true },
+    });
+    return {
+      is_admin: false,
+      allowed_category_ids: categories.map((category) => category.id),
+      unit_kerja_id: actor.unitKerjaId ?? null,
+    };
   }
 
   private async resolveConversation(

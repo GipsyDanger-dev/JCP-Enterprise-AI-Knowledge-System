@@ -155,11 +155,11 @@ export function SettingsPage() {
             </div>
             <div className="settings-info-item">
               <label>{isId ? 'Tingkat akses Anda' : 'Your access level'}</label>
-              <span>{role === 'admin' ? (isId ? 'Akses penuh (Admin)' : 'Full access (Admin)') : (isId ? 'Perpustakaan pengetahuan (Karyawan)' : 'Knowledge library (Employee)')}</span>
+              <span>{user?.isAdmin ? (isId ? 'Akses penuh (Super Admin)' : 'Full access (Super Admin)') : (isId ? `Dokumen ${(user?.role ?? '').replace(/_/g, ' ')}` : `${(user?.role ?? '').replace(/_/g, ' ')} docs`)}</span>
             </div>
             <div className="settings-info-item">
               <label>{isId ? 'Koleksi yang dapat diakses' : 'Collections accessible'}</label>
-              <span>{role === 'admin' ? (isId ? 'Semua koleksi' : 'All collections') : '3 collections'}</span>
+              <span>{role === 'admin' ? (isId ? 'Semua divisi' : 'All divisions') : (isId ? '1 divisi' : '1 division')}</span>
             </div>
           </div>
         </section>

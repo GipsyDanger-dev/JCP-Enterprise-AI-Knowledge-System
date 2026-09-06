@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsUUID, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 
@@ -38,14 +38,26 @@ export class UpdateUserDto {
   @MaxLength(100)
   displayName?: string;
 
-  @ApiPropertyOptional({ enum: UserRole, example: UserRole.USER })
+  @ApiPropertyOptional({ enum: UserRole, example: 'PEGAWAI' })
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  isAdmin?: boolean;
 
   @ApiPropertyOptional({ example: 'https://example.com/photo.jpg', maxLength: 220000 })
   @IsOptional()
   @IsString()
   @MaxLength(220000)
   photoUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Unit kerja / OPD penentu akses dokumen. Kosongkan bila pegawai belum ditempatkan.',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  unitKerjaId?: string;
 }

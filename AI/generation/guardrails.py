@@ -6,6 +6,7 @@ tests can rely on it verbatim.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -78,3 +79,46 @@ def is_out_of_scope(query: str) -> bool:
 
 def is_no_answer(answer: str) -> bool:
     return answer == NO_ANSWER
+
+
+# Penanda satu baris, bukan JSON penuh: jawaban biasa tetap teks polos sehingga
+# jalur yang paling sering dipakai tidak menanggung risiko salah format.
+CLARIFY_MARKER = "CLARIFY:"
+
+
+def parse_clarify(answer: str) -> dict[str, Any] | None:
+    """Baca permintaan penjelasan dari model, atau None kalau ini jawaban biasa."""
+    text = answer.strip()
+    if not text.startswith(CLARIFY_MARKER):
+        return None
+    try:
+        payload = json.loads(text[len(CLARIFY_MARKER):].strip())
+        question = str(payload["pertanyaan"]).strip()
+        options = [str(option).strip() for option in payload.get("pilihan", [])]
+    except (ValueError, KeyError, TypeError):
+        print("[AI] Clarify parse failed, treating as no answer")
+        return None
+    if not question:
+        return None
+    return {"question": question, "options": [option for option in options if option][:3]}
+
+
+def clarify_response(clarify: dict[str, Any], query: str) -> dict[str, Any]:
+    """Pertanyaan balik plus pilihan, selalu dengan satu jalan keluar.
+
+    Tanpa jalan keluar, salah menilai pertanyaan yang sebenarnya sudah jelas
+    membuat pengguna tidak punya cara mendapatkan jawabannya.
+    """
+    escape = f"Jelaskan ringkasan lengkap tentang {query.strip().rstrip('?')}"
+    return {
+        "answer": clarify["question"],
+        # Ini pertanyaan balik, bukan klaim berdasarkan dokumen: tanpa kutipan,
+        # lencana "Evidence verified" ikut tidak muncul.
+        "citations": [],
+        "grounded": False,
+        "retrieval": [],
+        "suggestions": [*clarify["options"], escape],
+        # Penanda bagi antarmuka: percakapan sedang menunggu pengguna memilih,
+        # bukan sekadar jawaban tanpa kutipan seperti "informasi tidak ditemukan".
+        "awaiting_choice": True,
+    }

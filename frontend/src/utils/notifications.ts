@@ -130,7 +130,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 }
 
 /** Show a browser notification popup */
-export function showBrowserNotification(title: string, body: string, icon?: string): void {
+export function showBrowserNotification(title: string, body: string, icon?: string, tag = 'jcp-message'): void {
   if (!isBrowserNotificationsEnabled()) return
   if (!('Notification' in window)) return
   if (Notification.permission !== 'granted') return
@@ -140,7 +140,7 @@ export function showBrowserNotification(title: string, body: string, icon?: stri
       body,
       icon: icon ?? '/vite.svg',
       badge: '/vite.svg',
-      tag: 'jcp-message', // replaces previous notification
+      tag, // replaces previous notification with the same tag
       renotify: true,
     } as NotificationOptions & { renotify: boolean })
     notif.onclick = () => {
@@ -161,4 +161,12 @@ export function notifyNewMessage(senderName?: string, preview?: string): void {
     senderName ? `Pesan dari ${senderName}` : 'Pesan baru',
     preview ?? 'Anda memiliki pesan baru.',
   )
+}
+
+/** Pengumuman baru — memakai suara & getar yang sama dengan notifikasi pesan */
+export function notifyNewAnnouncement(title?: string): void {
+  if (!isNotificationsEnabled()) return
+  playNotificationSound()
+  vibrateDevice()
+  showBrowserNotification('Pengumuman baru', title ?? 'Ada pengumuman baru untuk Anda.', undefined, 'jcp-announcement')
 }

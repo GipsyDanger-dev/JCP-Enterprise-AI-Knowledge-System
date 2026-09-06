@@ -15,6 +15,7 @@ removes its chunks when that version is deleted.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +31,12 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from config import EMBEDDING_MODEL
 from generation.citations import citations_from_matches
-from generation.guardrails import is_no_answer, no_answer_response
+from generation.guardrails import (
+    clarify_response,
+    is_no_answer,
+    no_answer_response,
+    parse_clarify,
+)
 from generation.llm import DEFAULT_MODEL, generate_answer
 from ingestion.chunking import chunk_pages
 from ingestion.parsers import read_document
@@ -39,6 +45,75 @@ from retrieval.embeddings import embed_texts
 
 VECTOR_MINIMUM_SCORE = 0.45
 DATABASE_URL_ENV = "DATABASE_URL"
+
+
+@dataclass(frozen=True)
+class AccessScope:
+    """Batas akses satu penanya, cerminan ``documentVisibilityWhere`` di backend.
+
+    Keputusan siapa-boleh-melihat-apa tetap milik backend: ia yang tahu role,
+    kategori, dan aturannya. Yang menyeberang ke sini hanya hasilnya, berupa
+    daftar id kategori dan unit kerja penanya. AI service tinggal menjalankan
+    penyaringnya.
+
+    Penyaringnya selalu masuk ke klausa WHERE, bukan disaring setelah baris
+    terambil, supaya chunk terlarang tidak pernah sempat menyentuh prompt LLM.
+    Semua jalur pengambilan wajib menerima objek ini sebagai argumen — sengaja
+    tanpa nilai default supaya jalur baru gagal keras, bukan diam-diam terbuka.
+    """
+
+    is_admin: bool = False
+    allowed_category_ids: tuple[str, ...] = ()
+    #: Unit kerja penanya. None berarti belum ditempatkan di unit mana pun,
+    #: sehingga dokumen bertanda unit tidak satu pun boleh dibacanya.
+    unit_kerja_id: str | None = None
+
+    @classmethod
+    def unrestricted(cls) -> "AccessScope":
+        """Untuk pemakaian CLI/ingest lokal, bukan untuk permintaan pengguna."""
+        return cls(is_admin=True)
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any] | None) -> "AccessScope | None":
+        """None berarti permintaan tidak membawa batas akses — penelepon wajib menolaknya."""
+        if not isinstance(payload, dict):
+            return None
+        ids = payload.get("allowed_category_ids") or []
+        if not isinstance(ids, list):
+            return None
+        unit = payload.get("unit_kerja_id")
+        return cls(
+            is_admin=bool(payload.get("is_admin")),
+            allowed_category_ids=tuple(str(i) for i in ids),
+            unit_kerja_id=str(unit) if unit else None,
+        )
+
+    def conditions(self, alias: str = "d") -> tuple[list[str], list[Any]]:
+        """Potongan WHERE plus parameternya, untuk ditempel ke setiap query."""
+        if self.is_admin:
+            return [f"{alias}.deleted_at IS NULL"], []
+        conditions = [
+            f"{alias}.deleted_at IS NULL",
+            f"{alias}.status = 'READY'",
+            # Rancangan tidak pernah dijawab: angkanya belum final, dan
+            # jawaban yang mengutipnya tetap terlihat meyakinkan.
+            f"{alias}.legal_status <> 'RANCANGAN'",
+            f"({alias}.category_id IS NULL OR {alias}.category_id = ANY(%s::uuid[]))",
+        ]
+        params: list[Any] = [list(self.allowed_category_ids)]
+        # Penanda unit kerja per dokumen, cerminan klausa yang sama di
+        # ``documentVisibilityWhere``. Dokumen tanpa penanda terbuka untuk
+        # semua; yang bertanda hanya untuk unit itu. Tanpa klausa ini, mengunci
+        # dokumen hanya menyembunyikannya dari daftar sementara isinya tetap
+        # bisa dikutip AI ke siapa saja.
+        if self.unit_kerja_id:
+            conditions.append(
+                f"({alias}.unit_kerja_id IS NULL OR {alias}.unit_kerja_id = %s::uuid)"
+            )
+            params.append(self.unit_kerja_id)
+        else:
+            conditions.append(f"{alias}.unit_kerja_id IS NULL")
+        return conditions, params
 
 
 def _require_deps() -> None:
@@ -92,10 +167,45 @@ class PgVectorStore:
             for row in rows
         ]
 
+    def document_metadata(self, *, scope: AccessScope) -> list[dict[str, Any]]:
+        """Sifat dokumen yang bisa dicari: halaman, ukuran, tanggal unggah.
+
+        Penyaringnya sengaja sama dengan ``search`` supaya pertanyaan metadata
+        tidak pernah menyebut dokumen yang tidak bisa ditanyakan isinya.
+        """
+        access_conditions, access_params = scope.conditions()
+        sql = f"""
+            SELECT dv.original_filename, dv.page_count, dv.file_size,
+                   dv.created_at, COUNT(c.chunk_id)::int
+            FROM document_versions AS dv
+            JOIN documents AS d ON d.id = dv.document_id
+            LEFT JOIN chunks AS c ON c.document_version_id = dv.id
+            WHERE {' AND '.join(access_conditions)}
+              AND dv.version_number = (
+                  SELECT MAX(v.version_number) FROM document_versions AS v
+                  WHERE v.document_id = d.id
+              )
+            GROUP BY dv.original_filename, dv.page_count, dv.file_size, dv.created_at
+            ORDER BY dv.original_filename
+        """
+        with psycopg.connect(self.dsn) as conn:
+            rows = conn.execute(sql, access_params).fetchall()
+        return [
+            {
+                "filename": row[0],
+                "page_count": row[1],
+                "file_size": row[2],
+                "created_at": row[3],
+                "chunks": row[4],
+            }
+            for row in rows
+        ]
+
     def get_document_version(self, document_version_id: str) -> dict[str, Any] | None:
         sql = """
             SELECT d.id, dv.id, dv.original_filename, dv.version_number,
-                   dv.checksum, COUNT(c.chunk_id)::int, COUNT(c.embedding)::int
+                   dv.checksum, COUNT(c.chunk_id)::int, COUNT(c.embedding)::int,
+                   MAX(c.page_number)::int
             FROM document_versions AS dv
             JOIN documents AS d ON d.id = dv.document_id
             LEFT JOIN chunks AS c ON c.document_version_id = dv.id
@@ -114,6 +224,9 @@ class PgVectorStore:
             "content_hash": row[4],
             "num_chunks": row[5],
             "embedding_count": row[6],
+            # Halaman tertinggi yang punya chunk. Dipakai saat ingest dilewati
+            # (status "unchanged"), karena file-nya tidak dibuka ulang.
+            "page_count": row[7],
         }
 
     def replace_document_version(
@@ -183,15 +296,17 @@ class PgVectorStore:
         query_vector: list[float],
         top_k: int = 5,
         filters: dict[str, Any] | None = None,
+        *,
+        scope: AccessScope,
     ) -> list[tuple[float, dict[str, Any]]]:
         """Cosine search joined to authoritative backend document metadata."""
+        access_conditions, access_params = scope.conditions()
         conditions = [
             "c.embedding IS NOT NULL",
-            "d.deleted_at IS NULL",
-            "d.status = 'READY'",
+            *access_conditions,
             "dv.version_number = (SELECT MAX(v.version_number) FROM document_versions AS v WHERE v.document_id = d.id)",
         ]
-        filter_params: list[Any] = []
+        filter_params: list[Any] = list(access_params)
         if filters:
             filename = filters.get("filename")
             if filename:
@@ -234,23 +349,27 @@ class PgVectorStore:
             results.append((float(row[8]), chunk))
         return results
 
-    def context_chunks(self, chunk_ids: list[str]) -> list[tuple[float, dict[str, Any]]]:
+    def context_chunks(
+        self, chunk_ids: list[str], *, scope: AccessScope
+    ) -> list[tuple[float, dict[str, Any]]]:
         """Load cited chunks from the prior answer without sending chat history to a provider."""
         ids = list(dict.fromkeys(chunk_ids))[:8]
         if not ids:
             return []
-        sql = """
+        # Ikut disaring meski id-nya berasal dari percakapan pengguna sendiri:
+        # hak akses bisa dicabut setelah jawaban lama dibuat.
+        access_conditions, access_params = scope.conditions()
+        sql = f"""
             SELECT c.chunk_id, d.id, dv.id, dv.original_filename,
                    dv.version_number, c.page_number, c.section_title, c.text
             FROM chunks AS c
             JOIN document_versions AS dv ON dv.id = c.document_version_id
             JOIN documents AS d ON d.id = dv.document_id
             WHERE c.chunk_id = ANY(%s)
-              AND d.deleted_at IS NULL
-              AND d.status = 'READY'
+              AND {' AND '.join(access_conditions)}
         """
         with psycopg.connect(self.dsn) as conn:
-            rows = conn.execute(sql, (ids,)).fetchall()
+            rows = conn.execute(sql, [ids, *access_params]).fetchall()
         chunks = {
             row[0]: {
                 "chunk_id": row[0],
@@ -266,7 +385,45 @@ class PgVectorStore:
         }
         return [(1.0, chunks[chunk_id]) for chunk_id in ids if chunk_id in chunks]
 
-    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None) -> dict[str, Any]:
+    def _answer_from_matches(self, query: str, matches: list[tuple[float, dict[str, Any]]],
+                             use_llm: bool = False, model: str = DEFAULT_MODEL,
+                             api_key: str | None = None, allow_clarify: bool = False,
+                             *, scope: AccessScope) -> dict[str, Any]:
+        """Turn retrieved chunks into the answer payload.
+
+        Deliberately left outside the retrieval ``try`` blocks: a ProviderError
+        here means the LLM itself failed, which is not the same as "the answer
+        is not in the documents". It must reach http_api so the user is told the
+        AI service is unavailable instead of being wrongly told nothing matched.
+        """
+        citations = citations_from_matches(matches)
+        answer = (
+            generate_answer(
+                query, matches, model=model, api_key=api_key,
+                # Sifat berkas (halaman, ukuran, tanggal) tidak ada di dalam
+                # teks dokumen, jadi ikut dikirim sebagai konteks.
+                documents=self.document_metadata(scope=scope),
+                allow_clarify=allow_clarify,
+            )
+            if use_llm
+            else matches[0][1]["text"]
+        )
+        clarify = parse_clarify(answer)
+        if clarify:
+            return clarify_response(clarify, query)
+        if is_no_answer(answer):
+            return no_answer_response()
+        return {
+            "answer": answer,
+            "citations": citations,
+            "grounded": True,
+            "retrieval": [
+                {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
+                for score, chunk in matches
+            ],
+        }
+
+    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False, *, scope: AccessScope) -> dict[str, Any]:
         """TF-IDF fallback when vector search fails or finds nothing."""
         try:
             import psycopg as _psycopg
@@ -276,16 +433,19 @@ class PgVectorStore:
                 return no_answer_response()
             with _psycopg.connect(dsn) as conn:
                 with conn.cursor() as cur:
+                    # Jalur cadangan ini memuat seluruh chunk sekaligus, jadi
+                    # justru di sini penyaring akses paling wajib ada.
+                    access_conditions, access_params = scope.conditions()
                     cur.execute(
                         "SELECT c.chunk_id, c.document_version_id, d.id, dv.original_filename, "
                         "dv.version_number, c.page_number, c.section_title, c.text "
                         "FROM chunks c "
                         "JOIN document_versions dv ON dv.id = c.document_version_id "
                         "JOIN documents d ON d.id = dv.document_id "
-                        "WHERE d.deleted_at IS NULL "
-                        "AND d.status = 'READY' "
+                        "WHERE " + " AND ".join(access_conditions) + " "
                         "AND dv.version_number = (SELECT MAX(v.version_number) FROM document_versions v WHERE v.document_id = d.id) "
-                        "ORDER BY c.created_at"
+                        "ORDER BY c.created_at",
+                        access_params,
                     )
                     rows = cur.fetchall()
             chunks = []
@@ -300,28 +460,15 @@ class PgVectorStore:
             tfidf = TfidfRetriever(chunks)
             matches = tfidf.search(query, top_k=top_k)
             print(f"[AI] TF-IDF: {len(chunks)} chunks, {len(matches)} matches for '{query[:30]}'")
-            if not matches:
-                return no_answer_response()
-            citations = citations_from_matches(matches)
-            answer = (
-                generate_answer(query, matches, model=model, api_key=api_key)
-                if use_llm
-                else matches[0][1]["text"]
-            )
-            if is_no_answer(answer):
-                return no_answer_response()
-            return {
-                "answer": answer,
-                "citations": citations,
-                "grounded": True,
-                "retrieval": [
-                    {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
-                    for score, chunk in matches
-                ],
-            }
         except Exception as exc:
-            print(f"[AI] TF-IDF fallback failed: {exc}")
+            print(f"[AI] TF-IDF retrieval failed: {exc}")
             return no_answer_response()
+        if not matches:
+            return no_answer_response()
+        return self._answer_from_matches(
+            query, matches, use_llm=use_llm, model=model,
+            api_key=api_key, allow_clarify=allow_clarify, scope=scope,
+        )
 
     # ---------- orchestration ----------
 
@@ -335,13 +482,16 @@ class PgVectorStore:
         api_key: str | None = None,
         filters: dict[str, Any] | None = None,
         context_chunk_ids: list[str] | None = None,
+        allow_clarify: bool = False,
+        *,
+        scope: AccessScope,
     ) -> dict[str, Any]:
         try:
-            context_matches = self.context_chunks(context_chunk_ids or [])
+            context_matches = self.context_chunks(context_chunk_ids or [], scope=scope)
             query_vector = embed_texts([query], model=self.model, api_key=api_key)[0]
             retrieved_matches = [
                 (score, chunk)
-                for score, chunk in self.search(query_vector, top_k, filters=filters)
+                for score, chunk in self.search(query_vector, top_k, filters=filters, scope=scope)
                 if score >= minimum_score
             ]
             seen = {chunk["chunk_id"] for _, chunk in context_matches}
@@ -349,30 +499,19 @@ class PgVectorStore:
                 match for match in retrieved_matches if match[1]["chunk_id"] not in seen
             ]
             matches = matches[:top_k]
-            if not matches:
-                # Vector search found nothing above threshold, try TF-IDF fallback
-                print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
-                return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key)
-            citations = citations_from_matches(matches)
-            answer = (
-                generate_answer(query, matches, model=model, api_key=api_key)
-                if use_llm
-                else matches[0][1]["text"]
-            )
-            if is_no_answer(answer):
-                return no_answer_response()
-            return {
-                "answer": answer,
-                "citations": citations,
-                "grounded": True,
-                "retrieval": [
-                    {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
-                    for score, chunk in matches
-                ],
-            }
         except Exception as exc:
+            # Only retrieval is guarded here. TF-IDF needs no embeddings, so it is
+            # a genuine fallback when the vector path fails.
             print(f"[AI] Vector search failed ({exc}), falling back to TF-IDF")
-            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key)
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, scope=scope)
+        if not matches:
+            # Vector search found nothing above threshold, try TF-IDF fallback
+            print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, scope=scope)
+        return self._answer_from_matches(
+            query, matches, use_llm=use_llm, model=model,
+            api_key=api_key, allow_clarify=allow_clarify, scope=scope,
+        )
 
 
 def ingest_file_to_pg(
@@ -454,6 +593,7 @@ def ingest_to_pg(
             "document_version_id": metadata["document_version_id"],
             "version": metadata["version"],
             "num_chunks": metadata["num_chunks"],
+            "page_count": metadata["page_count"],
             "status": "unchanged",
         }]
 
@@ -485,5 +625,8 @@ def ingest_to_pg(
         "document_version_id": metadata["document_version_id"],
         "version": metadata["version"],
         "num_chunks": len(chunks),
+        # Dihitung dari parser, bukan dari chunk: halaman kosong tetap ikut
+        # terhitung meskipun chunk_pages melewatinya.
+        "page_count": len(pages),
         "status": "indexed",
     }]

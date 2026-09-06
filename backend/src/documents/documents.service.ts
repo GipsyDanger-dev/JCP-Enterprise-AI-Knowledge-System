@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -12,7 +13,6 @@ import {
   ProcessingJobStatus,
   Prisma,
 } from '@prisma/client';
-import { isEmployeeRole } from '../auth/role.utils';
 import { createHash, randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -22,6 +22,13 @@ import { DOCUMENT_STORAGE, DocumentStorage } from './document-storage.interface'
 import { UploadedDocumentFile, validateDocumentFile } from './document-file.validator';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
+import { UpdateDocumentAccessDto } from './dto/update-document-access.dto';
+import {
+  allowedCategoryFilter,
+  canManageForUnit,
+  canUploadDocuments,
+  documentVisibilityWhere,
+} from './document-visibility';
 
 const normalizeCategoryName = (value: string) => value.trim().replace(/\s+/g, ' ');
 const categoryKey = (value: string) => normalizeCategoryName(value).toLocaleLowerCase('id-ID');
@@ -34,7 +41,47 @@ export class DocumentsService {
     private readonly auditLogs: AuditLogsService,
   ) {}
 
+  /**
+   * Tentukan kategori dan penanda unit kerja untuk dokumen baru, sekaligus
+   * memastikan aktor memang berwenang atasnya.
+   *
+   * Pemeriksaannya sengaja di sini, bukan di guard: guard hanya tahu role,
+   * sedangkan aturan sebenarnya bergantung pada kategori dan unit kerja tujuan
+   * yang baru diketahui setelah body permintaan dibaca.
+   */
+  private async resolveUploadScope(input: CreateDocumentDto, actor: AuthenticatedUser) {
+    if (!canUploadDocuments(actor)) {
+      throw new ForbiddenException('Anda tidak berwenang mengunggah dokumen');
+    }
+
+    // Admin unit selalu mengunggah untuk unitnya sendiri. Dibuat sebagai
+    // bawaan supaya dokumen internal tidak bocor gara-gara lupa memilih.
+    const unitKerjaId = actor.isAdmin
+      ? input.unitKerjaId ?? null
+      : input.unitKerjaId ?? actor.unitKerjaId ?? null;
+
+    if (!canManageForUnit(actor, unitKerjaId)) {
+      throw new ForbiddenException('Anda hanya dapat mengunggah dokumen untuk unit kerja sendiri');
+    }
+
+    let category: { id: string; name: string } | null = null;
+    if (input.categoryId) {
+      category = await this.prisma.documentCategory.findFirst({
+        // Admin unit tidak boleh menaruh dokumen di kategori yang unitnya
+        // sendiri tidak berhak membacanya.
+        where: { id: input.categoryId, ...(allowedCategoryFilter(actor) ?? {}) },
+        select: { id: true, name: true },
+      });
+      if (!category) {
+        throw new ForbiddenException('Kategori tidak tersedia untuk unit kerja Anda');
+      }
+    }
+
+    return { unitKerjaId, category };
+  }
+
   async create(input: CreateDocumentDto, uploadedFile: UploadedDocumentFile, actor: AuthenticatedUser) {
+    const { unitKerjaId, category } = await this.resolveUploadScope(input, actor);
     const file = validateDocumentFile(uploadedFile);
     const checksum = createHash('sha256').update(file.buffer).digest('hex');
     const duplicate = await this.prisma.documentVersion.findFirst({
@@ -50,7 +97,9 @@ export class DocumentsService {
     const documentVersionId = randomUUID();
     const processingJobId = randomUUID();
     const title = input.title?.trim() || file.originalname.slice(0, -extname(file.originalname).length);
-    const collection = await this.resolveCollection(input.collection);
+    // `collection` tinggal label warisan; nama kategori dipakai agar tampilan
+    // lama tetap masuk akal tanpa perlu diubah sekarang.
+    const collection = category?.name ?? input.collection?.trim() ?? 'Umum';
 
     await this.prisma.$transaction(async (transaction) => {
       await transaction.document.create({
@@ -58,7 +107,8 @@ export class DocumentsService {
           id: documentId,
           title,
           collection,
-          division: input.division?.trim() || null,
+          categoryId: category?.id ?? null,
+          unitKerjaId,
           status: DocumentStatus.QUEUED,
           uploadedById: actor.sub,
         },
@@ -106,7 +156,8 @@ export class DocumentsService {
       id: documentId,
       title,
       collection,
-      division: input.division?.trim() || null,
+      categoryId: category?.id ?? null,
+      unitKerjaId,
       status: DocumentStatus.QUEUED,
       version: {
         id: documentVersionId,
@@ -123,8 +174,15 @@ export class DocumentsService {
     };
   }
 
-  async listCategories() {
+  /**
+   * Kategori yang benar-benar bisa diakses aktor.
+   *
+   * Kategori yang selalu kosong untuk seseorang tidak ditampilkan sama sekali:
+   * filter berisi pilihan yang tak pernah membuahkan hasil hanya membingungkan.
+   */
+  async listCategories(actor: AuthenticatedUser) {
     return this.prisma.documentCategory.findMany({
+      where: allowedCategoryFilter(actor) ?? {},
       select: { id: true, name: true, createdAt: true },
       orderBy: { name: 'asc' },
     });
@@ -151,32 +209,105 @@ export class DocumentsService {
     }
   }
 
-  private async resolveCollection(input?: string) {
-    const key = input?.trim() ? categoryKey(input) : null;
-    const category = key
-      ? await this.prisma.documentCategory.findUnique({ where: { key }, select: { name: true } })
-      : await this.prisma.documentCategory.findFirst({ orderBy: { createdAt: 'asc' }, select: { name: true } });
-    if (!category) throw new BadRequestException('Select a valid document category');
-    return category.name;
+  /**
+   * Ubah kategori dan penanda unit kerja sebuah dokumen yang sudah terunggah.
+   *
+   * Inilah satu-satunya cara mengunci dokumen ke satu unit kerja setelah
+   * diunggah, dan juga membukanya kembali. Dokumen tanpa penanda terbuka untuk
+   * semua pegawai; begitu ditandai, hanya unit itu yang bisa membaca maupun
+   * menanyakannya ke AI.
+   *
+   * Wewenangnya diperiksa dua kali — pada unit dokumen SEKARANG dan pada unit
+   * TUJUAN. Tanpa pemeriksaan kedua, admin satu unit bisa memindahkan dokumen
+   * ke unit lain; tanpa yang pertama, ia bisa mengambil alih dokumen unit lain.
+   */
+  async updateAccess(id: string, input: UpdateDocumentAccessDto, actor: AuthenticatedUser) {
+    const document = await this.prisma.document.findFirst({
+      where: { id, ...documentVisibilityWhere(actor) },
+      select: { id: true, categoryId: true, unitKerjaId: true, collection: true },
+    });
+    if (!document) throw new NotFoundException('Document not found');
+    if (!canManageForUnit(actor, document.unitKerjaId)) {
+      throw new ForbiddenException('Dokumen ini di luar wewenang unit kerja Anda');
+    }
+
+    const nextUnitKerjaId = input.unitKerjaId === undefined ? document.unitKerjaId : input.unitKerjaId;
+    if (!canManageForUnit(actor, nextUnitKerjaId)) {
+      throw new ForbiddenException('Anda hanya dapat menandai dokumen untuk unit kerja sendiri');
+    }
+    if (nextUnitKerjaId && nextUnitKerjaId !== document.unitKerjaId) {
+      const unit = await this.prisma.unitKerja.findFirst({
+        where: { id: nextUnitKerjaId, isActive: true },
+        select: { id: true },
+      });
+      if (!unit) throw new BadRequestException('Unit kerja tidak dikenal atau sudah tidak aktif');
+    }
+
+    const nextCategoryId = input.categoryId === undefined ? document.categoryId : input.categoryId;
+    let category: { id: string; name: string } | null = null;
+    if (nextCategoryId) {
+      category = await this.prisma.documentCategory.findFirst({
+        where: { id: nextCategoryId, ...(allowedCategoryFilter(actor) ?? {}) },
+        select: { id: true, name: true },
+      });
+      if (!category) throw new ForbiddenException('Kategori tidak tersedia untuk unit kerja Anda');
+    }
+
+    const updated = await this.prisma.$transaction(async (transaction) => {
+      const result = await transaction.document.update({
+        where: { id },
+        data: {
+          categoryId: category?.id ?? null,
+          unitKerjaId: nextUnitKerjaId,
+          // `collection` adalah label warisan yang dipakai filter di antarmuka.
+          // Ikut disesuaikan supaya dokumen tidak menghilang dari filter
+          // kategori barunya setelah dipindahkan.
+          collection: category?.name ?? document.collection,
+        },
+        select: {
+          id: true,
+          title: true,
+          collection: true,
+          status: true,
+          updatedAt: true,
+          category: { select: { id: true, name: true } },
+          unitKerja: { select: { id: true, code: true, name: true } },
+        },
+      });
+      await this.auditLogs.record(transaction, {
+        actorType: AuditActorType.USER,
+        actorUserId: actor.sub,
+        action: AuditAction.DOCUMENT_UPDATED,
+        targetType: 'DOCUMENT',
+        targetId: id,
+        metadata: {
+          categoryIdBefore: document.categoryId,
+          categoryIdAfter: result.category?.id ?? null,
+          unitKerjaIdBefore: document.unitKerjaId,
+          unitKerjaIdAfter: result.unitKerja?.id ?? null,
+        },
+      });
+      return result;
+    });
+
+    return updated;
   }
 
   async findAll(actor: AuthenticatedUser) {
     const documents = await this.prisma.document.findMany({
-      where: {
-        deletedAt: null,
-        ...(isEmployeeRole(actor.role)
-          ? {
-              status: DocumentStatus.READY,
-              OR: [{ division: null }, { division: actor.division ?? null }],
-            }
-          : {}),
-      },
+      where: documentVisibilityWhere(actor),
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         title: true,
         collection: true,
         status: true,
+        documentType: true,
+        legalStatus: true,
+        regulationNumber: true,
+        regulationYear: true,
+        category: { select: { id: true, name: true } },
+        unitKerja: { select: { id: true, code: true, name: true } },
         createdAt: true,
         updatedAt: true,
         uploadedBy: {
@@ -211,9 +342,12 @@ export class DocumentsService {
     });
   }
 
-  async getStatus(id: string) {
+  async getStatus(id: string, actor: AuthenticatedUser) {
+    if (!canUploadDocuments(actor)) {
+      throw new ForbiddenException('Status pemrosesan hanya untuk pengunggah dokumen');
+    }
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, ...documentVisibilityWhere(actor) },
       select: {
         id: true,
         title: true,
@@ -262,16 +396,7 @@ export class DocumentsService {
 
   async download(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: {
-        id,
-        deletedAt: null,
-        ...(isEmployeeRole(actor.role)
-          ? {
-              status: DocumentStatus.READY,
-              OR: [{ division: null }, { division: actor.division ?? null }],
-            }
-          : {}),
-      },
+      where: { id, ...documentVisibilityWhere(actor) },
       select: {
         versions: {
           orderBy: { versionNumber: 'desc' },
@@ -292,16 +417,7 @@ export class DocumentsService {
 
   async getChunks(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: {
-        id,
-        deletedAt: null,
-        ...(isEmployeeRole(actor.role)
-          ? {
-              status: DocumentStatus.READY,
-              OR: [{ division: null }, { division: actor.division ?? null }],
-            }
-          : {}),
-      },
+      where: { id, ...documentVisibilityWhere(actor) },
       select: {
         id: true,
         title: true,
@@ -336,10 +452,13 @@ export class DocumentsService {
 
   async remove(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null },
-      select: { id: true },
+      where: { id, ...documentVisibilityWhere(actor) },
+      select: { id: true, unitKerjaId: true },
     });
     if (!document) throw new NotFoundException('Document not found');
+    if (!canManageForUnit(actor, document.unitKerjaId)) {
+      throw new ForbiddenException('Dokumen ini di luar wewenang unit kerja Anda');
+    }
 
     const deletedAt = new Date();
     await this.prisma.$transaction(async (transaction) => {

@@ -11,6 +11,7 @@ export interface ChatMessage {
   answer: string
   citations: Citation[]
   suggestions: string[]
+  awaitingChoice: boolean
   error: string | null
   timestamp: number
 }
@@ -26,6 +27,8 @@ export interface WorkspaceContextValue {
   chatHistory: ChatMessage[]
   clearChat: () => void
   isLoadingAnswer: boolean
+  // AI sedang menunggu pengguna memilih salah satu pertanyaan lanjutan.
+  awaitingChoice: boolean
   onAsk: (event: FormEvent) => void
   askQuestion: (value: string) => void
   triggerUpload: () => void
@@ -33,11 +36,17 @@ export interface WorkspaceContextValue {
   isUploading: boolean
   uploadError: string | null
   registerUploadedDocument: (document: ApiDocument) => void
+  /** Segarkan kategori dan penanda unit kerja satu dokumen setelah diubah admin. */
+  applyDocumentAccess: (document: ApiDocument) => void
   removeDocument: (id: string) => Promise<void>
   language: Language
   setLanguage: (lang: Language) => void
   unreadMessages: number
   setUnreadMessages: (count: number) => void
+  /** Pengumuman yang belum dibaca — dipakai badge di sidebar. */
+  unreadAnnouncements: number
+  /** Tandai seluruh pengumuman terbaca dan bersihkan badge. */
+  markAnnouncementsSeen: () => Promise<void>
 }
 
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)

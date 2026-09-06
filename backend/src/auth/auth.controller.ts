@@ -6,11 +6,9 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { AuthenticatedUser } from './auth.types';
 import { CurrentUser } from './decorators/current-user.decorator';
-import { Roles } from './decorators/roles.decorator';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -43,8 +41,7 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.USER)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get the authenticated user from the access token' })
   @ApiOkResponse({ description: 'Authenticated token payload' })

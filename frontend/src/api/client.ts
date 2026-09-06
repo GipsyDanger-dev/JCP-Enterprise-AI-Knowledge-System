@@ -6,7 +6,18 @@
  * - response typed sesuai schema di src/api/types.ts
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? `http://${window.location.hostname}:8000`
+/**
+ * Resolusi base URL backend - satu-satunya sumber kebenaran untuk seluruh frontend.
+ * Memakai cek truthy (bukan `??`) supaya VITE_API_BASE_URL yang kosong atau berisi
+ * whitespace tetap jatuh ke fallback, bukan menghasilkan URL yang salah.
+ */
+function resolveApiBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim()
+  if (configured) return configured.replace(/\/+$/, '')
+  return `http://${window.location.hostname}:8000`
+}
+
+export const API_BASE_URL = resolveApiBaseUrl()
 
 export class ApiError extends Error {
   readonly status: number

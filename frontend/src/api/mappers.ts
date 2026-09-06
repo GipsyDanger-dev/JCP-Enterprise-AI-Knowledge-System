@@ -1,14 +1,14 @@
 import type { ApiDocument, ApiDocumentStatus, ApiRole, ApiUser } from './types'
 import type { DocumentItem, DocumentStatus, Role } from '@/types/domain'
 
-/** API roles with administrative access map to the admin workspace. */
+/** API role → UI role */
 export function toDomainRole(role: ApiRole): Role {
-  return role === 'ADMIN' || role === 'SUPER_ADMIN' ? 'admin' : 'employee'
+  return role === 'SUPER_ADMIN' ? 'admin' : 'employee'
 }
 
-/** UI: admin | employee → API: ADMIN | USER */
+/** UI role → API role */
 export function toApiRole(role: Role): ApiRole {
-  return role === 'admin' ? 'ADMIN' : 'USER'
+  return role === 'admin' ? 'SUPER_ADMIN' : 'SEKRETARIS'
 }
 
 /** Status dokumen Prisma uppercase → status tampilan UI. */
@@ -34,6 +34,8 @@ export function toDomainDocument(document: ApiDocument): DocumentItem {
     updatedAt: document.updatedAt ? formatRelativeTime(document.updatedAt) : 'Baru saja',
     status: toDomainDocumentStatus(document.status),
     chunks: version?.chunkCount ?? null,
+    categoryId: document.category?.id ?? null,
+    unitKerja: document.unitKerja ? { id: document.unitKerja.id, name: document.unitKerja.name } : null,
   }
 }
 

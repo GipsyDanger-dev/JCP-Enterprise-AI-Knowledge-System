@@ -1,17 +1,54 @@
-import { authHeaders, request } from './client'
-import type { ApiDocument, DeleteDocumentResponse, DocumentStatusResponse } from './types'
+import { API_BASE_URL, authHeaders, request } from './client'
+import type {
+  ApiDocument,
+  ApiDocumentCategory,
+  DeleteDocumentResponse,
+  DocumentStatusResponse,
+} from './types'
 
 export function listDocuments(token?: string): Promise<ApiDocument[]> {
   return request<ApiDocument[]>('/documents', { headers: authHeaders(token) })
 }
 
-export function uploadDocument(file: File, token?: string, title?: string, collection?: string, division?: string): Promise<ApiDocument> {
+export interface UploadDocumentOptions {
+  title?: string
+  /** Kategori/subjek. Menentukan unit kerja mana yang boleh membaca dokumennya. */
+  categoryId?: string
+  /** Opsional: batasi hanya untuk satu unit kerja. Hanya mempersempit akses. */
+  unitKerjaId?: string
+}
+
+export function uploadDocument(file: File, token?: string, options: UploadDocumentOptions = {}): Promise<ApiDocument> {
   const form = new FormData()
   form.append('file', file)
-  if (title?.trim()) form.append('title', title.trim())
-  if (collection?.trim()) form.append('collection', collection.trim())
-  if (division?.trim()) form.append('division', division.trim())
+  if (options.title?.trim()) form.append('title', options.title.trim())
+  if (options.categoryId) form.append('categoryId', options.categoryId)
+  if (options.unitKerjaId) form.append('unitKerjaId', options.unitKerjaId)
   return request<ApiDocument>('/documents', { method: 'POST', body: form, headers: authHeaders(token) })
+}
+
+/**
+ * Ubah kategori dan penanda unit kerja dokumen yang sudah terunggah.
+ *
+ * `null` berarti dilepas (kategori dikosongkan / kunci unit dibuka), sedangkan
+ * field yang tidak disertakan berarti nilainya dibiarkan apa adanya.
+ */
+export interface DocumentAccessInput {
+  categoryId?: string | null
+  unitKerjaId?: string | null
+}
+
+export function updateDocumentAccess(id: string, input: DocumentAccessInput, token?: string): Promise<ApiDocument> {
+  return request<ApiDocument>(`/documents/${id}/access`, {
+    method: 'PATCH',
+    body: input,
+    headers: authHeaders(token),
+  })
+}
+
+/** Hanya kategori yang benar-benar bisa diakses pengguna yang sedang login. */
+export function listDocumentCategories(token?: string): Promise<ApiDocumentCategory[]> {
+  return request<ApiDocumentCategory[]>('/documents/categories', { headers: authHeaders(token) })
 }
 
 export function getDocumentStatus(id: string, token?: string): Promise<DocumentStatusResponse> {
@@ -40,15 +77,20 @@ export function getDocumentChunks(id: string, token?: string): Promise<DocumentC
   return request<DocumentChunksResponse>(`/documents/${id}/chunks`, { headers: authHeaders(token) })
 }
 
+/** URL download memakai base URL yang sama dengan request() agar konsisten di LAN/VPS */
+function downloadUrl(id: string): string {
+  return `${API_BASE_URL}/documents/${id}/download`
+}
+
 export async function getDocumentBlob(id: string, token?: string): Promise<Blob> {
-  const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/documents/${id}/download`
+  const url = downloadUrl(id)
   const response = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
   if (!response.ok) throw new Error('Unable to load document')
   return response.blob()
 }
 
 export function downloadDocument(id: string, filename: string, token?: string): void {
-  const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/documents/${id}/download`
+  const url = downloadUrl(id)
   const a = document.createElement('a')
   a.href = url
   a.setAttribute('download', filename)

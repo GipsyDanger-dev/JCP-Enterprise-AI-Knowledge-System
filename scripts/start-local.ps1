@@ -70,13 +70,15 @@ function Wait-ForHealth {
 }
 
 Import-LocalEnvironment -Path $envFile
-Require-Environment -Names @('DATABASE_URL', 'SUMOPOD_API_KEY', 'JWT_SECRET')
+# WORKER_TOKEN dipakai dua arah: guard /internal/* di backend dan header
+# X-Worker-Token saat backend memanggil AI service. Tanpa itu, AI service
+# menolak semua request selain /health.
+Require-Environment -Names @('DATABASE_URL', 'SUMOPOD_API_KEY', 'JWT_SECRET', 'WORKER_TOKEN')
 
 if (-not $env:AI_DATABASE_URL) { $env:AI_DATABASE_URL = $env:DATABASE_URL }
 if (-not $env:AI_SERVICE_URL) { $env:AI_SERVICE_URL = 'http://127.0.0.1:8001' }
 if (-not $env:VITE_API_BASE_URL) { $env:VITE_API_BASE_URL = 'http://127.0.0.1:8000' }
 if (-not $env:BACKEND_PORT) { $env:BACKEND_PORT = '8000' }
-if (-not $env:PORT) { $env:PORT = $env:BACKEND_PORT }
 if (-not $env:FRONTEND_PORT) { $env:FRONTEND_PORT = '5173' }
 
 if ($Seed) {
@@ -102,6 +104,6 @@ Start-LocalProcess -Name 'backend' -WorkingDirectory (Join-Path $projectRoot 'ba
 Start-LocalProcess -Name 'frontend' -WorkingDirectory (Join-Path $projectRoot 'frontend') -Command "npm run dev -- --host 127.0.0.1 --port $env:FRONTEND_PORT --strictPort"
 
 Wait-ForHealth -Url 'http://127.0.0.1:8001/health' -Name 'AI API'
-Wait-ForHealth -Url "http://127.0.0.1:$env:PORT/health" -Name 'Backend'
+Wait-ForHealth -Url "http://127.0.0.1:$env:BACKEND_PORT/health" -Name 'Backend'
 Wait-ForHealth -Url "http://127.0.0.1:$env:FRONTEND_PORT" -Name 'Frontend'
 Write-Host "Local runtime aktif di http://127.0.0.1:$env:FRONTEND_PORT"

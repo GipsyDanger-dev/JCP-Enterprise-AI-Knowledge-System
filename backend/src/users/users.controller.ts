@@ -10,10 +10,9 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { AdminOnly } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -26,10 +25,18 @@ import { UsersService } from './users.service';
 @ApiUnauthorizedResponse({ description: 'Missing, invalid, or expired access token' })
 @ApiForbiddenResponse({ description: 'Only ADMIN can manage users' })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN)
+@AdminOnly()
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  // Didaftarkan sebelum rute ber-parameter supaya tidak tertangkap sebagai :id.
+  @Get('reference-data')
+  @ApiOperation({ summary: 'Daftar unit kerja dan jabatan untuk dropdown form pengguna' })
+  @ApiOkResponse({ description: 'Unit kerja aktif dan nomenklatur jabatan' })
+  referenceData() {
+    return this.usersService.referenceData();
+  }
 
   @Get()
   @ApiOperation({ summary: 'List users without password hashes' })
