@@ -45,6 +45,31 @@ CLARIFY_RULE = (
 )
 
 
+# Kata yang menandai pengguna benar-benar sedang bertanya, bukan menyebut topik.
+_QUESTION_OPENERS = (
+    "apa", "apakah", "bagaimana", "gimana", "berapa", "kapan", "siapa", "mengapa",
+    "kenapa", "dimana", "di mana", "bolehkah", "adakah", "jelaskan", "ringkas",
+    "sebutkan", "tolong", "carikan", "cari", "apa saja", "what", "how", "when",
+    "who", "why", "where",
+)
+
+
+def looks_like_topic_phrase(query: str) -> bool:
+    """Benar bila masukan hanya menyebut topik, tanpa pertanyaan.
+
+    "kemitraan usaha mikro" bukan pertanyaan: jawabannya bisa syaratnya,
+    bentuknya, sanksinya, atau siapa pelaksananya. Menebak satu di antaranya
+    lebih buruk daripada bertanya balik sebentar.
+    """
+    text = query.strip().lower()
+    if not text or "?" in text:
+        return False
+    words = text.split()
+    if len(words) > 5:
+        return False
+    return not any(text.startswith(opener) for opener in _QUESTION_OPENERS)
+
+
 def _format_size(size_bytes: int | None) -> str:
     if not size_bytes:
         return "ukuran tidak tercatat"
@@ -93,6 +118,15 @@ def build_messages(
             + format_inventory(documents)
         )
     bagian.append(f"Konteks dokumen resmi:\n{context}")
+    if allow_clarify and looks_like_topic_phrase(query):
+        # Penilaian ini dikerjakan di sini, bukan diserahkan ke model: nada
+        # CLARIFY_RULE sengaja condong ke menjawab, sehingga frasa topik telanjang
+        # kerap dijawab dengan satu sudut pandang yang dipilih sendiri oleh model.
+        bagian.append(
+            f"Catatan: pengguna hanya menyebut topik \"{query.strip()}\" tanpa pertanyaan "
+            "yang jelas. Jangan menebak maksudnya — balas dengan type clarify, dan susun "
+            "setiap pilihan dari sudut pandang berbeda yang benar-benar ada di konteks di atas."
+        )
     system = SYSTEM_PROMPT + CLARIFY_RULE if allow_clarify else SYSTEM_PROMPT
     return [
         {"role": "system", "content": system},
