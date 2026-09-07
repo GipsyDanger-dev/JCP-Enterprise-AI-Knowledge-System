@@ -41,7 +41,7 @@ except ImportError:  # pragma: no cover - optional dependency
     ) from None
 
 from config import DEFAULT_MODEL, EMBEDDING_MODEL
-from generation.guardrails import QUICK_SUGGESTIONS, is_out_of_scope, out_of_scope_response
+from generation.guardrails import is_out_of_scope, out_of_scope_response
 from knowledge_base import KnowledgeBase
 from provider_errors import ProviderError
 from store import AccessScope, PgVectorStore, default_dsn, ingest_to_pg
@@ -157,79 +157,94 @@ def health() -> dict[str, Any]:
     }
 
 
-# Patterns for general chat (greetings, small talk, general knowledge)
-GENERAL_CHAT_PATTERNS = [
+# Sapaan dan basa-basi: pola berlabuh penuh (^...$), jadi hanya masukan yang
+# memang seluruhnya sapaan yang cocok. "kemitraan usaha mikro" tidak.
+SMALL_TALK_PATTERNS = [
     r'^(halo|hai|hi|hey|hello|selamat|morning|pagi|siang|sore|malam)[\s!.?]*$',
     r'^(apa kabar|how are you|kabar)[\s!.?]*$',
     r'^(siapa (kamu|anda|nama)|who are you|kenalan)[\s!.?]*$',
     r'^(terima kasih|thank|thanks|makasih|thx)[\s!.?]*$',
     r'^(bye|dadah|selamat tinggal|see you|sampai jumpa)[\s!.?]*$',
     r'^(tolong|help|bantuan|bisa bantu)[\s!.?]*$',
-    r'^(apa itu|what is|what are|gimana|bagaimana|how)[\s]?$',
-    r'^(ceritain|cerita|tell me|explain)[\s]?$',
     r'^(oks?|ok|baik|baiklah|siap|ready|noted)[\s!.?]*$',
 ]
 
-def is_general_chat(query: str) -> bool:
-    """Detect if query is general chat, not document-specific."""
+# Kalimat yang terpotong: bisa basa-basi, bisa juga susulan yang bersandar pada
+# jawaban sebelumnya ("bagaimana?" setelah dijelaskan satu ketentuan).
+INCOMPLETE_PATTERNS = [
+    r'^(apa itu|what is|what are|gimana|bagaimana|how)[\s]?$',
+    r'^(ceritain|cerita|tell me|explain)[\s]?$',
+]
+
+GENERAL_CHAT_PATTERNS = SMALL_TALK_PATTERNS + INCOMPLETE_PATTERNS
+
+
+def is_general_chat(query: str, has_topic: bool = False) -> bool:
+    """Sapaan/basa-basi saja — sisanya adalah pertanyaan dokumen.
+
+    Versi sebelumnya menebak lewat daftar kata kunci HR (cuti, hotel,
+    tunjangan) dan menganggap semua masukan pendek tanpa tanda tanya sebagai
+    obrolan. Akibatnya "kemitraan usaha mikro" dibalas sapaan, bukan dicari
+    atau ditanyakan balik. Yang pendek dan kabur sekarang tetap masuk ke
+    retrieval, dan model yang memutuskan menjawab atau bertanya balik.
+    """
     q = query.strip().lower()
-    
-    # Check off-topic first - these are NOT document queries
     if is_out_of_scope(q):
         return True
-    
-    # Document-related keywords that indicate a document query
-    doc_keywords = [
-        'hotel', 'biaya', 'tunjangan', 'sop', 'prosedur', 'kebijakan',
-        'dokumen', 'policy', 'cuti', 'izin', 'gaji',
-        'reimbursement', 'approval', 'persetujuan',
-        'berapa', 'mengapa', 'kapan', 'dimana', 'kenapa',
-        'manajer', 'manager', 'karyawan', 'staff', 'jabatan',
-    ]
-    
-    # Check if query contains document-related keywords
-    for kw in doc_keywords:
-        if kw in q:
-            return False
-    
-    # Check general chat patterns
-    for pattern in GENERAL_CHAT_PATTERNS:
-        if re.match(pattern, q, re.IGNORECASE):
-            return True
-    
-    # Short queries without question marks and without doc keywords
-    if len(q.split()) <= 3 and '?' not in q:
+    if any(re.match(pattern, q, re.IGNORECASE) for pattern in SMALL_TALK_PATTERNS):
         return True
-    
-    return False
+    # Percakapan yang sudah punya topik memberi kalimat terpotong sesuatu untuk
+    # disandari, jadi lebih baik dicarikan jawabannya daripada dibalas sapaan.
+    if has_topic:
+        return False
+    return any(re.match(pattern, q, re.IGNORECASE) for pattern in INCOMPLETE_PATTERNS)
 
 
+# Balasan sapaan. Sengaja tidak menyebut contoh topik apa pun: contoh yang
+# ditulis di sini akan menua bersama isi arsip, sementara tombol saran di
+# bawahnya sudah diambil langsung dari dokumen yang boleh dibaca penanya.
 SMART_RESPONSES = {
-    'halo': 'Halo! Selamat datang di Enterprise AI. Saya asisten Anda yang bisa membantu menjawab pertanyaan seputar dokumen perusahaan seperti SOP, kebijakan, dan prosedur. Silakan ketik pertanyaan Anda!',
-    'hai': 'Hai! Ada yang bisa saya bantu? Saya siap menjawab pertanyaan tentang dokumen perusahaan Anda.',
-    'hi': 'Hi! Welcome to Enterprise AI. I can help you find answers from company documents. Ask me anything!',
-    'apa kabar': 'Kabar baik! Saya Enterprise AI, siap membantu Anda menemukan informasi dari dokumen perusahaan. Ada yang ingin ditanyakan?',
-    'siapa': 'Saya Enterprise AI, asisten berbasis RAG (Retrieval-Augmented Generation) yang membantu Anda menjawab pertanyaan dari dokumen internal perusahaan. Saya bisa mencari informasi dari SOP, kebijakan, handbooks, dan dokumen lainnya.',
-    'terima kasih': 'Sama-sama! Senang bisa membantu. Jika ada pertanyaan lain tentang dokumen perusahaan, jangan ragu untuk bertanya.',
-    'thanks': 'You\'re welcome! If you have more questions about company documents, feel free to ask.',
-    'help': 'Tentu! Saya bisa membantu Anda dengan:\n- Mencari informasi dari dokumen perusahaan\n- Menjawab pertanyaan tentang SOP dan kebijakan\n- Memberikan ringkasan dari dokumen tertentu\n\nCukup ketik pertanyaan Anda!',
-    'bantuan': 'Tentu! Saya bisa membantu Anda mencari informasi dari dokumen perusahaan. Cukup ketik pertanyaan Anda, misalnya:\n- "Berapa biaya hotel untuk manager?"\n- "Apa prosedur cuti tahunan?"\n- "Ringkas SOP perjalanan dinas"',
-    'ok': 'Baik! Silakan ketik pertanyaan Anda tentang dokumen perusahaan.',
-    'siap': 'Siap! Saya menunggu pertanyaan Anda tentang dokumen perusahaan.',
+    'halo': 'Halo! Saya Enterprise AI. Saya menjawab dari dokumen resmi yang tersimpan di sistem ini. Silakan ketik pertanyaan Anda, atau pilih salah satu topik di bawah.',
+    'hai': 'Hai! Ada yang bisa saya bantu? Saya menjawab berdasarkan dokumen yang tersimpan di sistem ini.',
+    'hi': 'Hi! I answer questions from the official documents stored in this system. Ask me anything, or pick one of the topics below.',
+    'apa kabar': 'Kabar baik! Saya siap membantu mencari informasi dari dokumen yang tersimpan. Ada yang ingin ditanyakan?',
+    'siapa': 'Saya Enterprise AI, asisten berbasis RAG (Retrieval-Augmented Generation). Setiap jawaban saya diambil dari dokumen resmi yang tersimpan di sistem ini, lengkap dengan sumbernya.',
+    'terima kasih': 'Sama-sama! Kalau ada yang ingin ditanyakan lagi dari dokumen yang tersimpan, silakan.',
+    'thanks': "You're welcome! Feel free to ask anything else about the stored documents.",
+    'help': 'Tentu. Saya bisa mencari isi dokumen yang tersimpan, menjelaskan ketentuan di dalamnya, dan menunjukkan sumbernya. Ketik pertanyaan Anda, atau pilih salah satu topik di bawah.',
+    'bantuan': 'Tentu. Saya bisa mencari isi dokumen yang tersimpan, menjelaskan ketentuan di dalamnya, dan menunjukkan sumbernya. Ketik pertanyaan Anda, atau pilih salah satu topik di bawah.',
+    'ok': 'Baik! Silakan ketik pertanyaan Anda tentang dokumen yang tersimpan.',
+    'siap': 'Siap! Saya menunggu pertanyaan Anda tentang dokumen yang tersimpan.',
 }
 
-DEFAULT_GENERAL_RESPONSE = 'Halo! Saya Enterprise AI. Saya bisa membantu menjawab pertanyaan tentang dokumen perusahaan seperti SOP, kebijakan, dan prosedur. Silakan ketik pertanyaan Anda!'
+DEFAULT_GENERAL_RESPONSE = (
+    'Halo! Saya Enterprise AI. Saya menjawab dari dokumen resmi yang tersimpan '
+    'di sistem ini. Silakan ketik pertanyaan Anda, atau pilih salah satu topik di bawah.'
+)
 
 
-def general_chat_response(query: str, model: str) -> dict[str, Any]:
-    """Smart keyword-based response for general chat with off-topic guardrails."""
+def suggested_questions(store: PgVectorStore | KnowledgeBase, scope: AccessScope | None) -> list[str]:
+    """Saran pertanyaan dari korpus yang boleh dibaca penanya.
+
+    Gagal di sini tidak boleh menggagalkan permintaan: saran hanyalah tombol
+    bantu, bukan bagian dari jawaban.
+    """
+    try:
+        if isinstance(store, PgVectorStore):
+            return [] if scope is None else store.suggested_questions(scope=scope)
+        return store.suggested_questions()
+    except Exception as exc:  # pragma: no cover - jalur bantu
+        print(f"[AI] Suggestion build failed: {exc}")
+        return []
+
+
+def general_chat_response(query: str, suggestions: list[str]) -> dict[str, Any]:
+    """Balasan sapaan, dengan saran topik yang diambil dari korpus."""
     q = query.strip().lower()
-    
-    # Check for off-topic content first
+
     if is_out_of_scope(q):
-        return out_of_scope_response()
-    
-    # Check for known patterns (greetings, small talk)
+        return out_of_scope_response(suggestions)
+
     for keyword, response in SMART_RESPONSES.items():
         if keyword in q:
             return {
@@ -237,15 +252,15 @@ def general_chat_response(query: str, model: str) -> dict[str, Any]:
                 "citations": [],
                 "grounded": False,
                 "retrieval": [],
-                "suggestions": QUICK_SUGGESTIONS,
+                "suggestions": suggestions,
             }
-    
+
     return {
         "answer": DEFAULT_GENERAL_RESPONSE,
         "citations": [],
         "grounded": False,
         "retrieval": [],
-        "suggestions": QUICK_SUGGESTIONS,
+        "suggestions": suggestions,
     }
 
 
@@ -261,26 +276,30 @@ def ask(request: AskRequest) -> dict[str, Any]:
     """Page/section retrieval -> (optional LLM) -> answer + citations."""
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="query must not be empty")
+
+    store = current_store()
+    scope: AccessScope | None = None
+    if isinstance(store, PgVectorStore):
+        # Fail closed, dan sengaja dicek lebih dulu daripada balasan apa pun:
+        # permintaan tanpa batas akses ditolak sebelum sebutir isi korpus
+        # (termasuk judul dokumen di tombol saran) sempat keluar.
+        scope = AccessScope.from_payload(request.access)
+        if scope is None:
+            raise HTTPException(
+                status_code=400,
+                detail="access scope is required: sertakan field 'access' pada permintaan",
+            )
+
     # Guardrails evaluate the new user question before a local topic label is applied.
     if is_out_of_scope(request.query):
-        return out_of_scope_response()
-    if is_general_chat(request.query) and not request.conversation_topic:
-        return general_chat_response(request.query, request.model or DEFAULT_MODEL)
+        return out_of_scope_response(suggested_questions(store, scope))
+    if is_general_chat(request.query, has_topic=bool(request.conversation_topic)):
+        return general_chat_response(request.query, suggested_questions(store, scope))
 
     retrieval_query = contextualize_query(request.query, request.conversation_topic)
 
     try:
-        store = current_store()
-        if isinstance(store, PgVectorStore):
-            # Fail closed. Permintaan tanpa batas akses ditolak, bukan dianggap
-            # boleh membaca semuanya — kelalaian di pemanggil tidak boleh
-            # berubah menjadi kebocoran dokumen.
-            scope = AccessScope.from_payload(request.access)
-            if scope is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="access scope is required: sertakan field 'access' pada permintaan",
-                )
+        if isinstance(store, PgVectorStore) and scope is not None:
             return store.ask(
                 retrieval_query, top_k=request.top_k, use_llm=request.use_llm,
                 model=request.model or DEFAULT_MODEL, filters=request.filters,

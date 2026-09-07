@@ -4,6 +4,7 @@ from unittest import mock
 try:
     from fastapi.testclient import TestClient
     import http_api
+    from generation.suggestions import clean_document_name, clean_section
     from provider_errors import ProviderConfigurationError, ProviderHttpError
     HAS_DEPS = True
 except ImportError:  # pragma: no cover - optional dependencies
@@ -53,13 +54,50 @@ class HttpApiTests(unittest.TestCase):
         self.assertIn("hanya dapat membantu", body["answer"])
         self.assertEqual(body["citations"], [])
 
-    def test_ask_rejects_general_person_question_without_citations(self):
+    def test_ask_general_person_question_falls_back_to_no_answer(self):
+        """Bukan ditolak lewat tebakan topik, tapi karena tidak ada buktinya."""
         response = self.client.post("/ask", json={"query": "siapa itu elon musk"})
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertFalse(body["grounded"])
-        self.assertIn("hanya dapat membantu", body["answer"])
+        self.assertEqual(body["answer"], "Informasi tidak ditemukan pada dokumen yang tersedia.")
         self.assertEqual(body["citations"], [])
+
+    def test_frasa_topik_pendek_bukan_sapaan(self):
+        """Regresi: "kemitraan usaha mikro" pernah dibalas sapaan, bukan dicari."""
+        self.assertFalse(http_api.is_general_chat("kemitraan usaha mikro"))
+        self.assertFalse(http_api.is_general_chat("retribusi pasar"))
+        self.assertTrue(http_api.is_general_chat("halo"))
+        self.assertTrue(http_api.is_general_chat("terima kasih"))
+
+    def test_susulan_terpotong_dicari_saat_percakapan_sudah_bertopik(self):
+        """"bagaimana?" sesudah satu jawaban adalah susulan, bukan basa-basi."""
+        self.assertTrue(http_api.is_general_chat("bagaimana"))
+        self.assertFalse(http_api.is_general_chat("bagaimana", has_topic=True))
+        # Sapaan tetap sapaan, sekalipun percakapannya sudah punya topik.
+        self.assertTrue(http_api.is_general_chat("terima kasih", has_topic=True))
+
+    def test_pertanyaan_topik_umum_tidak_lagi_ditolak_lewat_kata_kunci(self):
+        """Arsip peraturan memang membahas kesehatan, wisata, dan keagamaan."""
+        for query in ("aturan tentang tempat wisata", "izin praktik dokter", "dana kegiatan keagamaan"):
+            self.assertFalse(http_api.is_general_chat(query), query)
+
+    def test_saran_diambil_dari_korpus_bukan_daftar_tetap(self):
+        """Sapaan tetap menawarkan topik, tapi topiknya berasal dari isi indeks."""
+        response = self.client.post("/ask", json={"query": "halo"})
+        self.assertEqual(response.status_code, 200)
+        suggestions = response.json()["suggestions"]
+        self.assertTrue(suggestions, "sapaan harus menawarkan topik dari dokumen yang ada")
+
+        store = http_api.current_store()
+        labels = {clean_document_name(chunk["filename"]).lower() for chunk in store.chunks}
+        labels |= {clean_section(chunk.get("section_title", "")).lower() for chunk in store.chunks}
+        labels.discard("")
+        for suggestion in suggestions:
+            self.assertTrue(
+                any(label in suggestion.lower() for label in labels),
+                f"saran '{suggestion}' tidak berasal dari dokumen yang terindeks",
+            )
 
     def test_ask_empty_query_is_400(self):
         response = self.client.post("/ask", json={"query": "   "})

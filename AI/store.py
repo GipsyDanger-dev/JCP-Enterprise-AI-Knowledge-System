@@ -38,6 +38,7 @@ from generation.guardrails import (
     parse_clarify,
 )
 from generation.llm import DEFAULT_MODEL, generate_answer
+from generation.suggestions import MAX_SUGGESTIONS, questions_from_topics
 from ingestion.chunking import chunk_pages
 from ingestion.parsers import read_document
 from ingestion.sections import extract_sections
@@ -200,6 +201,40 @@ class PgVectorStore:
             }
             for row in rows
         ]
+
+    def suggestion_topics(self, *, scope: AccessScope, limit: int = MAX_SUGGESTIONS) -> list[dict[str, Any]]:
+        """Judul bagian dan nama berkas yang boleh dibaca penanya, untuk saran pertanyaan.
+
+        Penyaringnya sama persis dengan ``search``: saran tidak boleh
+        membocorkan judul dokumen yang isinya sendiri tidak boleh ditanyakan.
+        Urutannya diacak supaya tombol saran berganti-ganti, bukan empat topik
+        yang sama sepanjang umur sistem.
+        """
+        access_conditions, access_params = scope.conditions()
+        sql = f"""
+            SELECT c.section_title, dv.original_filename
+            FROM chunks AS c
+            JOIN document_versions AS dv ON dv.id = c.document_version_id
+            JOIN documents AS d ON d.id = dv.document_id
+            WHERE {' AND '.join(access_conditions)}
+              AND dv.version_number = (
+                  SELECT MAX(v.version_number) FROM document_versions AS v
+                  WHERE v.document_id = d.id
+              )
+            GROUP BY c.section_title, dv.original_filename
+            ORDER BY random()
+            LIMIT %s
+        """
+        try:
+            with psycopg.connect(self.dsn) as conn:
+                rows = conn.execute(sql, [*access_params, limit * 5]).fetchall()
+        except Exception as exc:  # saran bukan jawaban: gagal di sini tidak boleh menggagalkan permintaan
+            print(f"[AI] Suggestion topics failed: {exc}")
+            return []
+        return [{"section_title": row[0] or "", "filename": row[1]} for row in rows]
+
+    def suggested_questions(self, *, scope: AccessScope) -> list[str]:
+        return questions_from_topics(self.suggestion_topics(scope=scope))
 
     def get_document_version(self, document_version_id: str) -> dict[str, Any] | None:
         sql = """
@@ -412,7 +447,7 @@ class PgVectorStore:
         if clarify:
             return clarify_response(clarify, query)
         if is_no_answer(answer):
-            return no_answer_response()
+            return no_answer_response(self.suggested_questions(scope=scope))
         return {
             "answer": answer,
             "citations": citations,
@@ -462,9 +497,9 @@ class PgVectorStore:
             print(f"[AI] TF-IDF: {len(chunks)} chunks, {len(matches)} matches for '{query[:30]}'")
         except Exception as exc:
             print(f"[AI] TF-IDF retrieval failed: {exc}")
-            return no_answer_response()
+            return no_answer_response(self.suggested_questions(scope=scope))
         if not matches:
-            return no_answer_response()
+            return no_answer_response(self.suggested_questions(scope=scope))
         return self._answer_from_matches(
             query, matches, use_llm=use_llm, model=model,
             api_key=api_key, allow_clarify=allow_clarify, scope=scope,

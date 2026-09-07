@@ -12,69 +12,67 @@ from typing import Any
 
 from config import NO_ANSWER
 
+# Tanpa menyebut jenis dokumen tertentu: isi arsipnya berganti, kalimat ini tidak.
 OUT_OF_SCOPE = (
-    "Saya hanya dapat membantu menjawab pertanyaan seputar dokumen perusahaan, "
-    "seperti SOP, kebijakan, prosedur, dan informasi internal."
+    "Saya hanya dapat membantu menjawab pertanyaan yang jawabannya ada pada "
+    "dokumen resmi yang tersimpan di sistem ini."
 )
-
-QUICK_SUGGESTIONS = [
-    "Apa persyaratan cuti tahunan?",
-    "Berapa batas pengajuan cuti sebelum tanggal cuti?",
-    "Dokumen apa yang diperlukan untuk cuti sakit?",
-    "Bagaimana alur persetujuan cuti?",
-]
 
 _ARITHMETIC_QUERY = re.compile(
     r"^\s*(?:berapa\s+|hitung(?:kan)?\s+)?\d+(?:[.,]\d+)?\s*"
     r"(?:[+\-*/x×÷]\s*\d+(?:[.,]\d+)?)+\s*(?:berapa|hasil(?:nya)?|=)?\s*\??\s*$",
     re.IGNORECASE,
 )
-_OFF_TOPIC_KEYWORDS = (
-    "politik", "presiden", "gubernur", "partai", "agama", "allah", "tuhan",
-    "cuaca", "hujan", "sepak bola", "basket", "film", "musik", "artis",
-    "iphone", "android", "samsung", "sakit", "demam", "obat", "dokter",
-    "resep", "masakan", "wisata", "jalan-jalan", "bitcoin", "crypto",
-    "ignore previous", "abaikan instruksi", "lupakan instruksi",
-)
-_DOCUMENT_KEYWORDS = (
-    "sop", "kebijakan", "prosedur", "dokumen", "cuti", "izin", "reimbursement",
-    "biaya", "tunjangan", "perjalanan dinas", "karyawan", "hrd", "perusahaan",
-)
-_GENERAL_PERSON_QUERY = re.compile(
-    r"^\s*(?:siapa|siapakah|who\s+is)\s+(?:itu\s+)?[a-z][a-z .'-]{1,80}\??\s*$",
-    re.IGNORECASE,
+
+# Sengaja hanya percobaan membajak instruksi. Daftar topik terlarang yang dulu
+# ada di sini (politik, agama, kesehatan, wisata, ...) menolak pertanyaan yang
+# justru ada jawabannya: arsip peraturan daerah memang membahas kesehatan,
+# keagamaan, dan pariwisata. Penjaga sebenarnya adalah bukti — pertanyaan yang
+# tidak punya dasar dokumen sudah dijawab "informasi tidak ditemukan" oleh
+# jalur retrieval, tanpa perlu menebak topiknya lebih dulu.
+_PROMPT_INJECTION_PHRASES = (
+    "ignore previous", "ignore all previous", "disregard previous",
+    "abaikan instruksi", "lupakan instruksi", "abaikan aturan di atas",
 )
 
 
-def no_answer_response() -> dict[str, Any]:
+def no_answer_response(suggestions: list[str] | None = None) -> dict[str, Any]:
+    """Tidak ada bukti, jadi tidak ada jawaban.
+
+    ``suggestions`` diisi pemanggil dari korpus yang boleh dibaca penanya.
+    Kosong lebih baik daripada saran tetap: tombol yang menunjuk topik di luar
+    arsip hanya mengantar pengguna ke jawaban kosong berikutnya.
+    """
     return {
         "answer": NO_ANSWER,
         "citations": [],
         "grounded": False,
         "retrieval": [],
-        "suggestions": QUICK_SUGGESTIONS,
+        "suggestions": list(suggestions or []),
     }
 
 
-def out_of_scope_response() -> dict[str, Any]:
+def out_of_scope_response(suggestions: list[str] | None = None) -> dict[str, Any]:
     return {
         "answer": OUT_OF_SCOPE,
         "citations": [],
         "grounded": False,
         "retrieval": [],
-        "suggestions": QUICK_SUGGESTIONS,
+        "suggestions": list(suggestions or []),
     }
 
 
 def is_out_of_scope(query: str) -> bool:
+    """Hanya yang jelas bukan pertanyaan dokumen: hitungan dan pembajakan instruksi.
+
+    Penilaian topik sengaja tidak dilakukan di sini. Menebak "ini soal politik,
+    tolak" salah dua arah sekaligus: menutup pertanyaan yang ada jawabannya di
+    arsip, dan tetap lolos untuk topik luar yang tidak ada di daftar.
+    """
     normalized = query.strip().lower()
     if _ARITHMETIC_QUERY.match(normalized):
         return True
-    if any(keyword in normalized for keyword in _OFF_TOPIC_KEYWORDS):
-        return True
-    return bool(_GENERAL_PERSON_QUERY.match(normalized)) and not any(
-        keyword in normalized for keyword in _DOCUMENT_KEYWORDS
-    )
+    return any(phrase in normalized for phrase in _PROMPT_INJECTION_PHRASES)
 
 
 def is_no_answer(answer: str) -> bool:

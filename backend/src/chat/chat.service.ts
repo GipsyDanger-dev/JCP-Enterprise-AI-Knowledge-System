@@ -3,7 +3,7 @@ import { MessageRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { aiServiceHeaders, aiServiceUrl } from '../config/env.util';
-import { allowedCategoryFilter } from '../documents/document-visibility';
+import { allowedCategoryFilter, documentVisibilityWhere } from '../documents/document-visibility';
 
 interface AiCitation {
   document_id: string;
@@ -35,12 +35,36 @@ export interface ChatCitation {
   excerpt?: string;
 }
 
-const QUICK_SUGGESTIONS = [
-  'Apa persyaratan cuti tahunan?',
-  'Berapa batas pengajuan cuti sebelum tanggal cuti?',
-  'Dokumen apa yang diperlukan untuk cuti sakit?',
-  'Bagaimana alur persetujuan cuti?',
-];
+/**
+ * Bersihkan judul/nama berkas menjadi label yang enak dibaca di tombol saran.
+ *
+ * Nama berkas arsip hukum jarang berupa kalimat ("PerbupNomor11Tahun2026ttg
+ * PengelolaanSampah.pdf"), jadi batas kata disisipkan dulu.
+ */
+function readableTitle(raw: string): string {
+  const withoutExtension = raw.replace(/\.[A-Za-z0-9]{1,5}$/, '');
+  const spaced = withoutExtension
+    .replace(/[_\-.]+/g, ' ')
+    .replace(/(?<=[a-z0-9])(?=[A-Z])/g, ' ')
+    .replace(/(?<=[A-Za-z])(?=\d)|(?<=\d)(?=[A-Za-z])/g, ' ')
+    .replace(/\bttg\b/gi, 'tentang')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (spaced.length <= 64) return spaced;
+  return spaced.slice(0, 64).replace(/\s\S*$/, '').trim();
+}
+
+/**
+ * Apakah pertanyaan ini perlu ditempeli topik percakapan sebelumnya.
+ *
+ * Pertanyaan panjang sudah membawa subjeknya sendiri; menempeli judul dokumen
+ * yang barusan dikutip malah menarik pencarian kembali ke dokumen itu saat
+ * pengguna sebenarnya sudah berpindah bahasan. Yang butuh sandaran hanyalah
+ * susulan pendek seperti "berarti tidak boleh ya?".
+ */
+function needsConversationTopic(question: string): boolean {
+  return question.trim().split(/\s+/).length <= 8;
+}
 
 @Injectable()
 export class ChatService {
@@ -56,7 +80,9 @@ export class ChatService {
   ) {
     const conversation = await this.resolveConversation(question, actor, conversationId);
     const contextChunkIds = await this.getContextChunkIds(conversation.id);
-    const conversationTopic = await this.getConversationTopic(conversation.id);
+    const conversationTopic = needsConversationTopic(question)
+      ? await this.getConversationTopic(conversation.id)
+      : undefined;
     const access = await this.accessScope(actor);
 
     await this.prisma.message.create({
@@ -109,14 +135,17 @@ export class ChatService {
         awaitingChoice: result.awaiting_choice ?? false,
       };
     } catch (error) {
-      const answer = 'Maaf, pertanyaan belum dapat diproses sekarang. Coba salah satu pertanyaan berikut tentang dokumen perusahaan:';
+      const suggestions = await this.fallbackSuggestions(actor);
+      const answer = suggestions.length > 0
+        ? 'Maaf, pertanyaan belum dapat diproses sekarang. Coba salah satu pertanyaan berikut:'
+        : 'Maaf, pertanyaan belum dapat diproses sekarang. Silakan coba lagi sebentar lagi.';
       const citations: ChatCitation[] = [];
       await this.persistAssistantMessage(conversation.id, answer, citations);
       return {
         conversationId: conversation.id,
         answer,
         citations,
-        suggestions: QUICK_SUGGESTIONS,
+        suggestions,
         // Kegagalan bukan pertanyaan balik: kolom ketik harus tetap terbuka.
         awaitingChoice: false,
       };
@@ -190,19 +219,66 @@ export class ChatService {
     return latestAnswer?.citations.map((citation) => citation.chunkId) ?? [];
   }
 
+  /**
+   * Label topik untuk pertanyaan lanjutan ("berarti tidak boleh ya?").
+   *
+   * Diambil dari sumber jawaban terakhir — judul dokumen dan bagian yang
+   * benar-benar dikutip — bukan dari daftar tema yang ditulis di kode. Daftar
+   * seperti itu hanya mengenali topik yang kebetulan terpikirkan saat ditulis,
+   * lalu diam untuk seluruh isi arsip yang lain; percakapan tentang dokumen di
+   * luar daftar kehilangan konteksnya tanpa ada yang menyadari.
+   */
   private async getConversationTopic(conversationId: string): Promise<string | undefined> {
-    const messages = await this.prisma.message.findMany({
-      where: { conversationId, role: MessageRole.USER },
+    const latestAnswer = await this.prisma.message.findFirst({
+      where: { conversationId, role: MessageRole.ASSISTANT, citations: { some: {} } },
       orderBy: { createdAt: 'desc' },
-      take: 3,
-      select: { content: true },
+      select: {
+        citations: {
+          orderBy: { sortOrder: 'asc' },
+          take: 1,
+          select: {
+            sectionTitle: true,
+            documentVersion: {
+              select: { originalFilename: true, document: { select: { title: true } } },
+            },
+          },
+        },
+      },
     });
-    const text = messages.map((message) => message.content.toLowerCase()).join(' ');
-    if (/\b(cuti|izin)\b/.test(text)) return 'kebijakan cuti dan izin karyawan';
-    if (/\b(reimbursement|penggantian biaya|klaim)\b/.test(text)) return 'kebijakan reimbursement dan penggantian biaya';
-    if (/\b(perjalanan dinas|hotel|akomodasi)\b/.test(text)) return 'kebijakan perjalanan dinas';
-    if (/\b(keamanan|security|akses)\b/.test(text)) return 'prosedur keamanan dan akses informasi';
-    return undefined;
+    const citation = latestAnswer?.citations[0];
+    if (!citation) return undefined;
+
+    const documentLabel = readableTitle(
+      citation.documentVersion.document.title || citation.documentVersion.originalFilename,
+    );
+    const section = (citation.sectionTitle ?? '').trim();
+    const parts = [documentLabel, section].filter((part) => part.length > 0);
+    return parts.length > 0 ? parts.join(' — ') : undefined;
+  }
+
+  /**
+   * Saran cadangan saat AI service tidak bisa dihubungi: diambil dari dokumen
+   * yang memang boleh dibaca aktor, lewat penyaring akses yang sama dengan
+   * daftar dokumen. Kalau tidak ada satu pun, lebih baik tanpa saran daripada
+   * menawarkan topik yang tidak ada isinya.
+   */
+  private async fallbackSuggestions(actor: AuthenticatedUser): Promise<string[]> {
+    try {
+      const documents = await this.prisma.document.findMany({
+        where: documentVisibilityWhere(actor),
+        orderBy: { updatedAt: 'desc' },
+        take: 3,
+        select: { title: true },
+      });
+      return documents
+        .map((document) => readableTitle(document.title))
+        .filter((title) => title.length > 0)
+        .map((title, index) => (index % 2 === 0
+          ? `Apa poin utama dokumen ${title}?`
+          : `Ringkas isi ${title}`));
+    } catch {
+      return [];
+    }
   }
 
   private toClientCitations(citations: AiCitation[]): ChatCitation[] {
