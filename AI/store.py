@@ -30,7 +30,7 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     register_vector = None
 
-from config import EMBEDDING_MODEL
+from config import EMBEDDING_MODEL, EMBEDDINGS_ENABLED
 from generation.citations import citations_from_matches
 from generation.guardrails import (
     clarify_response,
@@ -416,7 +416,9 @@ class PgVectorStore:
     def _answer_from_matches(self, query: str, matches: list[tuple[float, dict[str, Any]]],
                              use_llm: bool = False, model: str = DEFAULT_MODEL,
                              api_key: str | None = None, allow_clarify: bool = False,
-                             *, scope: AccessScope) -> dict[str, Any]:
+                             filters: dict[str, Any] | None = None,
+                             *, scope: AccessScope,
+                             workspace_type: str = "COMPANY") -> dict[str, Any]:
         """Turn retrieved chunks into the answer payload.
 
         Deliberately left outside the retrieval ``try`` blocks: a ProviderError
@@ -433,6 +435,7 @@ class PgVectorStore:
                 documents=self.document_metadata(scope=scope),
                 allow_clarify=allow_clarify,
                 ai_profile=scope.ai_profile,
+                workspace_type=workspace_type,
             )
             if use_llm
             else matches[0][1]["text"]
@@ -441,7 +444,7 @@ class PgVectorStore:
         if clarify:
             return clarify_response(clarify, query)
         if is_no_answer(answer):
-            return no_answer_response()
+            return no_answer_response(workspace_type)
         return {
             "answer": answer,
             "citations": citations,
@@ -452,13 +455,13 @@ class PgVectorStore:
             ],
         }
 
-    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False, *, scope: AccessScope) -> dict[str, Any]:
+    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False, filters: dict[str, Any] | None = None, context_chunk_ids: list[str] | None = None, workspace_type: str = "COMPANY", *, scope: AccessScope) -> dict[str, Any]:
         """TF-IDF fallback when vector search fails or finds nothing."""
         try:
             from retrieval.tfidf import TfidfRetriever
             dsn = default_dsn()
             if not dsn:
-                return no_answer_response()
+                return no_answer_response(workspace_type)
             if psycopg is None:
                 raise RuntimeError("psycopg is not installed. Run: pip install 'psycopg[binary]'")
             with _connect(dsn) as conn:
@@ -488,16 +491,27 @@ class PgVectorStore:
                     "text": row[7],
                 })
             tfidf = TfidfRetriever(chunks)
-            matches = tfidf.search(query, top_k=top_k)
+            retrieved_matches = [
+                match for match in tfidf.search(query, top_k=top_k)
+                if match[0] > 0.0
+            ]
+            context_matches = self.context_chunks(context_chunk_ids or [], scope=scope)
+            seen = {chunk["chunk_id"] for _, chunk in context_matches}
+            matches = context_matches + [
+                match for match in retrieved_matches
+                if match[1]["chunk_id"] not in seen
+            ]
+            matches = matches[:top_k]
             print(f"[AI] TF-IDF: {len(chunks)} chunks, {len(matches)} matches for '{query[:30]}'")
         except Exception as exc:
             print(f"[AI] TF-IDF retrieval failed: {exc}")
-            return no_answer_response()
+            return no_answer_response(workspace_type)
         if not matches:
-            return no_answer_response()
+            return no_answer_response(workspace_type)
         return self._answer_from_matches(
             query, matches, use_llm=use_llm, model=model,
             api_key=api_key, allow_clarify=allow_clarify, scope=scope,
+            filters=filters, workspace_type=workspace_type,
         )
 
     # ---------- orchestration ----------
@@ -515,7 +529,15 @@ class PgVectorStore:
         allow_clarify: bool = False,
         *,
         scope: AccessScope,
+        workspace_type: str = "COMPANY",
     ) -> dict[str, Any]:
+        if not EMBEDDINGS_ENABLED:
+            return self._tfidf_fallback(
+                query, top_k, use_llm=use_llm, model=model, api_key=api_key,
+                allow_clarify=allow_clarify, filters=filters,
+                context_chunk_ids=context_chunk_ids,
+                workspace_type=workspace_type, scope=scope,
+            )
         try:
             context_matches = self.context_chunks(context_chunk_ids or [], scope=scope)
             query_vector = embed_texts([query], model=self.model, api_key=api_key)[0]
@@ -533,14 +555,15 @@ class PgVectorStore:
             # Only retrieval is guarded here. TF-IDF needs no embeddings, so it is
             # a genuine fallback when the vector path fails.
             print(f"[AI] Vector search failed ({exc}), falling back to TF-IDF")
-            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, scope=scope)
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters, context_chunk_ids=context_chunk_ids, workspace_type=workspace_type, scope=scope)
         if not matches:
             # Vector search found nothing above threshold, try TF-IDF fallback
             print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
-            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, scope=scope)
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters, context_chunk_ids=context_chunk_ids, workspace_type=workspace_type, scope=scope)
         return self._answer_from_matches(
             query, matches, use_llm=use_llm, model=model,
-            api_key=api_key, allow_clarify=allow_clarify, scope=scope,
+            api_key=api_key, allow_clarify=allow_clarify, filters=filters,
+            workspace_type=workspace_type, scope=scope,
         )
 
 

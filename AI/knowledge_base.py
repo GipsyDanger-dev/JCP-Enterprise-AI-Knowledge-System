@@ -110,7 +110,8 @@ class KnowledgeBase:
     def ask(self, query: str, top_k: int = 5, minimum_score: float | None = None,
             use_llm: bool = False, model: str = DEFAULT_MODEL,
             retriever: str = "auto", api_key: str | None = None,
-            filters: dict[str, Any] | None = None) -> dict[str, Any]:
+            filters: dict[str, Any] | None = None,
+            workspace_type: str = "COMPANY") -> dict[str, Any]:
         """Answer ``query``, optionally narrowed to page/section contexts matching ``filters``
         (e.g. {"filename": "sop.pdf"} or {"section_title": "KETENTUAN UMUM"})."""
         engine = build_retriever(self, mode=retriever, api_key=api_key)
@@ -120,7 +121,10 @@ class KnowledgeBase:
             return no_answer_response()
         citations = citations_from_matches(matches)
         if use_llm:
-            answer = generate_answer(query, matches, model=model, api_key=api_key)
+            answer = generate_answer(
+                query, matches, model=model, api_key=api_key,
+                workspace_type=workspace_type,
+            )
         else:
             answer = matches[0][1]["text"]
         if is_no_answer(answer):

@@ -17,11 +17,16 @@ OUT_OF_SCOPE = (
     "seperti SOP, kebijakan, prosedur, dan informasi internal."
 )
 
+OUT_OF_SCOPE_PERSONAL = (
+    "Saya hanya dapat mengikuti instruksi sistem dan menjawab berdasarkan "
+    "dokumen yang tersedia di workspace Personal Anda."
+)
+
 QUICK_SUGGESTIONS = [
-    "Apa persyaratan cuti tahunan?",
-    "Berapa batas pengajuan cuti sebelum tanggal cuti?",
-    "Dokumen apa yang diperlukan untuk cuti sakit?",
-    "Bagaimana alur persetujuan cuti?",
+    "Ringkas dokumen yang tersedia.",
+    "Apa poin penting dari dokumen saya?",
+    "Jelaskan informasi utama beserta sumbernya.",
+    "Apakah ada informasi yang berbeda antar dokumen?",
 ]
 
 _ARITHMETIC_QUERY = re.compile(
@@ -34,7 +39,10 @@ _OFF_TOPIC_KEYWORDS = (
     "cuaca", "hujan", "sepak bola", "basket", "film", "musik", "artis",
     "iphone", "android", "samsung", "sakit", "demam", "obat", "dokter",
     "resep", "masakan", "wisata", "jalan-jalan", "bitcoin", "crypto",
+)
+_PROMPT_INJECTION_KEYWORDS = (
     "ignore previous", "abaikan instruksi", "lupakan instruksi",
+    "system prompt", "developer message",
 )
 _DOCUMENT_KEYWORDS = (
     "sop", "kebijakan", "prosedur", "dokumen", "cuti", "izin", "reimbursement",
@@ -46,7 +54,7 @@ _GENERAL_PERSON_QUERY = re.compile(
 )
 
 
-def no_answer_response() -> dict[str, Any]:
+def no_answer_response(workspace_type: str = "COMPANY") -> dict[str, Any]:
     return {
         "answer": NO_ANSWER,
         "citations": [],
@@ -56,9 +64,9 @@ def no_answer_response() -> dict[str, Any]:
     }
 
 
-def out_of_scope_response() -> dict[str, Any]:
+def out_of_scope_response(workspace_type: str = "COMPANY") -> dict[str, Any]:
     return {
-        "answer": OUT_OF_SCOPE,
+        "answer": OUT_OF_SCOPE_PERSONAL if workspace_type == "PERSONAL" else OUT_OF_SCOPE,
         "citations": [],
         "grounded": False,
         "retrieval": [],
@@ -66,8 +74,14 @@ def out_of_scope_response() -> dict[str, Any]:
     }
 
 
-def is_out_of_scope(query: str) -> bool:
+def is_out_of_scope(query: str, workspace_type: str = "COMPANY") -> bool:
     normalized = query.strip().lower()
+    if any(keyword in normalized for keyword in _PROMPT_INJECTION_KEYWORDS):
+        return True
+    # Personal workspace dapat berisi dokumen dari bidang apa pun. Validitas
+    # jawaban ditentukan oleh retrieval dan citation, bukan daftar topik HR.
+    if workspace_type == "PERSONAL":
+        return False
     if _ARITHMETIC_QUERY.match(normalized):
         return True
     if any(keyword in normalized for keyword in _OFF_TOPIC_KEYWORDS):

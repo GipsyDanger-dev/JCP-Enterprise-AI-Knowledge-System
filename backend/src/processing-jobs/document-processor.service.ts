@@ -82,7 +82,7 @@ export class DocumentProcessorService implements OnModuleInit {
       const form = new FormData();
       form.append('file', new Blob([content], { type: mimeType }), filename);
       form.append('document_version_id', versionId);
-      form.append('embed', process.env.SUMOPOD_API_KEY ? 'true' : 'false');
+      form.append('embed', process.env.AI_EMBEDDINGS_ENABLED !== 'false' ? 'true' : 'false');
 
       const ingestResponse = await fetch(`${this.aiBaseUrl}/ingest-file`, {
         method: 'POST',

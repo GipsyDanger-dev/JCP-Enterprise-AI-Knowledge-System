@@ -86,8 +86,9 @@ Request:
     "filename": "sop_perjalanan.pdf",
     "section_title": "KETENTUAN UMUM"
   },
+  "workspace_type": "PERSONAL",
   "use_llm": true,
-  "model": "deepseek-v4-pro",
+  "model": "your-provider-model",
   "retriever": "auto"
 }
 ```
@@ -97,6 +98,7 @@ Request:
 | `query` | Ya | — | Pertanyaan yang tidak boleh kosong |
 | `top_k` | Tidak | `5` | Jumlah hasil retrieval maksimum |
 | `filters` | Tidak | `null` | Filter `filename` dan `section_title` |
+| `workspace_type` | Tidak | `COMPANY` | `PERSONAL` membuat domain mengikuti dokumen milik user; `COMPANY` mempertahankan guardrail perusahaan |
 | `use_llm` | Tidak | `false` | Mengaktifkan penyusunan jawaban oleh LLM |
 | `model` | Tidak | model default | Model chat yang digunakan |
 | `retriever` | Tidak | `auto` | `auto`, `tfidf`, atau `vector` pada JSON store |

@@ -36,10 +36,10 @@ export interface ChatCitation {
 }
 
 const QUICK_SUGGESTIONS = [
-  'Apa persyaratan cuti tahunan?',
-  'Berapa batas pengajuan cuti sebelum tanggal cuti?',
-  'Dokumen apa yang diperlukan untuk cuti sakit?',
-  'Bagaimana alur persetujuan cuti?',
+  'Ringkas dokumen yang tersedia.',
+  'Apa poin penting dari dokumen saya?',
+  'Jelaskan informasi utama beserta sumbernya.',
+  'Apakah ada informasi yang berbeda antar dokumen?',
 ];
 
 @Injectable()
@@ -80,9 +80,10 @@ export class ChatService {
           query: question,
           // Only opaque chunk ids cross to the AI service. Previous user/assistant text stays in the database.
           context_chunk_ids: contextChunkIds,
+          workspace_type: actor.accountType,
           conversation_topic: conversationTopic,
           top_k: 5,
-          use_llm: Boolean(process.env.SUMOPOD_API_KEY || process.env.LLM_API_KEY),
+          use_llm: Boolean(process.env.AI_PROVIDER_API_KEY),
           // Hanya pertanyaan yang diketik sendiri yang boleh dibalas dengan
           // pertanyaan balik saat maksudnya terlalu luas.
           allow_clarify: !fromSuggestion,
@@ -212,12 +213,15 @@ export class ChatService {
       take: 3,
       select: { content: true },
     });
-    const text = messages.map((message) => message.content.toLowerCase()).join(' ');
-    if (/\b(cuti|izin)\b/.test(text)) return 'kebijakan cuti dan izin karyawan';
-    if (/\b(reimbursement|penggantian biaya|klaim)\b/.test(text)) return 'kebijakan reimbursement dan penggantian biaya';
-    if (/\b(perjalanan dinas|hotel|akomodasi)\b/.test(text)) return 'kebijakan perjalanan dinas';
-    if (/\b(keamanan|security|akses)\b/.test(text)) return 'prosedur keamanan dan akses informasi';
-    return undefined;
+    if (messages.length === 0) return undefined;
+    // Topik berasal dari pertanyaan user sendiri agar follow-up bekerja untuk
+    // bidang apa pun, bukan hanya daftar topik perusahaan yang di-hardcode.
+    return messages
+      .reverse()
+      .map((message) => message.content.trim())
+      .filter(Boolean)
+      .join(' | ')
+      .slice(0, 400);
   }
 
   private toClientCitations(citations: AiCitation[]): ChatCitation[] {

@@ -10,8 +10,11 @@ from __future__ import annotations
 from typing import Any
 
 SYSTEM_PROMPT = (
-    "Kamu adalah asisten knowledge perusahaan. Jawab HANYA berdasarkan konteks "
-    "dokumen resmi yang diberikan. Jangan menggunakan pengetahuan umum, asumsi, "
+    "Kamu adalah asisten knowledge berbasis dokumen. Jawab HANYA berdasarkan "
+    "konteks dokumen yang diberikan. Bidang dokumen dapat berupa apa saja, jadi "
+    "tentukan istilah, topik, dan sudut pandang dari isi dokumen; jangan otomatis "
+    "menganggap dokumen membahas HR atau kebijakan perusahaan. Jangan menggunakan "
+    "pengetahuan umum, asumsi, "
     "atau informasi dari luar konteks. Jangan menebak dan jangan mengisi bagian "
     "yang tidak tertulis eksplisit. Jika bukti tidak cukup, jawab persis: "
     "\"Informasi tidak ditemukan pada dokumen yang tersedia.\" Jika ada aturan "
@@ -81,19 +84,24 @@ def build_messages(
     documents: list[dict[str, Any]] | None = None,
     allow_clarify: bool = False,
     ai_profile: str = "general",
+    workspace_type: str = "COMPANY",
 ) -> list[dict[str, str]]:
     context = "\n\n".join(
         f"[DOKUMEN: {chunk['filename']} | HALAMAN: {chunk.get('page_number') or '-'} | "
         f"SECTION: {chunk.get('section_title') or '-'}]\n{chunk['text']}"
         for _, chunk in matches
     )
-    bagian = [f"Pertanyaan pengguna: {query}"]
+    workspace_label = "personal milik pengguna" if workspace_type == "PERSONAL" else "perusahaan"
+    bagian = [
+        f"Jenis workspace: {workspace_label}",
+        f"Pertanyaan pengguna: {query}",
+    ]
     if documents:
         bagian.append(
             "Daftar berkas yang tersimpan (sifat berkas, bukan isinya):\n"
             + format_inventory(documents)
         )
-    bagian.append(f"Konteks dokumen resmi:\n{context}")
+    bagian.append(f"Konteks dokumen yang dapat diakses pengguna:\n{context}")
     system = SYSTEM_PROMPT + CLARIFY_RULE if allow_clarify else SYSTEM_PROMPT
     if ai_profile == "sleman":
         system += " Konteks workspace adalah dokumen pemerintahan Sleman. Pertahankan istilah unit kerja, jenis produk hukum, nomor, tahun, dan status peraturan sesuai sumber. Jangan menganggap rancangan sebagai aturan yang sudah berlaku."

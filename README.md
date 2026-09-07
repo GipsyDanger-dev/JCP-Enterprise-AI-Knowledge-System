@@ -19,8 +19,10 @@ percakapan.
 | AI Service | Ingestion, retrieval, generation, citation, dan evaluasi tersedia |
 | Integrasi Backend–AI | Backend meneruskan file ke endpoint ingestion AI |
 
-Untuk runtime nyata, sistem memerlukan credential Neon (PostgreSQL dengan
-pgvector) dan SumoPod. Credential tidak disediakan oleh repository.
+Database PostgreSQL + pgvector dapat berjalan lokal melalui Docker Compose
+atau memakai database eksternal (misal Neon dengan ekstensi `vector`). Runtime
+AI memerlukan credential provider OpenAI-compatible yang tidak disediakan oleh
+repository.
 
 ## Tech stack
 
@@ -50,7 +52,8 @@ JCP-Enterprise-AI-Knowledge-System/
 ## Menjalankan lokal tanpa Docker
 
 Prasyarat: Node.js, Python 3, dependensi masing-masing service sudah terpasang,
-database Neon dengan ekstensi `vector`, serta API key SumoPod yang aktif.
+database PostgreSQL dengan ekstensi `vector` (Docker Compose lokal atau
+eksternal seperti Neon), serta API key provider AI OpenAI-compatible yang aktif.
 
 ```powershell
 Copy-Item .env.example .env
@@ -105,9 +108,15 @@ Salin `.env.example` menjadi `.env`. Jangan commit `.env` atau credential asli.
 | --- | --- |
 | `DATABASE_URL` | Koneksi PostgreSQL bersama |
 | `JWT_SECRET` | Penandatanganan JWT Backend |
-| `AI_SERVICE_URL` | URL AI dari Backend; lokal `http://127.0.0.1:8001` |
-| `SUMOPOD_API_KEY` | Akses embedding/LLM AI Service |
-| `VITE_API_BASE_URL` | Base URL Backend dari browser lokal |
+| `GOOGLE_CLIENT_ID` | OAuth Web Client ID untuk memverifikasi Google ID token di Backend |
+| `VITE_GOOGLE_CLIENT_ID` | OAuth Web Client ID publik untuk Google Identity Services di Frontend |
+| `AI_SERVICE_URL` | URL AI dari Backend; lokal `http://127.0.0.1:8001`, Docker `http://ai-api:8000` |
+| `WORKER_TOKEN` | Shared secret Backend <-> AI Service (header `X-Worker-Token`) |
+| `AI_PROVIDER_API_KEY` | API key provider AI yang kompatibel OpenAI |
+| `AI_PROVIDER_BASE_URL` | Base URL provider AI, misalnya `https://provider.example/v1` |
+| `AI_CHAT_MODEL` | ID model chat sesuai daftar model provider |
+| `AI_EMBEDDINGS_ENABLED` | Isi `false` bila provider tidak menyediakan `/v1/embeddings` |
+| `VITE_API_BASE_URL` | Base URL Backend dari browser lokal; `/api` berarti satu origin lewat proxy |
 
 ## Database dan seed
 
@@ -208,6 +217,11 @@ Endpoint percakapan membutuhkan JWT `ADMIN` atau `USER`. Setiap akun hanya dapat
 - `POST /conversations/:id/messages` — menyimpan pesan `USER` tanpa menjalankan AI.
 
 Judul percakapan yang kosong otomatis diambil dari 100 karakter pertama pesan pertama. Endpoint publik tidak menerima field role, sehingga client tidak dapat membuat pesan `ASSISTANT` atau `SYSTEM`. Penyimpanan jawaban AI dan citation akan dilakukan melalui kontrak internal pada tahap integrasi AI berikutnya.
+
+Untuk akun `PERSONAL`, Ask AI hanya mengambil chunk dari dokumen milik akun
+tersebut. Bidang tidak di-hardcode: prompt menentukan topik secara dinamis dari
+isi file hasil retrieval. Saat embedding dinonaktifkan, pencarian memakai TF-IDF
+lokal dan provider eksternal hanya menyusun jawaban dari konteks beserta citation.
 
 ## Audit logs
 

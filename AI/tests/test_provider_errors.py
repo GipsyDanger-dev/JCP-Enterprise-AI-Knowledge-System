@@ -97,7 +97,7 @@ class ProviderRedactionTests(unittest.TestCase):
 
     def test_public_error_contract_has_stable_status_and_detail(self):
         http_error = ProviderHttpError("chat", 401)
-        config_error = ProviderConfigurationError("SUMOPOD_API_KEY")
+        config_error = ProviderConfigurationError("AI_PROVIDER_API_KEY")
 
         self.assertEqual(http_error.http_status, 502)
         self.assertEqual(http_error.public_detail, "AI provider request failed")

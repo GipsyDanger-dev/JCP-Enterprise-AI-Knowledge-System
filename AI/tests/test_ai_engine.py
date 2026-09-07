@@ -5,6 +5,7 @@ from unittest import mock
 from pathlib import Path
 
 from ai_engine import KnowledgeBase, chunk_pages, generate_answer
+from generation.prompts import build_messages
 
 
 class RetrievalContractTests(unittest.TestCase):
@@ -51,13 +52,13 @@ class LlmModeTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(RuntimeError) as ctx:
                 self.kb.ask("Berapa maksimal biaya hotel Manager?", use_llm=True)
-        self.assertIn("SUMOPOD_API_KEY", str(ctx.exception))
+        self.assertIn("AI_PROVIDER_API_KEY", str(ctx.exception))
 
     def test_generate_answer_missing_key_message(self):
         with mock.patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(RuntimeError) as ctx:
                 generate_answer("q", [])
-        self.assertIn("SUMOPOD_API_KEY", str(ctx.exception))
+        self.assertIn("AI_PROVIDER_API_KEY", str(ctx.exception))
 
     def test_llm_answer_hides_internal_chunk_coordinates(self):
         class FakeResponse:
@@ -70,13 +71,31 @@ class LlmModeTests(unittest.TestCase):
             def read(self):
                 return json.dumps({"choices": [{"message": {"content": "Maksimal Rp900.000 [7db293d7-e271-473e-9d0d-431972042f04-1 - Biaya hotel]"}}]}).encode()
 
-        with mock.patch.dict(os.environ, {"SUMOPOD_API_KEY": "sk-test"}, clear=False), \
+        with mock.patch.dict(os.environ, {
+            "AI_PROVIDER_API_KEY": "sk-test",
+            "AI_PROVIDER_BASE_URL": "https://provider.test/v1",
+        }, clear=False), \
              mock.patch("generation.llm.urllib.request.urlopen", return_value=FakeResponse()):
             result = self.kb.ask("Berapa maksimal biaya hotel Manager?", use_llm=True)
         self.assertTrue(result["grounded"])
         self.assertEqual(result["answer"], "Maksimal Rp900.000")
         self.assertEqual(result["citations"][0]["chunk_id"], "doc-1-1")
         self.assertEqual(result["citations"][0]["page_number"], 7)
+
+    def test_personal_prompt_derives_domain_from_documents(self):
+        messages = build_messages(
+            "Apa kategori nodul ini?",
+            [(0.8, {
+                "filename": "panduan_tirads.pdf",
+                "page_number": 4,
+                "section_title": "Klasifikasi",
+                "text": "Kategori TI-RADS ditentukan dari karakteristik ultrasonografi.",
+            })],
+            workspace_type="PERSONAL",
+        )
+        self.assertIn("personal milik pengguna", messages[1]["content"])
+        self.assertIn("Bidang dokumen dapat berupa apa saja", messages[0]["content"])
+        self.assertIn("TI-RADS", messages[1]["content"])
 
 
 if __name__ == "__main__":
