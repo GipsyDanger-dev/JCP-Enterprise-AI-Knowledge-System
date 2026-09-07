@@ -522,7 +522,14 @@ class PgVectorStore:
         scope: AccessScope,
     ) -> dict[str, Any]:
         try:
-            context_matches = self.context_chunks(context_chunk_ids or [], scope=scope)
+            # Jatah konteks dibatasi, bukan sekadar digabung lalu dipotong.
+            # Penggabungan polos menaruh konteks di depan dan memotong di
+            # ``top_k``: begitu jawaban sebelumnya punya kutipan sebanyak
+            # top_k, seluruh hasil pencarian untuk pertanyaan baru terbuang
+            # sebelum sampai ke model, dan jawabannya berubah jadi "informasi
+            # tidak ditemukan" padahal dokumennya ada.
+            context_budget = max(1, top_k // 2)
+            context_matches = self.context_chunks(context_chunk_ids or [], scope=scope)[:context_budget]
             query_vector = embed_texts([query], model=self.model, api_key=api_key)[0]
             retrieved_matches = [
                 (score, chunk)

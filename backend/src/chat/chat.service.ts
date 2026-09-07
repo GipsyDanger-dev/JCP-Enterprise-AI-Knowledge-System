@@ -54,16 +54,41 @@ function readableTitle(raw: string): string {
   return spaced.slice(0, 64).replace(/\s\S*$/, '').trim();
 }
 
+// "apa itu retribusi daerah" menyebut "itu", tapi jelas membuka topik baru.
+// Diperiksa lebih dulu supaya tidak tertangkap penanda rujukan di bawah.
+const DEFINITIONAL_OPENER = /^(apa|apakah|siapa)\s+itu\b|^apa\s+yang\s+dimaksud\b/;
+
+// Kata sambung yang menggantung pada kalimat sebelumnya.
+const FOLLOW_UP_OPENER = /^(berarti|jadi|kalau\s+(begitu|gitu|iya|tidak|ya)|lalu|terus|trus|selain\s+itu|apalagi|apa\s+lagi|bagaimana\s+dengan|gimana\s+dengan|sedangkan|kalau\s+untuk)\b/;
+
+// Rujukan ke sesuatu yang sudah disebut, bukan ke subjek baru.
+const REFERENCE_WORD = /\b(itu|tersebut|tadi|sebelumnya|barusan|di\s+atas)\b/;
+
+// Kata yang boleh muncul di susulan elipsis: kata tanya, kata fungsi, atau kata
+// berklitik "-nya" yang menunjuk balik ("sanksinya?", "dasarnya?").
+const ELLIPSIS_WORD = /^(apa|apakah|kenapa|mengapa|berapa|kapan|siapa|bagaimana|gimana|dimana|mana|saja|aja|juga|lagi|ya|dong|sih|kah|dan|atau|yang|begitu|gitu|demikian|lalu|terus)$|nya$/;
+
 /**
- * Apakah pertanyaan ini perlu ditempeli topik percakapan sebelumnya.
+ * Apakah pertanyaan ini bersandar pada jawaban sebelumnya.
  *
- * Pertanyaan panjang sudah membawa subjeknya sendiri; menempeli judul dokumen
- * yang barusan dikutip malah menarik pencarian kembali ke dokumen itu saat
- * pengguna sebenarnya sudah berpindah bahasan. Yang butuh sandaran hanyalah
- * susulan pendek seperti "berarti tidak boleh ya?".
+ * Penilaiannya kebahasaan, bukan ketopikan: yang dicari adalah kalimat yang
+ * *tidak lengkap tanpa* giliran sebelumnya — kata sambung, rujukan balik, atau
+ * elipsis. Daftar topik tidak dipakai karena akan menua bersama isi arsip.
+ *
+ * Sengaja berat sebelah ke "topik baru". Salah menilai susulan sebagai topik
+ * baru hanya membuat satu jawaban kehilangan sedikit konteks; salah ke arah
+ * sebaliknya menyeret potongan dokumen lama ke pertanyaan yang tidak ada
+ * hubungannya, dan jawabannya berubah menjadi penolakan penuh.
  */
-function needsConversationTopic(question: string): boolean {
-  return question.trim().split(/\s+/).length <= 8;
+export function isFollowUpQuestion(question: string): boolean {
+  const text = question.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!text) return false;
+  if (DEFINITIONAL_OPENER.test(text)) return false;
+  if (FOLLOW_UP_OPENER.test(text)) return true;
+  if (REFERENCE_WORD.test(text)) return true;
+
+  const words = text.replace(/[?!.,]+$/g, '').split(' ');
+  return words.length <= 4 && words.every((word) => ELLIPSIS_WORD.test(word));
 }
 
 @Injectable()
@@ -79,8 +104,13 @@ export class ChatService {
     fromSuggestion?: boolean,
   ) {
     const conversation = await this.resolveConversation(question, actor, conversationId);
-    const contextChunkIds = await this.getContextChunkIds(conversation.id);
-    const conversationTopic = needsConversationTopic(question)
+    // Satu gerbang untuk kedua jalur konteks lama. Keduanya sendirian masih
+    // aman, tapi bersamaan mereka mematikan: label topik menarik pencarian ke
+    // dokumen lama, lalu potongan dokumen lama menghabiskan jatah top_k —
+    // pertanyaan bertopik baru pun dijawab "informasi tidak ditemukan".
+    const isFollowUp = isFollowUpQuestion(question);
+    const contextChunkIds = isFollowUp ? await this.getContextChunkIds(conversation.id) : [];
+    const conversationTopic = isFollowUp
       ? await this.getConversationTopic(conversation.id)
       : undefined;
     const access = await this.accessScope(actor);

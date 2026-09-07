@@ -248,6 +248,39 @@ class PgVectorStoreTests(unittest.TestCase):
         self.assertTrue(result["grounded"])
         self.assertEqual(result["citations"][0]["document_version_id"], "version-1")
 
+    def test_konteks_lama_tidak_menggusur_hasil_pencarian_baru(self):
+        """Regresi: pertanyaan bertopik baru dijawab "tidak ditemukan".
+
+        Jawaban sebelumnya bisa punya kutipan sebanyak top_k. Kalau konteks itu
+        digabung polos lalu dipotong di top_k, seluruh hasil pencarian untuk
+        pertanyaan baru terbuang sebelum sampai ke model.
+        """
+        def chunk(chunk_id, filename):
+            return {
+                "chunk_id": chunk_id, "document_id": "doc-" + filename,
+                "document_version_id": "version-" + filename, "filename": filename,
+                "version": 1, "page_number": 1, "section_title": "BAB I",
+                "text": f"isi {chunk_id}",
+            }
+
+        lama = [(1.0, chunk(f"lama-{i}", "perda_lama.txt")) for i in range(5)]
+        baru = [(0.8, chunk("baru-1", "perda_baru.txt"))]
+        with patch_deps():
+            db = PgVectorStore("postgresql://u:p@h/db")
+            with mock.patch("store.embed_texts", return_value=[[1.0, 0.0]]),                  mock.patch.object(PgVectorStore, "context_chunks", return_value=lama),                  mock.patch.object(PgVectorStore, "search", return_value=baru):
+                result = db.ask(
+                    "ekonomi kreatif", top_k=5,
+                    context_chunk_ids=[c["chunk_id"] for _, c in lama],
+                    scope=AccessScope.unrestricted(),
+                )
+        dikutip = {citation["filename"] for citation in result["citations"]}
+        self.assertIn("perda_baru.txt", dikutip, "hasil pencarian baru tergusur konteks lama")
+        self.assertLessEqual(
+            sum(1 for citation in result["citations"] if citation["filename"] == "perda_lama.txt"),
+            2,
+            "konteks lama tidak boleh mengambil lebih dari separuh jatah top_k",
+        )
+
     def test_delete_returns_false_when_missing(self):
         with patch_deps(cursor=FakeCursor(row=None)):
             db = PgVectorStore("postgresql://u:p@h/db")
