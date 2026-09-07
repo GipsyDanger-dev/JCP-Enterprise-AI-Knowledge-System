@@ -21,7 +21,7 @@ export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: 
   const isPersonal = user?.accountType === 'PERSONAL'
   const isPlatformOwner = user?.isPlatformOwner ?? false
   const profileName = isPlatformOwner && !isPersonal ? (workspaceName || 'Jogja Creative') : (user?.displayName ?? person.name)
-  const profileLabel = isPlatformOwner && !isPersonal ? (isId ? 'Pembuat aplikasi' : 'App builder') : (isPersonal ? (isId ? 'Ruang pribadi' : 'Personal workspace') : workspaceName)
+  const profileLabel = isPlatformOwner && !isPersonal ? 'Maintainer' : (isPersonal ? (isId ? 'Ruang pribadi' : 'Personal workspace') : workspaceName)
   const profileInitials = isPlatformOwner && !isPersonal ? 'JC' : person.initials
   return (
     <aside className={[menuOpen ? 'sidebar open' : 'sidebar', collapsed ? 'collapsed' : ''].filter(Boolean).join(' ')}>
