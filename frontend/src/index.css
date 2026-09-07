@@ -1491,7 +1491,7 @@ button { cursor: pointer; }
 }
 
 /* ============ Announcements ============ */
-.announcements-page { max-width: 1100px; }
+.announcements-page { max-width: 1100px; margin-inline: auto; }
 .announcement-composer { margin: 0 0 20px; border: 1px solid var(--border); border-radius: 8px; padding: 20px; background: var(--surface); }
 .announcement-composer-head { display: flex; align-items: center; gap: 9px; margin-bottom: 18px; color: var(--text-strong); }
 .announcement-composer-head svg, .announcement-icon { color: var(--accent); }
