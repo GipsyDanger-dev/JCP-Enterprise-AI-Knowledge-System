@@ -29,7 +29,7 @@ import os
 import re
 from hashlib import sha256
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 try:
@@ -40,7 +40,7 @@ except ImportError:  # pragma: no cover - optional dependency
         "fastapi/pydantic are not installed. Run: pip install -r requirements.txt"
     ) from None
 
-from config import DEFAULT_MODEL, EMBEDDING_MODEL
+from config import DEFAULT_MODEL, EMBEDDING_MODEL, EMBEDDINGS_ENABLED
 from generation.guardrails import QUICK_SUGGESTIONS, is_out_of_scope, out_of_scope_response
 from knowledge_base import KnowledgeBase
 from provider_errors import ProviderError
@@ -96,6 +96,7 @@ class AskRequest(BaseModel):
     conversation_topic: str | None = None
     top_k: int = 5
     filters: dict[str, str] | None = None
+    workspace_type: Literal["COMPANY", "PERSONAL"] = "COMPANY"
     use_llm: bool = False
     model: str | None = None
     retriever: str = "auto"  # auto | tfidf | vector (JSON store only; pg selalu vector)
@@ -151,6 +152,7 @@ def health() -> dict[str, Any]:
         "store": "pgvector" if default_dsn() else "json",
         "chat_model": DEFAULT_MODEL,
         "embedding_model": EMBEDDING_MODEL,
+        "embeddings_enabled": EMBEDDINGS_ENABLED,
     }
 
 
@@ -167,64 +169,46 @@ GENERAL_CHAT_PATTERNS = [
     r'^(oks?|ok|baik|baiklah|siap|ready|noted)[\s!.?]*$',
 ]
 
-def is_general_chat(query: str) -> bool:
+def is_general_chat(query: str, workspace_type: str = "COMPANY") -> bool:
     """Detect if query is general chat, not document-specific."""
     q = query.strip().lower()
     
     # Check off-topic first - these are NOT document queries
-    if is_out_of_scope(q):
+    if is_out_of_scope(q, workspace_type):
         return True
-    
-    # Document-related keywords that indicate a document query
-    doc_keywords = [
-        'hotel', 'biaya', 'tunjangan', 'sop', 'prosedur', 'kebijakan',
-        'dokumen', 'policy', 'cuti', 'izin', 'gaji',
-        'reimbursement', 'approval', 'persetujuan',
-        'berapa', 'mengapa', 'kapan', 'dimana', 'kenapa',
-        'manajer', 'manager', 'karyawan', 'staff', 'jabatan',
-    ]
-    
-    # Check if query contains document-related keywords
-    for kw in doc_keywords:
-        if kw in q:
-            return False
     
     # Check general chat patterns
     for pattern in GENERAL_CHAT_PATTERNS:
         if re.match(pattern, q, re.IGNORECASE):
             return True
     
-    # Short queries without question marks and without doc keywords
-    if len(q.split()) <= 3 and '?' not in q:
-        return True
-    
     return False
 
 
 SMART_RESPONSES = {
-    'halo': 'Halo! Selamat datang di Enterprise AI. Saya asisten Anda yang bisa membantu menjawab pertanyaan seputar dokumen perusahaan seperti SOP, kebijakan, dan prosedur. Silakan ketik pertanyaan Anda!',
-    'hai': 'Hai! Ada yang bisa saya bantu? Saya siap menjawab pertanyaan tentang dokumen perusahaan Anda.',
-    'hi': 'Hi! Welcome to Enterprise AI. I can help you find answers from company documents. Ask me anything!',
-    'apa kabar': 'Kabar baik! Saya Enterprise AI, siap membantu Anda menemukan informasi dari dokumen perusahaan. Ada yang ingin ditanyakan?',
-    'siapa': 'Saya Enterprise AI, asisten berbasis RAG (Retrieval-Augmented Generation) yang membantu Anda menjawab pertanyaan dari dokumen internal perusahaan. Saya bisa mencari informasi dari SOP, kebijakan, handbooks, dan dokumen lainnya.',
-    'terima kasih': 'Sama-sama! Senang bisa membantu. Jika ada pertanyaan lain tentang dokumen perusahaan, jangan ragu untuk bertanya.',
-    'thanks': 'You\'re welcome! If you have more questions about company documents, feel free to ask.',
-    'help': 'Tentu! Saya bisa membantu Anda dengan:\n- Mencari informasi dari dokumen perusahaan\n- Menjawab pertanyaan tentang SOP dan kebijakan\n- Memberikan ringkasan dari dokumen tertentu\n\nCukup ketik pertanyaan Anda!',
-    'bantuan': 'Tentu! Saya bisa membantu Anda mencari informasi dari dokumen perusahaan. Cukup ketik pertanyaan Anda, misalnya:\n- "Berapa biaya hotel untuk manager?"\n- "Apa prosedur cuti tahunan?"\n- "Ringkas SOP perjalanan dinas"',
-    'ok': 'Baik! Silakan ketik pertanyaan Anda tentang dokumen perusahaan.',
-    'siap': 'Siap! Saya menunggu pertanyaan Anda tentang dokumen perusahaan.',
+    'halo': 'Halo! Saya siap membantu mencari dan menjelaskan informasi dari dokumen yang dapat Anda akses.',
+    'hai': 'Hai! Silakan tanyakan apa pun yang berkaitan dengan file di workspace Anda.',
+    'hi': 'Hi! I can help answer questions using the documents available in your workspace.',
+    'apa kabar': 'Kabar baik! Saya siap membantu memahami dokumen di workspace Anda.',
+    'siapa': 'Saya adalah asisten berbasis dokumen. Jawaban saya disusun dari isi file yang tersedia di workspace Anda.',
+    'terima kasih': 'Sama-sama! Silakan tanyakan hal lain dari dokumen Anda.',
+    'thanks': 'You\'re welcome! Feel free to ask another question about your documents.',
+    'help': 'Saya dapat mencari informasi, menjelaskan bagian tertentu, membandingkan, dan merangkum dokumen di workspace Anda.',
+    'bantuan': 'Silakan tanyakan isi file, minta ringkasan, cari poin penting, atau bandingkan informasi antar dokumen.',
+    'ok': 'Baik! Silakan ajukan pertanyaan tentang dokumen Anda.',
+    'siap': 'Siap! Saya menunggu pertanyaan tentang dokumen Anda.',
 }
 
-DEFAULT_GENERAL_RESPONSE = 'Halo! Saya Enterprise AI. Saya bisa membantu menjawab pertanyaan tentang dokumen perusahaan seperti SOP, kebijakan, dan prosedur. Silakan ketik pertanyaan Anda!'
+DEFAULT_GENERAL_RESPONSE = 'Saya siap membantu menjawab berdasarkan dokumen yang tersedia di workspace Anda.'
 
 
-def general_chat_response(query: str, model: str) -> dict[str, Any]:
+def general_chat_response(query: str, model: str, workspace_type: str = "COMPANY") -> dict[str, Any]:
     """Smart keyword-based response for general chat with off-topic guardrails."""
     q = query.strip().lower()
     
     # Check for off-topic content first
-    if is_out_of_scope(q):
-        return out_of_scope_response()
+    if is_out_of_scope(q, workspace_type):
+        return out_of_scope_response(workspace_type)
     
     # Check for known patterns (greetings, small talk)
     for keyword, response in SMART_RESPONSES.items():
@@ -259,10 +243,12 @@ def ask(request: AskRequest) -> dict[str, Any]:
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="query must not be empty")
     # Guardrails evaluate the new user question before a local topic label is applied.
-    if is_out_of_scope(request.query):
-        return out_of_scope_response()
-    if is_general_chat(request.query) and not request.conversation_topic:
-        return general_chat_response(request.query, request.model or DEFAULT_MODEL)
+    if is_out_of_scope(request.query, request.workspace_type):
+        return out_of_scope_response(request.workspace_type)
+    if is_general_chat(request.query, request.workspace_type) and not request.conversation_topic:
+        return general_chat_response(
+            request.query, request.model or DEFAULT_MODEL, request.workspace_type,
+        )
 
     retrieval_query = contextualize_query(request.query, request.conversation_topic)
 
@@ -274,11 +260,13 @@ def ask(request: AskRequest) -> dict[str, Any]:
                 model=request.model or DEFAULT_MODEL, filters=request.filters,
                 context_chunk_ids=request.context_chunk_ids,
                 allow_clarify=request.allow_clarify,
+                workspace_type=request.workspace_type,
             )
         return store.ask(
             retrieval_query, top_k=request.top_k, use_llm=request.use_llm,
             model=request.model or DEFAULT_MODEL, retriever=request.retriever,
             filters=request.filters,
+            workspace_type=request.workspace_type,
         )
     except ProviderError as error:
         raise provider_http_error(error) from None

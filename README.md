@@ -20,7 +20,7 @@ percakapan.
 | Integrasi Backend–AI | Backend meneruskan file ke endpoint ingestion AI |
 
 Database PostgreSQL + pgvector berjalan lokal melalui Docker Compose. Runtime
-AI tetap memerlukan credential SumoPod yang tidak disediakan oleh repository.
+AI tetap memerlukan credential provider OpenAI-compatible yang tidak disediakan oleh repository.
 
 ## Tech stack
 
@@ -50,7 +50,7 @@ JCP-Enterprise-AI-Knowledge-System/
 ## Menjalankan lokal dengan Docker
 
 Prasyarat: Docker Desktop aktif serta `.env` sudah berisi secret aplikasi,
-credential PostgreSQL lokal, Google OAuth Client ID, dan API key SumoPod.
+credential PostgreSQL lokal, Google OAuth Client ID, dan API key provider AI.
 
 ```powershell
 Copy-Item .env.example .env
@@ -210,6 +210,11 @@ Endpoint percakapan membutuhkan JWT `ADMIN` atau `USER`. Setiap akun hanya dapat
 - `POST /conversations/:id/messages` — menyimpan pesan `USER` tanpa menjalankan AI.
 
 Judul percakapan yang kosong otomatis diambil dari 100 karakter pertama pesan pertama. Endpoint publik tidak menerima field role, sehingga client tidak dapat membuat pesan `ASSISTANT` atau `SYSTEM`. Penyimpanan jawaban AI dan citation akan dilakukan melalui kontrak internal pada tahap integrasi AI berikutnya.
+
+Untuk akun `PERSONAL`, Ask AI hanya mengambil chunk dari dokumen milik akun
+tersebut. Bidang tidak di-hardcode: prompt menentukan topik secara dinamis dari
+isi file hasil retrieval. Saat embedding dinonaktifkan, pencarian memakai TF-IDF
+lokal dan provider eksternal hanya menyusun jawaban dari konteks beserta citation.
 
 ## Audit logs
 

@@ -5,6 +5,7 @@ from unittest import mock
 from pathlib import Path
 
 from ai_engine import KnowledgeBase, chunk_pages, generate_answer
+from generation.prompts import build_messages
 
 
 class RetrievalContractTests(unittest.TestCase):
@@ -80,6 +81,21 @@ class LlmModeTests(unittest.TestCase):
         self.assertEqual(result["answer"], "Maksimal Rp900.000")
         self.assertEqual(result["citations"][0]["chunk_id"], "doc-1-1")
         self.assertEqual(result["citations"][0]["page_number"], 7)
+
+    def test_personal_prompt_derives_domain_from_documents(self):
+        messages = build_messages(
+            "Apa kategori nodul ini?",
+            [(0.8, {
+                "filename": "panduan_tirads.pdf",
+                "page_number": 4,
+                "section_title": "Klasifikasi",
+                "text": "Kategori TI-RADS ditentukan dari karakteristik ultrasonografi.",
+            })],
+            workspace_type="PERSONAL",
+        )
+        self.assertIn("personal milik pengguna", messages[1]["content"])
+        self.assertIn("Bidang dokumen dapat berupa apa saja", messages[0]["content"])
+        self.assertIn("TI-RADS", messages[1]["content"])
 
 
 if __name__ == "__main__":

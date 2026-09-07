@@ -80,7 +80,7 @@ def main() -> int:
     parser.add_argument("--golden", type=Path, default=SCRIPT_DIR / "golden_set.json")
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--retriever", choices=["auto", "tfidf", "vector"], default="tfidf")
-    parser.add_argument("--llm", action="store_true", help="Jalankan check answer memakai SumoPod LLM")
+    parser.add_argument("--llm", action="store_true", help="Jalankan check answer memakai provider LLM")
     parser.add_argument("--model", default=DEFAULT_MODEL)
     args = parser.parse_args()
 

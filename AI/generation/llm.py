@@ -1,4 +1,4 @@
-"""Grounded answer generation via SumoPod (OpenAI-compatible chat).
+"""Grounded answer generation via an OpenAI-compatible provider.
 
 The LLM only rewrites the retrieved chunks into a natural answer; it never
 produces the citations (see generation/citations.py).
@@ -64,8 +64,9 @@ def unwrap_clarify_envelope(content: str) -> str:
 def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
                     model: str = DEFAULT_MODEL, api_key: str | None = None,
                     documents: list[dict[str, Any]] | None = None,
-                    allow_clarify: bool = False) -> str:
-    """Ask a SumoPod LLM to answer using intact page/section contexts only."""
+                    allow_clarify: bool = False,
+                    workspace_type: str = "COMPANY") -> str:
+    """Ask the configured LLM to answer using intact page/section contexts only."""
     key = api_key or os.environ.get(AI_PROVIDER_API_KEY_ENV)
     if not key:
         raise ProviderConfigurationError(AI_PROVIDER_API_KEY_ENV)
@@ -73,7 +74,10 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
         raise ProviderConfigurationError("AI_PROVIDER_BASE_URL")
     body_fields: dict[str, Any] = {
         "model": model,
-        "messages": build_messages(query, matches, documents, allow_clarify),
+        "messages": build_messages(
+            query, matches, documents, allow_clarify,
+            workspace_type=workspace_type,
+        ),
         "temperature": 0.2,
     }
     if allow_clarify:

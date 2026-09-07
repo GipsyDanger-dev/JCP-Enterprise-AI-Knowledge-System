@@ -2,7 +2,7 @@
 
 Commands:
     ingest  <dir>     parse -> chunk -> (--embed embeddings) -> index
-    ask     <query>   retrieval -> answer + citation (--llm via SumoPod)
+    ask     <query>   retrieval -> answer + citation (--llm via configured provider)
     delete  <file>    remove a document and its chunks/embeddings
     docs              list indexed documents with their versions
 
@@ -35,15 +35,15 @@ def main() -> int:
     ingest_parser = subparsers.add_parser("ingest")
     ingest_parser.add_argument("input_dir", type=Path)
     ingest_parser.add_argument("--output", type=Path, default=DEFAULT_INDEX)
-    ingest_parser.add_argument("--embed", action="store_true", help="Generate and store embeddings via SumoPod")
+    ingest_parser.add_argument("--embed", action="store_true", help="Generate and store optional provider embeddings")
     ingest_parser.add_argument("--embed-model", default=None, help="Embedding model id (default: text-embedding-3-small)")
 
     ask_parser = subparsers.add_parser("ask")
     ask_parser.add_argument("query")
     ask_parser.add_argument("--index", type=Path, default=DEFAULT_INDEX)
     ask_parser.add_argument("--top-k", type=int, default=5)
-    ask_parser.add_argument("--llm", action="store_true", help="Answer with a SumoPod LLM grounded on retrieved chunks")
-    ask_parser.add_argument("--model", default=DEFAULT_MODEL, help="SumoPod chat model id (default: %(default)s)")
+    ask_parser.add_argument("--llm", action="store_true", help="Answer with the configured LLM grounded on retrieved chunks")
+    ask_parser.add_argument("--model", default=DEFAULT_MODEL, help="Provider chat model id (default: %(default)s)")
     ask_parser.add_argument("--retriever", choices=["auto", "tfidf", "vector"], default="auto",
                             help="Retrieval mode (default: auto -> vector if embeddings stored, else TF-IDF)")
     ask_parser.add_argument("--doc", default=None,

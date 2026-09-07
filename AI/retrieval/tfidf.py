@@ -29,12 +29,25 @@ class TfidfRetriever:
         self.chunks = chunks
         document_frequency = Counter()
         for chunk in chunks:
-            document_frequency.update(set(tokens(chunk["text"])))
+            document_frequency.update(set(tokens(self._searchable_text(chunk))))
         self.idf = {
             word: math.log((1 + len(chunks)) / (1 + frequency)) + 1
             for word, frequency in document_frequency.items()
         }
-        self.vectors = [self._vector(chunk["text"]) for chunk in chunks]
+        self.vectors = [self._vector(self._searchable_text(chunk)) for chunk in chunks]
+
+    @staticmethod
+    def _searchable_text(chunk: dict[str, Any]) -> str:
+        """Index content plus neutral metadata so filename queries also work."""
+        return " ".join(
+            str(value or "")
+            for value in (
+                "dokumen file",
+                chunk.get("filename"),
+                chunk.get("section_title"),
+                chunk.get("text"),
+            )
+        )
 
     def _vector(self, text: str) -> dict[str, float]:
         counts = Counter(tokens(text))

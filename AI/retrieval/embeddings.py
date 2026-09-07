@@ -1,4 +1,4 @@
-"""Embedding generation (SumoPod, OpenAI-compatible) and vector search.
+"""Optional OpenAI-compatible embedding generation and vector search.
 
 Embeddings are generated once at ingest time (``ingest --embed``) and
 stored in the knowledge base next to the chunks. Searching only needs the

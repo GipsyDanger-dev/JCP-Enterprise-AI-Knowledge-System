@@ -155,7 +155,7 @@ class PgVectorStoreTests(unittest.TestCase):
             "version": 1, "page_number": 1, "section_title": "SOP",
             "text": "Biaya hotel maksimal Rp900.000.",
         }
-        with patch_deps():
+        with patch_deps(), mock.patch("store.EMBEDDINGS_ENABLED", True):
             db = PgVectorStore("postgresql://u:p@h/db")
             with mock.patch("store.embed_texts", return_value=[[1.0, 0.0]]), \
                  mock.patch.object(PgVectorStore, "search", return_value=[(0.20, chunk)]):
@@ -171,13 +171,33 @@ class PgVectorStoreTests(unittest.TestCase):
             "version": 1, "page_number": 1, "section_title": "SOP",
             "text": "Biaya hotel maksimal Rp900.000.",
         }
-        with patch_deps():
+        with patch_deps(), mock.patch("store.EMBEDDINGS_ENABLED", True):
             db = PgVectorStore("postgresql://u:p@h/db")
             with mock.patch("store.embed_texts", return_value=[[1.0, 0.0]]), \
                  mock.patch.object(PgVectorStore, "search", return_value=[(0.71, chunk)]):
                 result = db.ask("biaya hotel")
         self.assertTrue(result["grounded"])
         self.assertEqual(result["citations"][0]["document_version_id"], "version-1")
+
+    def test_ask_without_embeddings_uses_tfidf_and_keeps_personal_scope(self):
+        expected = {"answer": "hasil", "grounded": True, "citations": []}
+        with patch_deps(), mock.patch("store.EMBEDDINGS_ENABLED", False):
+            db = PgVectorStore("postgresql://u:p@h/db")
+            with mock.patch("store.embed_texts") as embed, \
+                 mock.patch.object(db, "_tfidf_fallback", return_value=expected) as tfidf:
+                result = db.ask(
+                    "jelaskan hasil pemeriksaan",
+                    filters={"uploaded_by_id": "owner-1", "collection": "PERSONAL"},
+                    workspace_type="PERSONAL",
+                )
+        embed.assert_not_called()
+        tfidf.assert_called_once()
+        self.assertEqual(tfidf.call_args.kwargs["workspace_type"], "PERSONAL")
+        self.assertEqual(
+            tfidf.call_args.kwargs["filters"],
+            {"uploaded_by_id": "owner-1", "collection": "PERSONAL"},
+        )
+        self.assertEqual(result, expected)
 
     def test_delete_returns_false_when_missing(self):
         with patch_deps(cursor=FakeCursor(row=None)):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from config import AI_PROVIDER_API_KEY_ENV
+from config import AI_PROVIDER_API_KEY_ENV, EMBEDDINGS_ENABLED
 from retrieval.tfidf import TfidfRetriever
 from retrieval.embeddings import VectorRetriever
 
@@ -28,6 +28,6 @@ def build_retriever(knowledge_base: Any, mode: str = "auto", api_key: str | None
     if mode == "tfidf":
         return TfidfRetriever(knowledge_base.chunks)
     # auto
-    if knowledge_base.embeddings and _has_api_key(api_key):
+    if EMBEDDINGS_ENABLED and knowledge_base.embeddings and _has_api_key(api_key):
         return VectorRetriever(knowledge_base.chunks, knowledge_base.embeddings, api_key=api_key)
     return TfidfRetriever(knowledge_base.chunks)
