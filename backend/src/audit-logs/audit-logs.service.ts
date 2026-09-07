@@ -10,6 +10,7 @@ export interface RecordAuditLogInput {
   targetType: string;
   targetId?: string;
   metadata?: Prisma.InputJsonValue;
+  workspaceId?: string;
 }
 
 @Injectable()
@@ -21,6 +22,7 @@ export class AuditLogsService {
       data: {
         actorType: input.actorType,
         actorUserId: input.actorUserId,
+        workspaceId: input.workspaceId,
         action: input.action,
         targetType: input.targetType,
         targetId: input.targetId,
@@ -30,8 +32,9 @@ export class AuditLogsService {
     });
   }
 
-  async findAll(query: ListAuditLogsDto) {
+  async findAll(query: ListAuditLogsDto, workspaceId: string) {
     const where: Prisma.AuditLogWhereInput = {
+      OR: [{ workspaceId }, { actorUser: { workspaceId } }],
       ...(query.action ? { action: query.action } : {}),
       ...(query.actorUserId ? { actorUserId: query.actorUserId } : {}),
       ...(query.targetType ? { targetType: query.targetType } : {}),

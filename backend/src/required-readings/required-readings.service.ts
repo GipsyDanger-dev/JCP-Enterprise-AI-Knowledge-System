@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DocumentStatus, NotificationType } from '@prisma/client';
+import { AccountType, DocumentStatus, NotificationType } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import type { AuthenticatedUser } from '../auth/auth.types';
 
 const DEFAULT_DUE_DAYS = 7;
 
@@ -19,14 +20,15 @@ function resolveDueAt(value?: string): Date {
 export class RequiredReadingsService {
   constructor(private readonly prisma: PrismaService, private readonly notifications: NotificationsService) {}
 
-  async assign(documentId: string, userIds: string[], dueAtInput?: string) {
+  async assign(documentId: string, userIds: string[], actor: AuthenticatedUser, dueAtInput?: string) {
+    if (!Array.isArray(userIds) || userIds.some((id) => typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id))) throw new BadRequestException('Invalid employee IDs');
     const uniqueUserIds = [...new Set(userIds)];
     if (uniqueUserIds.length === 0) throw new BadRequestException('Select at least one active employee');
     const dueAt = resolveDueAt(dueAtInput);
-    const doc = await this.prisma.document.findFirst({ where: { id: documentId, deletedAt: null, status: DocumentStatus.READY }, select: { id: true, title: true } });
+    const doc = await this.prisma.document.findFirst({ where: { id: documentId, workspaceId: actor.workspaceId, deletedAt: null, status: DocumentStatus.READY }, select: { id: true, title: true, unitKerjaId: true } });
     if (!doc) throw new NotFoundException('Ready document not found');
-    const users = await this.prisma.user.findMany({ where: { id: { in: uniqueUserIds }, isAdmin: false, isActive: true }, select: { id: true, displayName: true, employeeNumber: true } });
-    if (users.length === 0) throw new BadRequestException('No active employees were selected');
+    const users = await this.prisma.user.findMany({ where: { id: { in: uniqueUserIds }, workspaceId: actor.workspaceId, accountType: AccountType.COMPANY, isAdmin: false, isActive: true, ...(doc.unitKerjaId ? { unitKerjaId: doc.unitKerjaId } : {}) }, select: { id: true, displayName: true, employeeNumber: true } });
+    if (users.length !== uniqueUserIds.length) throw new BadRequestException('Selected employees must belong to this workspace and have document access');
 
     const existing = await this.prisma.requiredReading.findMany({ where: { documentId, userId: { in: users.map((user) => user.id) } }, select: { userId: true } });
     const existingIds = new Set(existing.map((item) => item.userId));
@@ -55,19 +57,19 @@ export class RequiredReadingsService {
   }
 
   async complete(id: string, userId: string) {
-    const item = await this.prisma.requiredReading.findFirst({ where: { id, userId }, select: { id: true, progress: true, completedAt: true, document: { select: { id: true, title: true } }, user: { select: { displayName: true } } } });
+    const item = await this.prisma.requiredReading.findFirst({ where: { id, userId }, select: { id: true, progress: true, completedAt: true, document: { select: { id: true, title: true, workspaceId: true } }, user: { select: { displayName: true } } } });
     if (!item) throw new NotFoundException('Required reading not found');
     if (item.completedAt) return { id: item.id, progress: 100, completedAt: item.completedAt };
     if (item.progress < 95) throw new BadRequestException('Document has not been read to the end');
     const completed = await this.prisma.requiredReading.update({ where: { id }, data: { progress: 100, completedAt: new Date(), lastProgressAt: new Date() }, select: { id: true, progress: true, completedAt: true } });
-    const admins = await this.prisma.user.findMany({ where: { isAdmin: true, isActive: true }, select: { id: true } });
+    const admins = await this.prisma.user.findMany({ where: { workspaceId: item.document.workspaceId, accountType: AccountType.COMPANY, isAdmin: true, isActive: true }, select: { id: true } });
     await this.notifications.createMany(admins.map((admin) => ({ userId: admin.id, type: NotificationType.REQUIRED_READING_COMPLETED, title: 'Wajib baca diselesaikan', body: `${item.user.displayName} telah membaca ${item.document.title}.`, href: '/' })));
     return completed;
   }
 
-  async report() {
+  async report(actor: AuthenticatedUser) {
     const now = new Date();
-    const items = await this.prisma.requiredReading.findMany({ select: { userId: true, progress: true, dueAt: true, completedAt: true, user: { select: { displayName: true, employeeNumber: true, division: true, jobTitle: true } }, document: { select: { id: true, title: true } } } });
+    const items = await this.prisma.requiredReading.findMany({ where: { document: { workspaceId: actor.workspaceId }, user: { workspaceId: actor.workspaceId } }, select: { userId: true, progress: true, dueAt: true, completedAt: true, user: { select: { displayName: true, employeeNumber: true, division: true, jobTitle: true } }, document: { select: { id: true, title: true } } } });
     const map = new Map<string, { documentId: string; title: string; total: number; completed: number; overdue: number; readers: Array<Record<string, unknown>> }>();
     for (const item of items) {
       const row = map.get(item.document.id) ?? { documentId: item.document.id, title: item.document.title, total: 0, completed: 0, overdue: 0, readers: [] };

@@ -14,7 +14,7 @@
 function resolveApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim()
   if (configured) return configured.replace(/\/+$/, '')
-  return `http://${window.location.hostname}:8000`
+  return '/api'
 }
 
 export const API_BASE_URL = resolveApiBaseUrl()

@@ -18,3 +18,10 @@ export function RequireRole({ role, children }: { role: 'admin' | 'user'; childr
   if (role === 'admin' && !user.isAdmin) return <Navigate to="/" replace />
   return <>{children}</>
 }
+
+export function RequireCompanyAccount({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/" replace />
+  if (user.accountType === 'PERSONAL') return <Navigate to="/" replace />
+  return <>{children}</>
+}

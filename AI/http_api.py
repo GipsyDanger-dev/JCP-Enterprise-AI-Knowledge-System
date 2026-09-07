@@ -247,6 +247,8 @@ def ask(request: AskRequest) -> dict[str, Any]:
                 context_chunk_ids=request.context_chunk_ids,
                 allow_clarify=request.allow_clarify, scope=scope,
             )
+        if request.access is not None:
+            raise HTTPException(status_code=503, detail="Workspace retrieval requires PostgreSQL storage")
         return store.ask(
             retrieval_query, top_k=request.top_k, use_llm=request.use_llm,
             model=request.model or DEFAULT_MODEL, retriever=request.retriever,

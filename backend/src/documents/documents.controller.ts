@@ -40,6 +40,7 @@ import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
 import { UpdateDocumentAccessDto } from './dto/update-document-access.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
 
 @ApiTags('documents')
 @ApiBearerAuth()
@@ -94,12 +95,11 @@ export class DocumentsController {
   }
 
   @Post('categories')
-  @AdminOnly()
   @ApiOperation({ summary: 'Create a document category' })
   @ApiCreatedResponse({ description: 'Document category created' })
   @ApiForbiddenResponse({ description: 'Only ADMIN can create document categories' })
-  createCategory(@Body() input: CreateDocumentCategoryDto) {
-    return this.documentsService.createCategory(input);
+  createCategory(@Body() input: CreateDocumentCategoryDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.documentsService.createCategory(input, actor);
   }
 
   // Tanpa @AdminOnly, sama seperti unggah: ADMIN_UNIT boleh mengatur dokumen
@@ -171,5 +171,10 @@ export class DocumentsController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.documentsService.remove(id, actor);
+  }
+
+  @Patch(':id')
+  update(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() input: UpdateDocumentDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.documentsService.update(id, input, actor);
   }
 }

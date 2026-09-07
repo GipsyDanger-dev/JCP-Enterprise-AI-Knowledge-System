@@ -13,8 +13,8 @@ export class RequiredReadingsController {
 
   @Post('documents/:documentId/assign')
   @AdminOnly()
-  assign(@Param('documentId', new ParseUUIDPipe({ version: '4' })) id: string, @Body() body: { userIds?: string[]; dueAt?: string }) {
-    return this.service.assign(id, body.userIds ?? [], body.dueAt);
+  assign(@Param('documentId', new ParseUUIDPipe({ version: '4' })) id: string, @Body() body: { userIds?: string[]; dueAt?: string }, @CurrentUser() actor: AuthenticatedUser) {
+    return this.service.assign(id, body.userIds ?? [], actor, body.dueAt);
   }
 
   @Get('mine')
@@ -32,5 +32,5 @@ export class RequiredReadingsController {
 
   @Get('report')
   @AdminOnly()
-  report() { return this.service.report(); }
+  report(@CurrentUser() actor: AuthenticatedUser) { return this.service.report(actor); }
 }

@@ -34,15 +34,15 @@ export class UsersController {
   @Get('reference-data')
   @ApiOperation({ summary: 'Daftar unit kerja dan jabatan untuk dropdown form pengguna' })
   @ApiOkResponse({ description: 'Unit kerja aktif dan nomenklatur jabatan' })
-  referenceData() {
-    return this.usersService.referenceData();
+  referenceData(@CurrentUser() actor: AuthenticatedUser) {
+    return this.usersService.referenceData(actor);
   }
 
   @Get()
   @ApiOperation({ summary: 'List users without password hashes' })
   @ApiOkResponse({ description: 'All users ordered by creation time' })
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@CurrentUser() actor: AuthenticatedUser) {
+    return this.usersService.findAll(actor);
   }
 
   @Post()

@@ -18,6 +18,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 try:
     import psycopg
@@ -63,6 +64,9 @@ class AccessScope:
     """
 
     is_admin: bool = False
+    workspace_id: str | None = None
+    uploaded_by_id: str | None = None
+    ai_profile: str = "general"
     allowed_category_ids: tuple[str, ...] = ()
     #: Unit kerja penanya. None berarti belum ditempatkan di unit mana pun,
     #: sehingga dokumen bertanda unit tidak satu pun boleh dibacanya.
@@ -78,11 +82,19 @@ class AccessScope:
         """None berarti permintaan tidak membawa batas akses — penelepon wajib menolaknya."""
         if not isinstance(payload, dict):
             return None
+        try:
+            workspace_id = str(UUID(payload.get("workspace_id", "")))
+            uploaded_by_id = str(UUID(payload["uploaded_by_id"])) if payload.get("uploaded_by_id") else None
+        except (ValueError, TypeError, AttributeError):
+            return None
         ids = payload.get("allowed_category_ids") or []
         if not isinstance(ids, list):
             return None
         unit = payload.get("unit_kerja_id")
         return cls(
+            workspace_id=workspace_id,
+            uploaded_by_id=uploaded_by_id,
+            ai_profile="sleman" if payload.get("ai_profile") == "sleman" else "general",
             is_admin=bool(payload.get("is_admin")),
             allowed_category_ids=tuple(str(i) for i in ids),
             unit_kerja_id=str(unit) if unit else None,
@@ -90,9 +102,14 @@ class AccessScope:
 
     def conditions(self, alias: str = "d") -> tuple[list[str], list[Any]]:
         """Potongan WHERE plus parameternya, untuk ditempel ke setiap query."""
+        boundary = [f"{alias}.workspace_id = %s::uuid"] if self.workspace_id else []
+        boundary_params: list[Any] = [self.workspace_id] if self.workspace_id else []
+        if self.uploaded_by_id:
+            return boundary + [f"{alias}.uploaded_by_id = %s::uuid", f"{alias}.deleted_at IS NULL", f"{alias}.status = 'READY'"], boundary_params + [self.uploaded_by_id]
         if self.is_admin:
-            return [f"{alias}.deleted_at IS NULL"], []
+            return boundary + [f"{alias}.deleted_at IS NULL"], boundary_params
         conditions = [
+            *boundary,
             f"{alias}.deleted_at IS NULL",
             f"{alias}.status = 'READY'",
             # Rancangan tidak pernah dijawab: angkanya belum final, dan
@@ -100,7 +117,7 @@ class AccessScope:
             f"{alias}.legal_status <> 'RANCANGAN'",
             f"({alias}.category_id IS NULL OR {alias}.category_id = ANY(%s::uuid[]))",
         ]
-        params: list[Any] = [list(self.allowed_category_ids)]
+        params: list[Any] = [*boundary_params, list(self.allowed_category_ids)]
         # Penanda unit kerja per dokumen, cerminan klausa yang sama di
         # ``documentVisibilityWhere``. Dokumen tanpa penanda terbuka untuk
         # semua; yang bertanda hanya untuk unit itu. Tanpa klausa ini, mengunci
@@ -404,6 +421,7 @@ class PgVectorStore:
                 # teks dokumen, jadi ikut dikirim sebagai konteks.
                 documents=self.document_metadata(scope=scope),
                 allow_clarify=allow_clarify,
+                ai_profile=scope.ai_profile,
             )
             if use_llm
             else matches[0][1]["text"]

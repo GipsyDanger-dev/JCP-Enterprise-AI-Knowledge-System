@@ -25,6 +25,10 @@ export interface ApiUserReferenceData {
 }
 
 export interface ApiUser {
+  email?: string | null
+  accountType: ApiAccountType
+  workspaceId: string
+  isPlatformOwner?: boolean
   id: string
   displayName: string
   username: string
@@ -44,6 +48,15 @@ export interface LoginRequest {
   password: string
 }
 
+export type ApiAccountType = 'COMPANY' | 'PERSONAL'
+export interface GoogleLoginRequest { credential: string }
+export interface PersonalRegisterRequest {
+  displayName: string
+  email: string
+  password: string
+  confirmPassword: string
+}
+
 export interface LoginResponse {
   accessToken: string
   tokenType: 'Bearer'
@@ -52,6 +65,9 @@ export interface LoginResponse {
 
 /** Response aktual GET /auth/me adalah payload JWT secara langsung. */
 export interface MeResponse {
+  accountType: ApiAccountType
+  workspaceId: string
+  isPlatformOwner?: boolean
   sub: string
   username: string
   displayName?: string

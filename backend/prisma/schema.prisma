@@ -48,6 +48,28 @@ enum UserRole {
 }
 
 // Jenis produk hukum — mengikuti kategori resmi JDIH Sleman satu lawan satu.
+enum AccountType {
+  COMPANY
+  PERSONAL
+}
+
+model Workspace {
+  id        String      @id @default(uuid()) @db.Uuid
+  name      String
+  type      AccountType @default(COMPANY)
+  aiProfile String      @default("general") @map("ai_profile")
+  isActive  Boolean     @default(true) @map("is_active")
+  createdAt DateTime    @default(now()) @map("created_at")
+  users     User[]
+  documents Document[]
+  categories DocumentCategory[]
+  units     UnitKerja[]
+  announcements Announcement[]
+  auditLogs AuditLog[]
+
+  @@map("workspaces")
+}
+
 enum DocumentType {
   PERATURAN_DAERAH
   PERATURAN_BUPATI
@@ -115,19 +137,24 @@ enum NotificationType {
 }
 
 model User {
+  workspaceId         String               @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
+  workspace           Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  accountType         AccountType          @default(COMPANY) @map("account_type")
+  googleSubject       String?              @unique @map("google_subject")
+  isPlatformOwner     Boolean              @default(false) @map("is_platform_owner")
   id                  String               @id @default(uuid()) @db.Uuid
   email               String?              @unique
   username            String?              @unique
-  employeeNumber      String               @unique @map("employee_number")
+  employeeNumber      String?              @map("employee_number")
   // Teks bebas warisan; dipertahankan supaya data lama tidak hilang.
   // Sumber kebenaran untuk hak akses adalah unitKerjaId.
-  division            String
-  jobTitle            String               @map("job_title")
+  division            String?
+  jobTitle            String?              @map("job_title")
   unitKerjaId         String?              @map("unit_kerja_id") @db.Uuid
   unitKerja           UnitKerja?           @relation(fields: [unitKerjaId], references: [id], onDelete: SetNull)
-  passwordHash        String               @map("password_hash")
+  passwordHash        String?              @map("password_hash")
   displayName         String               @map("display_name")
-  role                UserRole             @default(SUPER_ADMIN)
+  role                UserRole             @default(USER)
   isAdmin             Boolean              @default(false) @map("is_admin")
   isActive            Boolean              @default(true) @map("is_active")
   photoUrl            String?              @map("photo_url")
@@ -144,10 +171,13 @@ model User {
   announcements       Announcement[]
   announcementReads   AnnouncementRead[]
 
+  @@unique([workspaceId, employeeNumber])
   @@map("users")
 }
 
 model Document {
+  workspaceId      String            @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   division         String?
   id               String            @id @default(uuid()) @db.Uuid
   title            String
@@ -193,9 +223,11 @@ model Document {
 /// mengubah tipe enum PostgreSQL. Isi awalnya versi sementara sampai daftar
 /// resmi dari Perbup SOTK didapat; menggantinya cukup lewat seed.
 model UnitKerja {
+  workspaceId String @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id         String             @id @default(uuid()) @db.Uuid
   name       String
-  code       String             @unique
+  code       String
   isActive   Boolean            @default(true) @map("is_active")
   createdAt  DateTime           @default(now()) @map("created_at")
   users      User[]
@@ -203,13 +235,16 @@ model UnitKerja {
   categories DocumentCategory[] @relation("CategoryAccess")
 
   @@index([name])
+  @@unique([workspaceId, code])
   @@map("unit_kerja")
 }
 
 model DocumentCategory {
+  workspaceId String @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id        String      @id @default(uuid()) @db.Uuid
   name      String
-  key       String      @unique
+  key       String
   // Daftar kosong berarti terbuka untuk semua pegawai yang sudah login.
   // Hak akses sengaja ditempel di kategori: menandai ratusan dokumen satu per
   // satu terlalu rawan salah, sedangkan kategori cukup ditandai sekali.
@@ -218,6 +253,7 @@ model DocumentCategory {
   createdAt DateTime    @default(now()) @map("created_at")
 
   @@index([name])
+  @@unique([workspaceId, key])
   @@map("document_categories")
 }
 
@@ -255,6 +291,8 @@ model AppNotification {
 }
 
 model Announcement {
+  workspaceId String @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id          String   @id @default(uuid()) @db.Uuid
   title       String   @db.VarChar(180)
   body        String   @db.Text
@@ -404,6 +442,8 @@ model AuditLog {
   actorType   AuditActorType @map("actor_type")
   actorUserId String?        @map("actor_user_id") @db.Uuid
   actorUser   User?          @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  workspaceId String?        @map("workspace_id") @db.Uuid
+  workspace   Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   action      AuditAction
   targetType  String         @map("target_type")
   targetId    String?        @map("target_id") @db.Uuid
@@ -413,6 +453,7 @@ model AuditLog {
   @@index([createdAt])
   @@index([action, createdAt])
   @@index([actorUserId, createdAt])
+  @@index([workspaceId, createdAt])
   @@index([targetType, targetId])
   @@map("audit_logs")
 }

@@ -27,7 +27,7 @@ Panduan lengkap untuk menjalankan dan mendeplai seluruh service.
        │ SQL                          │ HTTP
 ┌──────▼──────────────┐    ┌──────────▼───────────────────┐
 │    PostgreSQL       │    │       AI ENGINE (FastAPI)     │
-│   (Neon Cloud)      │    │   internal http://ai-api:8000 │
+│   (Docker lokal)    │    │   internal http://ai-api:8000 │
 │  + pgvector         │    │  ┌──────────┬──────────┐     │
 └─────────────────────┘    │  │ Ingest   │ RAG Ask  │     │
                            │  └──────────┴──────────┘     │
@@ -48,7 +48,7 @@ Panduan lengkap untuk menjalankan dan mendeplai seluruh service.
 | **Frontend** | React + Vite + TypeScript | 5173 | Single Page Application |
 | **Backend** | NestJS + Prisma | 8000 | REST API + Auth + CRUD |
 | **AI Engine** | Python + FastAPI | 8000 (internal only, no host port) | RAG pipeline + LLM |
-| **Database** | PostgreSQL + pgvector | 5432 | Neon Cloud (managed) |
+| **Database** | PostgreSQL + pgvector | 5432 | Container Docker dengan volume persisten |
 
 ---
 
@@ -59,6 +59,7 @@ Panduan lengkap untuk menjalankan dan mendeplai seluruh service.
 - Node.js 18+ (recommended: 22)
 - Python 3.11+
 - Git
+- Docker Desktop / Docker Engine (untuk PostgreSQL lokal)
 
 ### 1. Clone & Install
 
@@ -92,18 +93,13 @@ cd AI && pip install -r requirements.txt && cd ..
 ### 4. Setup Database
 
 ```bash
-cd backend
+# Jalankan PostgreSQL + pgvector lokal
+docker compose up -d postgres
 
-# Generate Prisma client
-npx prisma generate
-
-# Run migrations
-npx prisma migrate deploy
-
-# Seed initial users
-npm run prisma:seed
-
-cd ..
+# Bila seluruh stack dijalankan melalui Docker, Backend menjalankan migration
+# otomatis. Seed akun awal dilakukan satu kali setelah Backend aktif.
+docker compose up -d backend
+docker compose exec backend npm run prisma:seed
 ```
 
 ### 5. Start Services
@@ -202,7 +198,10 @@ docker compose down
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db` |
+| `POSTGRES_USER` | User PostgreSQL lokal | `jcp` |
+| `POSTGRES_PASSWORD` | Password PostgreSQL lokal | `strong-local-password` |
+| `POSTGRES_DB` | Nama database lokal | `jcp_enterprise_ai` |
+| `DATABASE_URL` | Koneksi native dari host ke PostgreSQL Docker | `postgresql://jcp:pass@127.0.0.1:5432/jcp_enterprise_ai?schema=public` |
 | `JWT_SECRET` | Secret key for JWT signing | `your-random-secret-min-32-chars` |
 | `WORKER_TOKEN` | Shared secret backend ↔ AI service (`X-Worker-Token` header) | `long-random-string` |
 | `SUMOPOD_API_KEY` | SumoPod API key for LLM/embeddings | `sk-xxxxxxxxxxxx` |
@@ -213,6 +212,7 @@ docker compose down
 |----------|---------|-------------|
 | `BACKEND_PORT` | `8000` | Backend listen port (dibaca `main.ts`; Docker memetakan port host yang sama) |
 | `FRONTEND_PORT` | `5173` | Vite dev server port (dibaca `vite.config.ts`) |
+| `POSTGRES_PORT` | `5432` | Port PostgreSQL yang hanya dipublikasikan ke loopback host |
 | `JWT_EXPIRES_IN` | `24h` | JWT token expiration |
 | `SUMOPOD_BASE_URL` | `https://ai.sumopod.com/v1` | Endpoint provider LLM/embedding |
 | `AI_CHAT_MODEL` | `deepseek-v4-pro` | Model chat default AI service |
@@ -474,7 +474,7 @@ Access via API: `GET /audit-logs` (Admin only)
 | `503 WORKER_TOKEN is not configured` | Set `WORKER_TOKEN` on the AI service |
 | `401 Valid worker token required` | Backend `WORKER_TOKEN` differs from the AI service value |
 | `Document stuck at QUEUED` | Check AI engine is running |
-| `Cannot connect to database` | Verify DATABASE_URL in .env |
+| `Cannot connect to database` | Pastikan Docker Desktop aktif dan container `postgres` healthy |
 | `CORS error` | Ensure frontend URL is allowed |
 
 ### Reset Database

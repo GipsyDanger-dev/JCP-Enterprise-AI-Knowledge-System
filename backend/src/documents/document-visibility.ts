@@ -20,9 +20,11 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  *    default yang wajar. Dokumen yang belum berkategori ikut aturan yang sama.
  */
 export function documentVisibilityWhere(actor: AuthenticatedUser): Prisma.DocumentWhereInput {
-  if (actor.isAdmin) return { deletedAt: null };
+  if (actor.accountType === 'PERSONAL') return { workspaceId: actor.workspaceId, uploadedById: actor.sub, deletedAt: null };
+  if (actor.isAdmin) return { workspaceId: actor.workspaceId, deletedAt: null };
 
   return {
+    workspaceId: actor.workspaceId,
     deletedAt: null,
     status: DocumentStatus.READY,
     legalStatus: { not: LegalStatus.RANCANGAN },
@@ -56,8 +58,9 @@ export function documentVisibilityWhere(actor: AuthenticatedUser): Prisma.Docume
  * Mengembalikan `null` bila aktor boleh membaca semuanya (admin).
  */
 export function allowedCategoryFilter(actor: AuthenticatedUser): Prisma.DocumentCategoryWhereInput | null {
-  if (actor.isAdmin) return null;
+  if (actor.isAdmin || actor.accountType === 'PERSONAL') return { workspaceId: actor.workspaceId };
   return {
+    workspaceId: actor.workspaceId,
     OR: [
       { units: { none: {} } },
       ...(actor.unitKerjaId ? [{ units: { some: { id: actor.unitKerjaId } } }] : []),
@@ -72,6 +75,7 @@ export function allowedCategoryFilter(actor: AuthenticatedUser): Prisma.Document
  * tidak bisa mengelola apa pun, bukan malah bisa mengelola semuanya.
  */
 export function canManageForUnit(actor: AuthenticatedUser, unitKerjaId: string | null | undefined): boolean {
+  if (actor.accountType === 'PERSONAL') return !unitKerjaId;
   if (actor.isAdmin) return true;
   if (actor.role !== UserRole.ADMIN_UNIT) return false;
   if (!actor.unitKerjaId) return false;
@@ -82,5 +86,5 @@ export function canManageForUnit(actor: AuthenticatedUser, unitKerjaId: string |
 
 /** Aktor yang boleh mengunggah dokumen sama sekali. */
 export function canUploadDocuments(actor: AuthenticatedUser): boolean {
-  return actor.isAdmin || (actor.role === UserRole.ADMIN_UNIT && Boolean(actor.unitKerjaId));
+  return actor.accountType === 'PERSONAL' || actor.isAdmin || (actor.role === UserRole.ADMIN_UNIT && Boolean(actor.unitKerjaId));
 }

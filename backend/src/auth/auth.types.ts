@@ -1,6 +1,9 @@
-import { UserRole } from '@prisma/client';
+import { AccountType, UserRole } from '@prisma/client';
 
 export interface JwtPayload {
+  workspaceId: string;
+  accountType: AccountType;
+  isPlatformOwner?: boolean;
   sub: string;
   username: string;
   role: UserRole;
@@ -12,7 +15,7 @@ export interface JwtPayload {
 }
 
 export interface AuthenticatedUser extends JwtPayload {
-  division?: string;
+  division?: string | null;
   /**
    * Nomenklatur jabatan pemiliknya. Sengaja tidak ikut ditandatangani di token:
    * diisi ulang dari database oleh JwtAuthGuard, sama seperti unitKerjaId,

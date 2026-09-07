@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { DashboardLayout } from '@/components/DashboardLayout'
-import { RequireAuth, RequireRole } from '@/components/RequireAuth'
+import { RequireAuth, RequireCompanyAccount, RequireRole } from '@/components/RequireAuth'
 import { AuthProvider } from '@/context/AuthProvider'
 import { WorkspaceProvider } from '@/context/WorkspaceProvider'
 import { ActivityPage } from '@/pages/ActivityPage'
@@ -16,6 +16,7 @@ import { OverviewPage } from '@/pages/OverviewPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { UsersPage } from '@/pages/UsersPage'
 import { AnnouncementsPage } from '@/pages/AnnouncementsPage'
+import { WorkspacesPage } from '@/pages/WorkspacesPage'
 
 function ThemeInitializer() {
   useEffect(() => {
@@ -40,11 +41,12 @@ export default function App() {
             <Route element={<RequireAuth><DashboardLayout /></RequireAuth>}>
               <Route index element={<OverviewPage />} />
               <Route path="documents" element={<DocumentsPage />} />
+              <Route path="workspaces" element={<WorkspacesPage />} />
               <Route path="chat" element={<ChatPage />} />
-              <Route path="announcements" element={<AnnouncementsPage />} />
+              <Route path="announcements" element={<RequireCompanyAccount><AnnouncementsPage /></RequireCompanyAccount>} />
               <Route path="users" element={<RequireRole role="admin"><UsersPage /></RequireRole>} />
               <Route path="inbox" element={<RequireRole role="admin"><AdminInboxPage /></RequireRole>} />
-              <Route path="messages" element={<MessagingPage />} />
+              <Route path="messages" element={<RequireCompanyAccount><MessagingPage /></RequireCompanyAccount>} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="help" element={<HelpPage />} />
               <Route path="activity" element={<RequireRole role="admin"><ActivityPage /></RequireRole>} />

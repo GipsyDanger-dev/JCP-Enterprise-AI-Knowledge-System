@@ -13,13 +13,12 @@ export interface MessagingStreamEvent {
 @Injectable()
 export class MessagingEventsService {
   private readonly employeeSubjects = new Map<string, Subject<MessagingStreamEvent>>();
-  private readonly adminSubject = new Subject<MessagingStreamEvent>();
 
   private readonly subscriptionCounts = new Map<string, number>();
 
   /** Stream events for an employee (their own conversation) or the shared admin channel. */
-  stream(userId: string, isAdmin: boolean): Observable<MessagingStreamEvent> {
-    if (isAdmin) return this.adminSubject.asObservable();
+  stream(userId: string, isAdmin: boolean, workspaceId: string): Observable<MessagingStreamEvent> {
+    if (isAdmin) userId = `admin:${workspaceId}`;
     const subject = this.subjectFor(userId);
     return new Observable<MessagingStreamEvent>((subscriber) => {
       this.subscriptionCounts.set(userId, (this.subscriptionCounts.get(userId) ?? 0) + 1);
@@ -41,14 +40,14 @@ export class MessagingEventsService {
     this.employeeSubjects.get(userId)?.next(event);
   }
 
-  emitToAdmins(event: MessagingStreamEvent) {
-    this.adminSubject.next(event);
+  emitToAdmins(event: MessagingStreamEvent, workspaceId: string) {
+    this.employeeSubjects.get(`admin:${workspaceId}`)?.next(event);
   }
 
   /** Deliver an event to both sides of a conversation (employee + all admins). */
-  emitToConversation(employeeId: string, event: MessagingStreamEvent) {
+  emitToConversation(employeeId: string, event: MessagingStreamEvent, workspaceId: string) {
     this.emitToEmployee(employeeId, event);
-    this.emitToAdmins(event);
+    this.emitToAdmins(event, workspaceId);
   }
 
   private subjectFor(userId: string): Subject<MessagingStreamEvent> {

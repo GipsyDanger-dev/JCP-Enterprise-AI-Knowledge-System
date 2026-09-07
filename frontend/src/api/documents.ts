@@ -51,12 +51,28 @@ export function listDocumentCategories(token?: string): Promise<ApiDocumentCateg
   return request<ApiDocumentCategory[]>('/documents/categories', { headers: authHeaders(token) })
 }
 
+export function createDocumentCategory(name: string, token?: string): Promise<ApiDocumentCategory> {
+  return request<ApiDocumentCategory>('/documents/categories', { method: 'POST', body: { name }, headers: authHeaders(token) })
+}
+
 export function getDocumentStatus(id: string, token?: string): Promise<DocumentStatusResponse> {
   return request<DocumentStatusResponse>(`/documents/${id}/status`, { headers: authHeaders(token) })
 }
 
 export function deleteDocument(id: string, token?: string): Promise<DeleteDocumentResponse> {
   return request<DeleteDocumentResponse>(`/documents/${id}`, { method: 'DELETE', headers: authHeaders(token) })
+}
+
+export function updateDocument(
+  id: string,
+  input: { title?: string; collection?: string },
+  token?: string,
+): Promise<ApiDocument> {
+  return request<ApiDocument>(`/documents/${id}`, {
+    method: 'PATCH',
+    body: input,
+    headers: authHeaders(token),
+  })
 }
 
 export interface DocumentChunk {

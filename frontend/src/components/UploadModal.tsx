@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Building2, FileText, FolderOpen, LoaderCircle, Upload, X } from 'lucide-react'
-import { listDocumentCategories, uploadDocument } from '@/api/documents'
+import { Building2, FileText, FolderOpen, LoaderCircle, Plus, Upload, X } from 'lucide-react'
+import { createDocumentCategory, listDocumentCategories, uploadDocument } from '@/api/documents'
 import { getUserReferenceData } from '@/api/users'
 import { errorMessage } from '@/api/client'
 import type { ApiDocument, ApiDocumentCategory, ApiUnitKerja } from '@/api/types'
@@ -28,6 +28,9 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [newCategory, setNewCategory] = useState('')
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [categorySaving, setCategorySaving] = useState(false)
   // Bawaannya terbuka. Isi JDIH adalah peraturan daerah yang memang publik,
   // jadi mengunci harus jadi keputusan sadar admin — bukan sesuatu yang
   // terjadi diam-diam pada setiap unggahan. Admin unit tidak punya pilihan
@@ -39,6 +42,19 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
 
   const isSuperAdmin = user?.isAdmin ?? false
   const ownUnit = user?.unitKerja ?? null
+  const saveCategory = async () => {
+    if (newCategory.trim().length < 2 || categorySaving) return
+    setCategorySaving(true)
+    try {
+      const category = await createDocumentCategory(newCategory.trim(), token ?? undefined)
+      setCategories((items) => [...items, category].sort((a, b) => a.name.localeCompare(b.name)))
+      setCategoryId(category.id)
+      setNewCategory('')
+      setAddingCategory(false)
+      setError(null)
+    } catch (e) { setError(errorMessage(e)) }
+    finally { setCategorySaving(false) }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -151,6 +167,10 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
 
         <div className="upload-field">
           <label><FolderOpen size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Kategori' : 'Category'}</label>
+          {(isSuperAdmin || user?.accountType === 'PERSONAL') && <div>
+            {addingCategory ? <div className="upload-field"><input aria-label={isId ? 'Nama kategori baru' : 'New category name'} value={newCategory} onChange={(e) => setNewCategory(e.target.value)} maxLength={80} disabled={categorySaving} /><button type="button" className="secondary-button" disabled={categorySaving || newCategory.trim().length < 2} onClick={saveCategory}><Plus size={15} />{isId ? 'Simpan kategori' : 'Save category'}</button></div>
+              : <button type="button" className="link-button" onClick={() => setAddingCategory(true)}><Plus size={15} />{isId ? 'Tambah kategori' : 'Add category'}</button>}
+          </div>}
           {categories.length === 0 ? (
             <p className="field-hint">
               {isId
@@ -179,7 +199,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           </p>
         </div>
 
-        <div className="upload-field">
+        {user?.accountType !== 'PERSONAL' && <div className="upload-field">
           <label><Building2 size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Batasi ke unit kerja' : 'Restrict to work unit'}</label>
           <label className="upload-restrict-toggle">
             <input
@@ -226,6 +246,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           </p>
         </div>
 
+        }
         {error && <div className="upload-error-msg">{error}</div>}
         </div>
 

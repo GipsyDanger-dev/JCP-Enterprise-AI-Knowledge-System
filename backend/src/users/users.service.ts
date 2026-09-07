@@ -1,5 +1,5 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditAction, AuditActorType, Prisma } from '@prisma/client';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { AccountType, AuditAction, AuditActorType, Prisma } from '@prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { hashPassword } from '../auth/password.util';
@@ -34,8 +34,9 @@ export class UsersService {
     private readonly auditLogs: AuditLogsService,
   ) {}
 
-  findAll() {
+  findAll(actor: AuthenticatedUser) {
     return this.prisma.user.findMany({
+      where: { accountType: AccountType.COMPANY, workspaceId: actor.workspaceId },
       orderBy: { createdAt: 'asc' },
       select: SAFE_USER_SELECT,
     });
@@ -48,9 +49,9 @@ export class UsersService {
    * jabatan berasal dari konstanta karena murni keterangan dan tidak
    * memengaruhi hak akses apa pun.
    */
-  async referenceData() {
+  async referenceData(actor: AuthenticatedUser) {
     const unitKerja = await this.prisma.unitKerja.findMany({
-      where: { isActive: true },
+      where: { isActive: true, workspaceId: actor.workspaceId },
       select: { id: true, code: true, name: true },
       orderBy: { name: 'asc' },
     });
@@ -58,6 +59,7 @@ export class UsersService {
   }
 
   async create(input: CreateUserDto, actor: AuthenticatedUser) {
+    await this.assertOrganizationAdmin(actor, input.unitKerjaId);
     const username = input.username.trim().toLowerCase();
     const displayName = input.displayName.trim();
     const passwordHash = await hashPassword(input.password);
@@ -67,6 +69,8 @@ export class UsersService {
         const user = await transaction.user.create({
           data: {
             username,
+            workspaceId: actor.workspaceId,
+            isAdmin: input.role === 'SUPER_ADMIN' || input.role === 'ADMIN',
             employeeNumber: input.employeeNumber.trim().toUpperCase(),
             division: input.division.trim(),
             jobTitle: input.jobTitle.trim(),
@@ -75,6 +79,7 @@ export class UsersService {
             role: input.role ?? 'PEGAWAI',
             unitKerjaId: input.unitKerjaId ?? null,
             isActive: true,
+            accountType: AccountType.COMPANY,
           },
           select: SAFE_USER_SELECT,
         });
@@ -97,8 +102,10 @@ export class UsersService {
   }
 
   async update(id: string, input: UpdateUserDto, actor: AuthenticatedUser) {
-    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
+    await this.assertOrganizationAdmin(actor, input.unitKerjaId);
+    const user = await this.prisma.user.findFirst({ where: { id, workspaceId: actor.workspaceId, accountType: AccountType.COMPANY }, select: { id: true, isPlatformOwner: true } });
     if (!user) throw new NotFoundException('User not found');
+    if (user.isPlatformOwner && !actor.isPlatformOwner) throw new ForbiddenException('Cannot modify platform owner');
 
     const data: Prisma.UserUpdateInput = {};
     if (input.displayName !== undefined) data.displayName = input.displayName.trim();
@@ -106,7 +113,10 @@ export class UsersService {
     if (input.employeeNumber !== undefined) data.employeeNumber = input.employeeNumber.trim().toUpperCase();
     if (input.division !== undefined) data.division = input.division.trim();
     if (input.jobTitle !== undefined) data.jobTitle = input.jobTitle.trim();
-    if (input.role !== undefined) data.role = input.role;
+    if (input.role !== undefined) {
+      data.role = input.role;
+      data.isAdmin = input.role === 'SUPER_ADMIN' || input.role === 'ADMIN';
+    }
     if (input.unitKerjaId !== undefined) {
       data.unitKerja = input.unitKerjaId
         ? { connect: { id: input.unitKerjaId } }
@@ -134,8 +144,10 @@ export class UsersService {
   }
 
   async changePassword(id: string, input: ChangePasswordDto, actor: AuthenticatedUser) {
-    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
+    await this.assertOrganizationAdmin(actor);
+    const user = await this.prisma.user.findFirst({ where: { id, workspaceId: actor.workspaceId, accountType: AccountType.COMPANY }, select: { id: true, isPlatformOwner: true } });
     if (!user) throw new NotFoundException('User not found');
+    if (user.isPlatformOwner && !actor.isPlatformOwner) throw new ForbiddenException('Cannot modify platform owner');
 
     const passwordHash = await hashPassword(input.newPassword);
     await this.prisma.user.update({ where: { id }, data: { passwordHash } });
@@ -144,8 +156,10 @@ export class UsersService {
   }
 
   async remove(id: string, actor: AuthenticatedUser) {
-    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true, username: true } });
+    await this.assertOrganizationAdmin(actor);
+    const user = await this.prisma.user.findFirst({ where: { id, workspaceId: actor.workspaceId, accountType: AccountType.COMPANY }, select: { id: true, username: true, isPlatformOwner: true } });
     if (!user) throw new NotFoundException('User not found');
+    if (user.isPlatformOwner) throw new ForbiddenException('Cannot deactivate platform owner');
     if (id === actor.sub) throw new ConflictException('Cannot deactivate your own account');
 
     await this.prisma.$transaction(async (transaction) => {
@@ -164,5 +178,11 @@ export class UsersService {
     });
 
     return { id, isActive: false };
+  }
+  private async assertOrganizationAdmin(actor: AuthenticatedUser, unitId?: string | null) {
+    if (!actor.isAdmin || actor.accountType !== AccountType.COMPANY) throw new ForbiddenException('Organization admin required');
+    if (unitId && !await this.prisma.unitKerja.findFirst({ where: { id: unitId, workspaceId: actor.workspaceId, isActive: true }, select: { id: true } })) {
+      throw new ForbiddenException('Unit does not belong to this workspace');
+    }
   }
 }

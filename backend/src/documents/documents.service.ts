@@ -23,6 +23,7 @@ import { UploadedDocumentFile, validateDocumentFile } from './document-file.vali
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
 import { UpdateDocumentAccessDto } from './dto/update-document-access.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
 import {
   allowedCategoryFilter,
   canManageForUnit,
@@ -64,6 +65,10 @@ export class DocumentsService {
       throw new ForbiddenException('Anda hanya dapat mengunggah dokumen untuk unit kerja sendiri');
     }
 
+    if (unitKerjaId && !await this.prisma.unitKerja.findFirst({ where: { id: unitKerjaId, workspaceId: actor.workspaceId, isActive: true }, select: { id: true } })) {
+      throw new ForbiddenException('Unit is not available in this workspace');
+    }
+
     let category: { id: string; name: string } | null = null;
     if (input.categoryId) {
       category = await this.prisma.documentCategory.findFirst({
@@ -87,7 +92,7 @@ export class DocumentsService {
     const duplicate = await this.prisma.documentVersion.findFirst({
       where: {
         checksum,
-        document: { deletedAt: null },
+        document: { deletedAt: null, workspaceId: actor.workspaceId },
       },
       select: { documentId: true },
     });
@@ -105,6 +110,7 @@ export class DocumentsService {
       await transaction.document.create({
         data: {
           id: documentId,
+          workspaceId: actor.workspaceId,
           title,
           collection,
           categoryId: category?.id ?? null,
@@ -188,17 +194,18 @@ export class DocumentsService {
     });
   }
 
-  async createCategory(input: CreateDocumentCategoryDto) {
+  async createCategory(input: CreateDocumentCategoryDto, actor: AuthenticatedUser) {
+    if (!actor.isAdmin && actor.accountType !== 'PERSONAL') throw new ForbiddenException('Insufficient permissions');
     const name = normalizeCategoryName(input.name);
     if (name.length < 2) throw new BadRequestException('Category name must contain at least 2 characters');
     const key = categoryKey(name);
     if (key === 'all') throw new BadRequestException('"All" is reserved for the document filter');
-    const existing = await this.prisma.documentCategory.findUnique({ where: { key }, select: { id: true } });
+    const existing = await this.prisma.documentCategory.findUnique({ where: { workspaceId_key: { workspaceId: actor.workspaceId, key } }, select: { id: true } });
     if (existing) throw new ConflictException('A category with this name already exists');
 
     try {
       return await this.prisma.documentCategory.create({
-        data: { id: randomUUID(), name, key },
+        data: { id: randomUUID(), name, key, workspaceId: actor.workspaceId },
         select: { id: true, name: true, createdAt: true },
       });
     } catch (error) {
@@ -237,7 +244,7 @@ export class DocumentsService {
     }
     if (nextUnitKerjaId && nextUnitKerjaId !== document.unitKerjaId) {
       const unit = await this.prisma.unitKerja.findFirst({
-        where: { id: nextUnitKerjaId, isActive: true },
+        where: { id: nextUnitKerjaId, workspaceId: actor.workspaceId, isActive: true },
         select: { id: true },
       });
       if (!unit) throw new BadRequestException('Unit kerja tidak dikenal atau sudah tidak aktif');
@@ -340,6 +347,19 @@ export class DocumentsService {
         latestVersion: { ...version, chunkCount: _count.chunks },
       };
     });
+  }
+
+  async update(id: string, input: UpdateDocumentDto, actor: AuthenticatedUser) {
+    const document = await this.prisma.document.findFirst({ where: { id, ...documentVisibilityWhere(actor) }, select: { id: true, unitKerjaId: true } });
+    if (!document) throw new NotFoundException('Document not found');
+    if (!canManageForUnit(actor, document.unitKerjaId)) throw new ForbiddenException('Insufficient permissions');
+    if (input.title === undefined && input.collection === undefined) throw new BadRequestException('No fields supplied');
+    const category = input.collection === undefined ? null : await this.prisma.documentCategory.findFirst({ where: { workspaceId: actor.workspaceId, key: categoryKey(input.collection) }, select: { id: true, name: true } });
+    if (input.collection !== undefined && !category) throw new BadRequestException('Category not found in this workspace');
+    return this.prisma.document.update({ where: { id, workspaceId: actor.workspaceId }, data: {
+      ...(input.title !== undefined ? { title: input.title.trim() } : {}),
+      ...(category ? { categoryId: category.id, collection: category.name } : {}),
+    }, select: { id: true, title: true, collection: true, status: true, updatedAt: true } });
   }
 
   async getStatus(id: string, actor: AuthenticatedUser) {

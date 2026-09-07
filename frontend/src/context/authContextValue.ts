@@ -7,6 +7,8 @@ export interface AuthContextValue {
   /** true saat memulihkan sesi dari token tersimpan */
   loading: boolean
   login: (username: string, password: string) => Promise<void>
+  loginWithGoogle: (credential: string) => Promise<void>
+  registerPersonal: (displayName: string, email: string, password: string, confirmPassword: string) => Promise<void>
   logout: () => void
 }
 

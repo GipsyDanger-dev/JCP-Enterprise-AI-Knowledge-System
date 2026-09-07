@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { WorkspacesController } from './workspaces/workspaces.controller';
 import { AiModule } from './ai/ai.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { AuthModule } from './auth/auth.module';
@@ -28,7 +29,7 @@ import { AnnouncementsModule } from './announcements/announcements.module';
     NotificationsModule,
     AnnouncementsModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, WorkspacesController],
 })
 export class AppModule {}
 

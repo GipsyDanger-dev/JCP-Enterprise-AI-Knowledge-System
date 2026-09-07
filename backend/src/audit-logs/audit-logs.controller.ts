@@ -12,6 +12,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AuditLogsService } from './audit-logs.service';
 import { ListAuditLogsDto } from './dto/list-audit-logs.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../auth/auth.types';
 
 @ApiTags('audit logs')
 @ApiBearerAuth()
@@ -26,7 +28,7 @@ export class AuditLogsController {
   @Get()
   @ApiOperation({ summary: 'List and filter security-sensitive Backend activity' })
   @ApiOkResponse({ description: 'Paginated audit logs ordered from newest to oldest' })
-  findAll(@Query() query: ListAuditLogsDto) {
-    return this.auditLogsService.findAll(query);
+  findAll(@Query() query: ListAuditLogsDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.auditLogsService.findAll(query, actor.workspaceId);
   }
 }

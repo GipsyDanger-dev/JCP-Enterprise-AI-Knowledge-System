@@ -6,7 +6,7 @@ import { errorMessage } from '@/api/client'
 import { deleteDocument, getDocumentStatus, listDocuments, uploadDocument } from '@/api/documents'
 import { getAnnouncementUnreadCount, markAnnouncementsRead } from '@/api/announcements'
 import { listConversations, getEmployeeConversation } from '@/api/messaging'
-import { toDomainDocument, toDomainDocumentStatus, toDomainRole } from '@/api/mappers'
+import { toDomainDocument, toDomainDocumentStatus } from '@/api/mappers'
 import type { ApiDocument, ConversationDetail } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import type { ChatMessage } from './workspaceContextValue'
@@ -22,7 +22,7 @@ const LANG_KEY = 'jcp-lang'
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user, token } = useAuth()
-  const [role, setRole] = useState<Role>(() => (user ? toDomainRole(user.role) : 'admin'))
+  const [role, setRole] = useState<Role>(() => (user?.accountType === 'COMPANY' && user.isAdmin ? 'admin' : 'employee'))
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [question, setQuestion] = useState('')
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
@@ -45,7 +45,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // Role mengikuti akun yang login
   useEffect(() => {
-    setRole(user ? toDomainRole(user.role) : 'admin')
+    setRole(user?.accountType === 'COMPANY' && user.isAdmin ? 'admin' : 'employee')
   }, [user])
 
   // Reset seluruh workspace & riwayat chat saat logout atau berganti akun
@@ -124,7 +124,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // Polling unread messages + notification
   useEffect(() => {
-    if (!user || !token) { setUnreadMessages(0); prevUnreadRef.current = 0; return }
+    if (!user || !token || user.accountType === 'PERSONAL') { setUnreadMessages(0); prevUnreadRef.current = 0; return }
     let cancelled = false
     const poll = async () => {
       try {
@@ -167,7 +167,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // Polling pengumuman belum dibaca + notifikasi
   useEffect(() => {
-    if (!user || !token) { setUnreadAnnouncements(0); prevUnreadAnnouncementsRef.current = 0; return }
+    if (!user || !token || user.accountType === 'PERSONAL') { setUnreadAnnouncements(0); prevUnreadAnnouncementsRef.current = 0; return }
     let cancelled = false
     const poll = async () => {
       try {
@@ -230,9 +230,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       item.id === document.id
         ? {
             ...item,
+            name: document.title || item.name,
             collection: document.collection || item.collection,
-            categoryId: document.category?.id ?? null,
-            unitKerja: document.unitKerja ? { id: document.unitKerja.id, name: document.unitKerja.name } : null,
+            categoryId: document.category === undefined ? item.categoryId : document.category?.id ?? null,
+            unitKerja: document.unitKerja === undefined ? item.unitKerja : document.unitKerja ? { id: document.unitKerja.id, name: document.unitKerja.name } : null,
           }
         : item
     )))
@@ -319,7 +320,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         initials: userInitials(user?.displayName ?? ''),
         label: '',
       },
-      navigation: navigationFor(role, language),
+      navigation: navigationFor(role, language).filter((item) => user?.accountType !== 'PERSONAL' || item.id !== 'announcements'),
       documents,
       question,
       setQuestion,

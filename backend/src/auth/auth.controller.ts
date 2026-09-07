@@ -1,8 +1,11 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Ip, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConflictResponse,
+  ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -10,8 +13,10 @@ import { AuthService } from './auth.service';
 import { AuthenticatedUser } from './auth.types';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { LoginDto } from './dto/login.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { RegisterPersonalDto } from './dto/register-personal.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -29,6 +34,34 @@ export class AuthController {
     @Headers('user-agent') userAgent?: string
   ) {
     return this.authService.login(input, ip, userAgent);
+  }
+
+  @Post('register/personal')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Register a PERSONAL account with email and password' })
+  @ApiCreatedResponse({ description: 'JWT access token and PERSONAL user profile' })
+  @ApiConflictResponse({ description: 'Email is already registered' })
+  registerPersonal(
+    @Body() input: RegisterPersonalDto,
+    @Ip() ip?: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.authService.registerPersonal(input, ip, userAgent);
+  }
+
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sign in or register a PERSONAL account with Google' })
+  @ApiOkResponse({ description: 'Application JWT and PERSONAL user profile' })
+  @ApiUnauthorizedResponse({ description: 'Invalid Google credential' })
+  @ApiConflictResponse({ description: 'Email already belongs to another account' })
+  @ApiServiceUnavailableResponse({ description: 'Google authentication is not configured' })
+  googleLogin(
+    @Body() input: GoogleLoginDto,
+    @Ip() ip?: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.authService.googleLogin(input, ip, userAgent);
   }
 
   @Post('logout')

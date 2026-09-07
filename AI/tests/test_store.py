@@ -168,10 +168,12 @@ class PgVectorStoreTests(unittest.TestCase):
         """Permintaan tanpa batas akses harus bisa dibedakan, supaya bisa ditolak."""
         self.assertIsNone(AccessScope.from_payload(None))
         self.assertIsNone(AccessScope.from_payload("bukan dict"))
-        scope = AccessScope.from_payload({"is_admin": False, "allowed_category_ids": ["x"]})
-        self.assertEqual(scope, AccessScope(is_admin=False, allowed_category_ids=("x",)))
+        workspace = "00000000-0000-4000-8000-000000000001"
+        self.assertIsNone(AccessScope.from_payload({"is_admin": True}))
+        scope = AccessScope.from_payload({"workspace_id": workspace, "is_admin": False, "allowed_category_ids": ["x"]})
+        self.assertEqual(scope, AccessScope(workspace_id=workspace, is_admin=False, allowed_category_ids=("x",)))
         scope = AccessScope.from_payload(
-            {"is_admin": False, "allowed_category_ids": ["x"], "unit_kerja_id": "unit-1"}
+            {"workspace_id": workspace, "is_admin": False, "allowed_category_ids": ["x"], "unit_kerja_id": "unit-1"}
         )
         self.assertEqual(scope.unit_kerja_id, "unit-1")
 
@@ -216,6 +218,28 @@ class PgVectorStoreTests(unittest.TestCase):
         self.assertIn("ORDER BY c.embedding <=> %s::vector", sql)
         self.assertIn("LIMIT %s", sql)
         self.assertEqual(params, [[0.1], "%sop_b.txt%", "%KETENTUAN%", [0.1], 5])
+
+    def test_search_builds_workspace_access_filters(self):
+        with patch_deps(cursor=FakeCursor(rows=[])) as fake:
+            db = PgVectorStore("postgresql://u:p@h/db")
+            db.search(
+                [0.1],
+                top_k=5,
+                scope=AccessScope(workspace_id="workspace-1", uploaded_by_id="owner-1"),
+            )
+        sql, params = fake.conn.executed[-1]
+        self.assertIn("d.uploaded_by_id = %s", sql)
+        self.assertIn("d.workspace_id = %s::uuid", sql)
+        self.assertEqual(params, [[0.1], "workspace-1", "owner-1", [0.1], 5])
+
+    def test_admin_scope_keeps_workspace_boundary(self):
+        scope = AccessScope(workspace_id="workspace-a", is_admin=True)
+        for call in [lambda db: db.search([0.1], scope=scope), lambda db: db.context_chunks(['foreign-chunk'], scope=scope), lambda db: db.document_metadata(scope=scope)]:
+            with patch_deps(cursor=FakeCursor(rows=[])) as fake:
+                call(PgVectorStore("postgresql://u:p@h/db"))
+                sql, params = fake.conn.executed[-1]
+                self.assertIn('d.workspace_id = %s::uuid', sql)
+                self.assertIn('workspace-a', params)
 
     def test_ask_returns_no_answer_below_threshold(self):
         chunk = {

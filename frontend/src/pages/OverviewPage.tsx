@@ -29,9 +29,25 @@ function greeting(isId: boolean, hour = new Date().getHours()) {
 }
 
 export function OverviewPage() {
+  const { user } = useAuth()
   const { role, language } = useWorkspace()
   const isId = language === 'id'
+  if (user?.accountType === 'PERSONAL') return <PersonalOverview isId={isId} />
   return role === 'admin' ? <AdminOverview isId={isId} /> : <EmployeeOverview isId={isId} />
+}
+
+function PersonalOverview({ isId }: { isId: boolean }) {
+  const { user } = useAuth()
+  const { documents, registerUploadedDocument } = useWorkspace()
+  const [showUpload, setShowUpload] = useState(false)
+  const navigate = useNavigate()
+  return <div className="standard-page">
+    <PageHeading eyebrow={isId ? 'Ruang pribadi' : 'Personal workspace'} title={<>{greeting(isId)} <span>{user?.displayName}.</span></>} detail={isId ? 'Dokumen dan percakapan pribadi Anda.' : 'Your private documents and conversations.'} action={<><button className="secondary-button" onClick={() => navigate('/chat')}><MessageSquareText size={17} />{isId ? 'Tanya AI' : 'Ask AI'}</button><button className="primary-button" onClick={() => setShowUpload(true)}><Upload size={17} />{isId ? 'Unggah dokumen' : 'Upload document'}</button></>} />
+    <SectionHeading title={isId ? 'Dokumen terbaru' : 'Recent documents'} detail={`${documents.length} ${isId ? 'dokumen' : 'documents'}`} />
+    <div className="activity-list">{documents.slice(0, 6).map((document) => <DocumentActivity key={document.id} document={document} onOpen={() => navigate(`/documents?doc=${encodeURIComponent(document.id)}`)} />)}</div>
+    {!documents.length && <p className="empty-state">{isId ? 'Belum ada dokumen.' : 'No documents yet.'}</p>}
+    <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
+  </div>
 }
 
 function AdminOverview({ isId }: { isId: boolean }) {

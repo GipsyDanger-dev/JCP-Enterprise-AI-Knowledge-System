@@ -64,14 +64,14 @@ def unwrap_clarify_envelope(content: str) -> str:
 def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
                     model: str = DEFAULT_MODEL, api_key: str | None = None,
                     documents: list[dict[str, Any]] | None = None,
-                    allow_clarify: bool = False) -> str:
+                    allow_clarify: bool = False, ai_profile: str = "general") -> str:
     """Ask a SumoPod LLM to answer using intact page/section contexts only."""
     key = api_key or os.environ.get(SUMOPOD_API_KEY_ENV)
     if not key:
         raise ProviderConfigurationError(SUMOPOD_API_KEY_ENV)
     body_fields: dict[str, Any] = {
         "model": model,
-        "messages": build_messages(query, matches, documents, allow_clarify),
+        "messages": build_messages(query, matches, documents, allow_clarify, ai_profile),
         "temperature": 0.2,
     }
     if allow_clarify:

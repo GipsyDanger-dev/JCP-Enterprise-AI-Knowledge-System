@@ -89,3 +89,21 @@ Required acceptance evidence:
 - Staging supports a single public origin with backend routing and internal AI service.
 
 Passing builds alone does not establish completion. Push and deployment remain separate actions.
+
+## Verification Evidence (2026-09-07)
+
+- `backend/scripts/test-unified-api.cjs`: 113 HTTP checks passed on the isolated
+  `codex_unified_integration_20260906` database. This covers two organizations,
+  two personal workspaces, direct-ID isolation, uploads, ingestion, required
+  reading, announcements, messaging, and AI citation boundaries.
+- `backend/scripts/test-unified-migration.py`: 22 migration steps passed on a
+  fresh isolated schema. Legacy rows, document bytes, completed reading state,
+  roles, and unit ownership were compared before and after the unified migration.
+- Backend and frontend production builds passed. The AI suite passed 64 tests.
+- `frontend/e2e/unified-platform.spec.mjs` passed real browser login for personal,
+  organization-admin, and platform-owner accounts at desktop and mobile sizes,
+  including private document preview and rename.
+- The local deployment services use one origin (`/api` reverse proxy) and the
+  integration runtime was kept separate from the original database. Docker was
+  not available in this environment, so container startup remains a deployment
+  gate rather than a claim of local runtime verification.

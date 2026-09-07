@@ -3,7 +3,7 @@ import { MessageRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { aiServiceHeaders, aiServiceUrl } from '../config/env.util';
-import { allowedCategoryFilter } from '../documents/document-visibility';
+import { allowedCategoryFilter, documentVisibilityWhere } from '../documents/document-visibility';
 
 interface AiCitation {
   document_id: string;
@@ -97,6 +97,7 @@ export class ChatService {
 
       const result = (await response.json()) as AiAskResult;
       const citations = this.toClientCitations(result.citations ?? []);
+      await this.assertCitationsAccessible(citations, actor);
       await this.persistAssistantMessage(conversation.id, result.answer, citations);
 
       return {
@@ -136,19 +137,33 @@ export class ChatService {
    * bisa dikutip AI untuk unit lain meski dokumennya tak muncul di daftar.
    */
   private async accessScope(actor: AuthenticatedUser) {
+    const workspace = await this.prisma.workspace.findUniqueOrThrow({ where: { id: actor.workspaceId }, select: { aiProfile: true } });
+    const boundary = { workspace_id: actor.workspaceId, uploaded_by_id: actor.accountType === 'PERSONAL' ? actor.sub : null, ai_profile: workspace.aiProfile };
     const filter = allowedCategoryFilter(actor);
-    if (filter === null) {
-      return { is_admin: true, allowed_category_ids: [] as string[], unit_kerja_id: null };
+    if (actor.isAdmin || actor.accountType === 'PERSONAL') {
+      return { ...boundary, is_admin: actor.isAdmin, allowed_category_ids: [] as string[], unit_kerja_id: null };
     }
     const categories = await this.prisma.documentCategory.findMany({
-      where: filter,
+      where: filter ?? { workspaceId: actor.workspaceId },
       select: { id: true },
     });
     return {
+      ...boundary,
       is_admin: false,
       allowed_category_ids: categories.map((category) => category.id),
       unit_kerja_id: actor.unitKerjaId ?? null,
     };
+  }
+
+  private async assertCitationsAccessible(citations: ChatCitation[], actor: AuthenticatedUser) {
+    if (!citations.length) return;
+    const chunks = await this.prisma.documentChunk.findMany({
+      where: { chunkId: { in: citations.map((item) => item.chunkId) }, documentVersion: { document: documentVisibilityWhere(actor) } },
+      select: { chunkId: true, documentVersionId: true, documentVersion: { select: { documentId: true } } },
+    });
+    if (citations.some((item) => !chunks.some((chunk) => chunk.chunkId === item.chunkId && chunk.documentVersionId === item.documentVersionId && chunk.documentVersion.documentId === item.documentId))) {
+      throw new Error('AI citation is outside the permitted documents');
+    }
   }
 
   private async resolveConversation(

@@ -45,6 +45,7 @@ export class AnnouncementsService {
    * seorang Sekretaris tetap PEGAWAI di mata pengelolaan dokumen.
    */
   private canPublish(actor: AuthenticatedUser) {
+    if (actor.accountType !== 'COMPANY') return false;
     if (actor.isAdmin) return true;
     const jabatan = actor.jobTitle?.trim().toLowerCase() ?? '';
     return jabatan.length > 0 && JABATAN_PENERBIT_PENGUMUMAN.some((item) => item.toLowerCase() === jabatan);
@@ -76,7 +77,7 @@ export class AnnouncementsService {
     const items = await this.prisma.announcement.findMany({
       // Yang boleh menerbitkan juga melihat arsipnya, supaya tombol aktifkan
       // ulang punya tempat; pegawai lain hanya melihat yang masih berlaku.
-      where: canSeeReaders ? {} : { isActive: true },
+      where: { workspaceId: actor.workspaceId, ...(canSeeReaders ? {} : { isActive: true }) },
       select: ANNOUNCEMENT_SELECT,
       orderBy: [{ isActive: 'desc' }, { publishedAt: 'desc' }],
     });
@@ -86,17 +87,17 @@ export class AnnouncementsService {
   async create(input: CreateAnnouncementDto, actor: AuthenticatedUser) {
     this.assertCanPublish(actor);
     const announcement = await this.prisma.announcement.create({
-      data: { title: input.title, body: input.body, createdById: actor.sub },
+      data: { title: input.title, body: input.body, createdById: actor.sub, workspaceId: actor.workspaceId },
       select: ANNOUNCEMENT_SELECT,
     });
-    await this.notifyEveryone(announcement, actor.sub);
+    await this.notifyEveryone(announcement, actor.sub, actor.workspaceId);
     return this.toResponse(announcement, true);
   }
 
   /** Notifikasi ke seluruh karyawan aktif, kecuali penerbitnya sendiri. */
-  private async notifyEveryone(announcement: { id: string; title: string }, authorId: string) {
+  private async notifyEveryone(announcement: { id: string; title: string }, authorId: string, workspaceId: string) {
     const recipients = await this.prisma.user.findMany({
-      where: { isActive: true, id: { not: authorId } },
+      where: { workspaceId, accountType: 'COMPANY', isActive: true, id: { not: authorId } },
       select: { id: true },
     });
     await this.notifications.createMany(recipients.map((recipient) => ({
@@ -130,8 +131,9 @@ export class AnnouncementsService {
    * pertama tetap utuh.
    */
   private async recordReads(userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { workspaceId: true } });
     const active = await this.prisma.announcement.findMany({
-      where: { isActive: true },
+      where: { isActive: true, workspaceId: user.workspaceId },
       select: { id: true },
     });
     if (active.length === 0) return;
@@ -151,14 +153,14 @@ export class AnnouncementsService {
   async readers(id: string, actor: AuthenticatedUser) {
     this.assertCanPublish(actor);
     const announcement = await this.prisma.announcement.findUnique({
-      where: { id },
+      where: { id, workspaceId: actor.workspaceId },
       select: { id: true, title: true, createdById: true, publishedAt: true },
     });
     if (!announcement) throw new NotFoundException('Announcement not found');
 
     const [audience, reads] = await Promise.all([
       this.prisma.user.findMany({
-        where: { isActive: true, id: { not: announcement.createdById } },
+        where: { workspaceId: actor.workspaceId, accountType: 'COMPANY', isActive: true, id: { not: announcement.createdById } },
         select: READER_SELECT,
         orderBy: { displayName: 'asc' },
       }),
@@ -192,7 +194,7 @@ export class AnnouncementsService {
 
   async update(id: string, input: UpdateAnnouncementDto, actor: AuthenticatedUser) {
     this.assertCanPublish(actor);
-    const announcement = await this.prisma.announcement.findUnique({ where: { id }, select: { id: true, createdById: true } });
+    const announcement = await this.prisma.announcement.findUnique({ where: { id, workspaceId: actor.workspaceId }, select: { id: true, createdById: true } });
     if (!announcement) throw new NotFoundException('Announcement not found');
     // Pimpinan hanya boleh menyunting dan mengarsipkan pengumumannya sendiri;
     // menyapu pengumuman unit lain bukan bagian dari wewenangnya.

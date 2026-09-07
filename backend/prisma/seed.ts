@@ -3,6 +3,7 @@ import { hashPassword } from '../src/auth/password.util';
 import { KATEGORI_DEMO_LAMA, KATEGORI_DOKUMEN, PEMETAAN_UNIT_LAMA, UNIT_KERJA } from './reference-data';
 
 const prisma = new PrismaClient();
+const workspaceId = process.env.SEED_WORKSPACE_ID?.trim() || '00000000-0000-4000-8000-000000000001';
 
 function requiredEnvironment(name: string): string {
   const value = process.env[name]?.trim();
@@ -22,7 +23,7 @@ async function upsertUser(
   unitKerjaCode: string | null = null,
 ) {
   const unitKerja = unitKerjaCode
-    ? await prisma.unitKerja.findUnique({ where: { code: unitKerjaCode }, select: { id: true } })
+    ? await prisma.unitKerja.findUnique({ where: { workspaceId_code: { workspaceId, code: unitKerjaCode } }, select: { id: true } })
     : null;
   const unitKerjaId = unitKerja?.id ?? null;
   const email = requiredEnvironment(emailName).toLowerCase();
@@ -31,10 +32,16 @@ async function upsertUser(
   if (password.length < 12) throw new Error(`${passwordName} must contain at least 12 characters`);
 
   const passwordHash = await hashPassword(password);
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    if (existing.workspaceId !== workspaceId) throw new Error('Seed email belongs to another workspace');
+    console.log(`Preserved existing account: ${username}`);
+    return;
+  }
   await prisma.user.upsert({
     where: { email },
-    update: { displayName, username, employeeNumber, division, jobTitle, isActive: true, passwordHash, role, isAdmin, unitKerjaId },
-    create: { displayName, username, employeeNumber, division, jobTitle, email, isActive: true, passwordHash, role, isAdmin, unitKerjaId },
+    update: {},
+    create: { workspaceId, displayName, username, employeeNumber, division, jobTitle, email, isActive: true, passwordHash, role, isAdmin, unitKerjaId },
   });
   console.log(`Seeded ${isAdmin ? 'SUPER_ADMIN' : role}: ${username}${unitKerjaCode ? ` @ ${unitKerjaCode}` : ''}`);
 }
@@ -47,9 +54,9 @@ async function upsertUser(
 async function seedUnitKerjaDanKategori(): Promise<void> {
   for (const unit of UNIT_KERJA) {
     await prisma.unitKerja.upsert({
-      where: { code: unit.code },
-      update: { name: unit.name, isActive: true },
-      create: { code: unit.code, name: unit.name },
+      where: { workspaceId_code: { workspaceId, code: unit.code } },
+      update: {},
+      create: { workspaceId, code: unit.code, name: unit.name },
     });
   }
   console.log(`Seeded ${UNIT_KERJA.length} unit kerja`);
@@ -57,7 +64,7 @@ async function seedUnitKerjaDanKategori(): Promise<void> {
   for (const kategori of KATEGORI_DOKUMEN) {
     const key = kategori.name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('id-ID');
     const units = await prisma.unitKerja.findMany({
-      where: { code: { in: kategori.units } },
+      where: { workspaceId, code: { in: kategori.units } },
       select: { id: true },
     });
     if (units.length !== kategori.units.length) {
@@ -65,11 +72,11 @@ async function seedUnitKerjaDanKategori(): Promise<void> {
     }
     const ids = units.map((unit) => ({ id: unit.id }));
     await prisma.documentCategory.upsert({
-      where: { key },
+      where: { workspaceId_key: { workspaceId, key } },
       // `set` pada update supaya unit yang DIHAPUS dari daftar acuan ikut
       // tercermin, bukan hanya penambahannya.
-      update: { name: kategori.name, units: { set: ids } },
-      create: { key, name: kategori.name, units: { connect: ids } },
+      update: {},
+      create: { workspaceId, key, name: kategori.name, units: { connect: ids } },
     });
   }
   const terbuka = KATEGORI_DOKUMEN.filter((k) => k.units.length === 0).length;
@@ -78,10 +85,10 @@ async function seedUnitKerjaDanKategori(): Promise<void> {
   // Kategori bawaan template lama hanya dibuang kalau belum dipakai dokumen,
   // supaya seed tidak pernah menghapus sesuatu yang masih dirujuk.
   const demo = await prisma.documentCategory.findMany({
-    where: { key: { in: KATEGORI_DEMO_LAMA } },
+    where: { workspaceId, key: { in: KATEGORI_DEMO_LAMA } },
     select: { id: true, name: true, _count: { select: { documents: true } } },
   });
-  const buang = demo.filter((kategori) => kategori._count.documents === 0);
+  const buang: typeof demo = [];
   if (buang.length > 0) {
     await prisma.documentCategory.deleteMany({ where: { id: { in: buang.map((k) => k.id) } } });
     console.log(`Menghapus ${buang.length} kategori demo lama: ${buang.map((k) => k.name).join(', ')}`);
@@ -103,13 +110,13 @@ async function seedUnitKerjaDanKategori(): Promise<void> {
  */
 async function pindahkanUnitLama(): Promise<void> {
   const lama = await prisma.unitKerja.findMany({
-    where: { code: { in: Object.keys(PEMETAAN_UNIT_LAMA) } },
+    where: { workspaceId, code: { in: Object.keys(PEMETAAN_UNIT_LAMA) } },
     select: { id: true, code: true },
   });
   if (lama.length === 0) return;
 
   const pengganti = await prisma.unitKerja.findMany({
-    where: { code: { in: UNIT_KERJA.map((unit) => unit.code) } },
+    where: { workspaceId, code: { in: UNIT_KERJA.map((unit) => unit.code) } },
     select: { id: true, code: true, name: true },
   });
   const perKode = new Map(pengganti.map((unit) => [unit.code, unit]));
@@ -141,8 +148,12 @@ async function pindahkanUnitLama(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  await seedUnitKerjaDanKategori();
-  await pindahkanUnitLama();
+  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+  if (!workspace || workspace.type !== 'COMPANY') throw new Error('Seed requires an existing company workspace');
+  if (workspace.aiProfile === 'sleman') {
+    await seedUnitKerjaDanKategori();
+    await pindahkanUnitLama();
+  }
 
   const adminEmail = requiredEnvironment('SEED_ADMIN_EMAIL').toLowerCase();
   const userEmail = requiredEnvironment('SEED_USER_EMAIL').toLowerCase();
@@ -153,7 +164,7 @@ async function main(): Promise<void> {
     UserRole.SUPER_ADMIN, true,
     'SEED_ADMIN_EMAIL', 'SEED_ADMIN_PASSWORD',
     'Local Admin', 'ADM-0001', 'Dinas Hukum & Peradilan', 'Kepala Subbagian',
-    'HUKUM',
+    workspace.aiProfile === 'sleman' ? 'HUKUM' : null,
   );
 
   // Pegawai contoh, sengaja ditempatkan di Dinas Koperasi: dengan begitu batas
@@ -163,7 +174,7 @@ async function main(): Promise<void> {
     UserRole.PEGAWAI, false,
     'SEED_USER_EMAIL', 'SEED_USER_PASSWORD',
     'Nadia Putri', 'EMP-0001', 'Dinas Koperasi, UMKM & Ekonomi',
-    'Staf / Pelaksana', 'KOPERASI',
+    'Staf / Pelaksana', workspace.aiProfile === 'sleman' ? 'KOPERASI' : null,
   );
 }
 

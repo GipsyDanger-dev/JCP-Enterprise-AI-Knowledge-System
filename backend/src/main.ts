@@ -7,7 +7,7 @@ import { AppModule } from './app.module';
 
 const { json, urlencoded } = require('express');
 
-loadEnvironment({ path: resolve(__dirname, '../.env'), override: true, quiet: true });
+loadEnvironment({ path: resolve(__dirname, '../.env'), override: false, quiet: true });
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });

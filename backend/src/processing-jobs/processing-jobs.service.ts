@@ -99,7 +99,7 @@ export class ProcessingJobsService {
           documentVersion: {
             select: {
               document: {
-                select: { id: true, status: true, deletedAt: true },
+                select: { id: true, status: true, deletedAt: true, workspaceId: true },
               },
             },
           },
@@ -152,6 +152,7 @@ export class ProcessingJobsService {
 
       await this.auditLogs.record(transaction, {
         actorType: AuditActorType.WORKER,
+        workspaceId: document.workspaceId,
         action:
           targetJobStatus === ProcessingJobStatus.COMPLETED
             ? AuditAction.PROCESSING_JOB_COMPLETED
@@ -195,7 +196,7 @@ export class ProcessingJobsService {
               mimeType: true,
               fileSize: true,
               checksum: true,
-              document: { select: { id: true, title: true } },
+              document: { select: { id: true, title: true, workspaceId: true } },
             },
           },
         },
@@ -225,6 +226,7 @@ export class ProcessingJobsService {
 
       await this.auditLogs.record(transaction, {
         actorType: AuditActorType.WORKER,
+        workspaceId: candidate.documentVersion.document.workspaceId,
         action: AuditAction.PROCESSING_JOB_CLAIMED,
         targetType: 'PROCESSING_JOB',
         targetId: candidate.id,

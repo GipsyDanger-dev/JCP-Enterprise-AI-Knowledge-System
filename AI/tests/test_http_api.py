@@ -1,4 +1,5 @@
 import tempfile
+import os
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -16,12 +17,33 @@ except ImportError:  # pragma: no cover - optional dependencies
 class HttpApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(http_api.app)
+        environment = mock.patch.dict(os.environ, {"WORKER_TOKEN": "integration-test-worker"})
+        environment.start()
+        cls.addClassCleanup(environment.stop)
+        cls.client = TestClient(http_api.app, headers={"X-Worker-Token": "integration-test-worker"})
+
+    def test_worker_authentication_is_required(self):
+        response = TestClient(http_api.app).post('/ask', json={"query": "policy"})
+        self.assertEqual(response.status_code, 401)
+        response = TestClient(http_api.app).post('/ingest-file', headers={"X-Worker-Token": "wrong"})
+        self.assertEqual(response.status_code, 401)
+
+    def test_pg_request_without_workspace_is_rejected(self):
+        fake_store = object.__new__(http_api.PgVectorStore)
+        with mock.patch('http_api.current_store', return_value=fake_store):
+            response = self.client.post('/ask', json={"query": "policy", "access": {"is_admin": True}})
+        self.assertEqual(response.status_code, 400)
 
     def test_health(self):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
+
+    def test_workspace_request_cannot_fall_back_to_shared_json(self):
+        with mock.patch('http_api.current_store', return_value=mock.Mock()) as current:
+            response = self.client.post('/ask', json={"query": "policy", "access": {"workspace_id": "00000000-0000-4000-8000-000000000001", "is_admin": True}})
+        self.assertEqual(response.status_code, 503)
+        current.return_value.ask.assert_not_called()
 
     def test_ask_returns_grounded_answer(self):
         response = self.client.post("/ask", json={"query": "Berapa maksimal biaya hotel level Manager?"})

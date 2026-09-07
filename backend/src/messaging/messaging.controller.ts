@@ -30,8 +30,8 @@ export class MessagingController {
   /** Admin: list all conversations */
   @Get('conversations')
   @Roles('admin')
-  listConversations() {
-    return this.messagingService.listConversations();
+  listConversations(@CurrentUser() actor: AuthenticatedUser) {
+    return this.messagingService.listConversations(actor);
   }
 
   /** Get messages in a conversation */

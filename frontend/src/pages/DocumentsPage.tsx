@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowUpRight, BookOpenCheck, Building2, CheckCircle2, ChevronDown, Download, FileText, FolderLock, FolderOpen, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { ArrowUpRight, BookOpenCheck, Building2, CheckCircle2, ChevronDown, Download, FileText, FolderLock, FolderOpen, Pencil, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { UploadModal } from '@/components/UploadModal'
 import { DocumentAccessModal } from '@/components/DocumentAccessModal'
-import { downloadDocument, getDocumentBlob, getDocumentChunks, listDocumentCategories, updateDocumentAccess, type DocumentChunk } from '@/api/documents'
+import { downloadDocument, getDocumentBlob, getDocumentChunks, listDocumentCategories, updateDocument, updateDocumentAccess, type DocumentChunk } from '@/api/documents'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import type { DocumentItem } from '@/types/domain'
@@ -53,7 +53,7 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
   chunksLoading: boolean
   setChunksLoading: (v: boolean) => void
 }) {
-  const extension = doc.name.split('.').pop()?.toLowerCase()
+  const extension = doc.filename.split('.').pop()?.toLowerCase()
   const canRenderOriginal = extension === 'pdf' || extension === 'docx' || extension === 'txt' || extension === 'md'
   const [readerUrl, setReaderUrl] = useState<string | null>(null)
   const [readerText, setReaderText] = useState<string | null>(null)
@@ -225,9 +225,14 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
 }
 
 export function DocumentsPage() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const { documents, role, uploadError, removeDocument, registerUploadedDocument, applyDocumentAccess, language } = useWorkspace()
-  const canManage = role === 'admin'
+  const isPersonal = user?.accountType === 'PERSONAL'
+  const [renameDoc, setRenameDoc] = useState<DocumentItem | null>(null)
+  const [renameTitle, setRenameTitle] = useState('')
+  const [renameSaving, setRenameSaving] = useState(false)
+  const [renameError, setRenameError] = useState<string | null>(null)
+  const canManage = role === 'admin' || isPersonal || user?.role === 'ADMIN_UNIT'
   const isId = language === 'id'
   const [searchParams, setSearchParams] = useSearchParams()
   const initialCollection = searchParams.get('collection') ?? 'All'
@@ -420,9 +425,9 @@ export function DocumentsPage() {
 
   const action = canManage ? (
     <>
-      <button className="secondary-button" onClick={() => setShowDocumentAccess(true)}>
+      {!isPersonal && <button className="secondary-button" onClick={() => setShowDocumentAccess(true)}>
         <FolderLock size={16} /> {isId ? 'Manajemen dokumen' : 'Document management'}
-      </button>
+      </button>}
       <button className="primary-button" onClick={() => setShowUpload(true)}>
         <Upload size={17} /> {isId ? 'Unggah dokumen' : 'Upload document'}
       </button>
@@ -484,8 +489,9 @@ export function DocumentsPage() {
               <td><StatusBadge status={document.status} /></td>
               <td>{document.chunks ?? '—'}</td>
               <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                {canManage && <button className="icon-button" title={isId ? 'Ubah nama dokumen' : 'Rename document'} onClick={(event) => { event.stopPropagation(); setRenameDoc(document); setRenameTitle(document.name); setRenameError(null) }}><Pencil size={15} /></button>}
                 <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>
-                {canManage
+                {isPersonal ? <button className="icon-button danger" title={isId ? 'Hapus dokumen' : 'Delete document'} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button> : canManage
                   ? <><button className="icon-button" title={isId ? 'Atur akses dokumen' : 'Manage document access'} onClick={(e) => { e.stopPropagation(); openAccessDialog(document) }}><Building2 size={16} /></button>{document.status === 'Ready' && <button className="icon-button" title={isId ? 'Jadikan wajib baca' : 'Assign required reading'} onClick={(e) => { e.stopPropagation(); setSelectedDivision(''); setAssignmentError(null); setSelectedEmployeeIds([]); setAssignmentView('assign'); setAssignmentDoc(document) }}><BookOpenCheck size={16} /></button>}<button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
                   : <button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button>}
               </td>
@@ -500,6 +506,24 @@ export function DocumentsPage() {
       )}
 
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
+      {renameDoc && <div className="modal-overlay" onClick={() => !renameSaving && setRenameDoc(null)}>
+        <form className="modal-card" onClick={(event) => event.stopPropagation()} onSubmit={async (event) => {
+          event.preventDefault()
+          if (!token || !renameTitle.trim() || renameSaving) return
+          setRenameSaving(true)
+          setRenameError(null)
+          try {
+            const updated = await updateDocument(renameDoc.id, { title: renameTitle.trim() }, token)
+            applyDocumentAccess(updated)
+            setRenameDoc(null)
+          } catch (error) { setRenameError(error instanceof Error ? error.message : 'Update failed') }
+          finally { setRenameSaving(false) }
+        }}>
+          <div className="modal-header"><h2>{isId ? 'Ubah nama dokumen' : 'Rename document'}</h2><button type="button" className="icon-button" aria-label={isId ? 'Tutup' : 'Close'} disabled={renameSaving} onClick={() => setRenameDoc(null)}><X size={18} /></button></div>
+          <div className="modal-body"><label className="upload-field">{isId ? 'Nama dokumen' : 'Document title'}<input required maxLength={255} value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} autoFocus /></label>{renameError && <p role="alert">{renameError}</p>}</div>
+          <div className="modal-footer"><button type="button" className="secondary-button" disabled={renameSaving} onClick={() => setRenameDoc(null)}>{isId ? 'Batal' : 'Cancel'}</button><button className="primary-button" disabled={renameSaving || !renameTitle.trim()}>{isId ? 'Simpan' : 'Save'}</button></div>
+        </form>
+      </div>}
       <DocumentAccessModal open={showDocumentAccess} onClose={() => setShowDocumentAccess(false)} />
 
       {/* Atur akses: kategori sebagai penanda subjek, penanda unit sebagai
