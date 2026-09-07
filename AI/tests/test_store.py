@@ -57,7 +57,7 @@ class FakePsycopg:
     def __init__(self, cursor=None):
         self.conn = FakeConn(cursor)
 
-    def connect(self, dsn):
+    def connect(self, dsn, **_kwargs):
         return self.conn
 
 

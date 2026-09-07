@@ -92,10 +92,11 @@ cd AI && pip install -r requirements.txt && cd ..
 
 ### 4. Setup Database
 
-```bash
-# Jalankan PostgreSQL + pgvector lokal
-docker compose up -d postgres
+Database bersifat eksternal (misal Neon atau PostgreSQL milik sendiri dengan
+ekstensi `vector`) — compose **tidak** menyediakan service postgres. Isi
+`DATABASE_URL` dan `AI_DATABASE_URL` di `.env`, lalu:
 
+```bash
 # Bila seluruh stack dijalankan melalui Docker, Backend menjalankan migration
 # otomatis. Seed akun awal dilakukan satu kali setelah Backend aktif.
 docker compose up -d backend
@@ -198,10 +199,8 @@ docker compose down
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `POSTGRES_USER` | User PostgreSQL lokal | `jcp` |
-| `POSTGRES_PASSWORD` | Password PostgreSQL lokal | `strong-local-password` |
-| `POSTGRES_DB` | Nama database lokal | `jcp_enterprise_ai` |
-| `DATABASE_URL` | Koneksi native dari host ke PostgreSQL Docker | `postgresql://jcp:pass@127.0.0.1:5432/jcp_enterprise_ai?schema=public` |
+| `DATABASE_URL` | Koneksi PostgreSQL + pgvector (dipakai Prisma; wajib) | `postgresql://user:pass@host:5432/db?schema=public` |
+| `AI_DATABASE_URL` | Koneksi yang sama untuk AI engine, tanpa `?schema=public` (wajib) | `postgresql://user:pass@host:5432/db` |
 | `JWT_SECRET` | Secret key for JWT signing | `your-random-secret-min-32-chars` |
 | `WORKER_TOKEN` | Shared secret backend ↔ AI service (`X-Worker-Token` header) | `long-random-string` |
 | `SUMOPOD_API_KEY` | SumoPod API key for LLM/embeddings | `sk-xxxxxxxxxxxx` |
@@ -212,12 +211,11 @@ docker compose down
 |----------|---------|-------------|
 | `BACKEND_PORT` | `8000` | Backend listen port (dibaca `main.ts`; Docker memetakan port host yang sama) |
 | `FRONTEND_PORT` | `5173` | Vite dev server port (dibaca `vite.config.ts`) |
-| `POSTGRES_PORT` | `5432` | Port PostgreSQL yang hanya dipublikasikan ke loopback host |
 | `JWT_EXPIRES_IN` | `24h` | JWT token expiration |
 | `SUMOPOD_BASE_URL` | `https://ai.sumopod.com/v1` | Endpoint provider LLM/embedding |
 | `AI_CHAT_MODEL` | `deepseek-v4-pro` | Model chat default AI service |
 | `AI_SERVICE_URL` | `http://localhost:8001` | AI engine URL from backend (Docker: `http://ai-api:8000`) |
-| `VITE_API_BASE_URL` | `http://localhost:8000` | Backend URL from frontend |
+| `VITE_API_BASE_URL` | `/api` | Backend URL dari browser; `/api` berarti satu origin lewat proxy |
 | `VITE_USE_MOCK_AUTH` | `false` | Enable mock API (dev only) |
 
 ### Seed Variables (Auto-create users on first run)
@@ -310,7 +308,7 @@ users
 
 ### Key Tables
 
-- **users** — User accounts with roles (ADMIN/USER)
+- **users** — Akun dengan role `SUPER_ADMIN`/`ADMIN_UNIT`/`PEGAWAI` (legacy role masih ada di database), terikat pada workspace
 - **documents** — Document metadata + collection
 - **document_versions** — Version history with file checksums
 - **document_files** — Binary file storage (PostgreSQL bytea)
@@ -364,7 +362,14 @@ nano .env
 
 # 2. Build & deploy
 docker compose -f docker-compose.prod.yml up -d --build
+```
 
+Satu origin: Nginx pada service frontend (port 5173) menyajikan aset SPA
+sekaligus meneruskan `/api` ke backend. Backend dan AI tidak mengekspos port
+ke host. Login Google bersifat opsional — kosongkan `GOOGLE_CLIENT_ID` dan
+`VITE_GOOGLE_CLIENT_ID` bila tidak dipakai.
+
+```bash
 # 3. Run migrations
 docker compose exec backend npx prisma migrate deploy
 

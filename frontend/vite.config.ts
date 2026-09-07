@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
       port,
       proxy: {
         '/api': {
-          target: process.env.BACKEND_PROXY_URL || 'http://127.0.0.1:8002',
+          target: process.env.BACKEND_PROXY_URL || `http://127.0.0.1:${process.env.BACKEND_PORT || 8000}`,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
       },

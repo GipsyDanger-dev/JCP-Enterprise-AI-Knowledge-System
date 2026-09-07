@@ -107,3 +107,40 @@ Passing builds alone does not establish completion. Push and deployment remain s
   integration runtime was kept separate from the original database. Docker was
   not available in this environment, so container startup remains a deployment
   gate rather than a claim of local runtime verification.
+
+## Deployment Configuration Audit (2026-09-07)
+
+Docker is still unavailable in this environment, so the container startup gate
+stays open. A static audit of the deployment files found and fixed:
+
+- `.env.example` header still described a local PostgreSQL service that compose
+  no longer runs; it now states that `DATABASE_URL`/`AI_DATABASE_URL` are
+  required and external (e.g. Neon with pgvector).
+- Vite dev proxy defaulted to a stale port `8002`; it now follows
+  `BACKEND_PORT` (default 8000).
+- Dev compose frontend now defaults `VITE_API_BASE_URL` to `/api` with
+  `BACKEND_PROXY_URL=http://backend:8000`, so the single-origin contract also
+  holds in development, not only in production.
+- Production image build no longer hard-fails without `VITE_GOOGLE_CLIENT_ID`;
+  Google login is optional and `GOOGLE_CLIENT_ID` is passed through to the
+  backend in both compose files.
+- Removed the unused `./backend/tmp` bind mount (leftover from the pre-multipart
+  file transport) and the `POSTGRES_*` leftovers from `.env.example` and docs.
+- Both compose files parse cleanly and merge as expected; `prisma validate`,
+  backend build, frontend build, and frontend lint pass after the changes.
+
+## AI Test Determinism (2026-09-07)
+
+The AI suite depended on the shell environment: a real `DATABASE_URL` switched
+the store to pgvector, and a real `SUMOPOD_API_KEY` made answer paths call the
+actual provider (502 in tests). Worse, the TF-IDF fallback imported `psycopg`
+locally, so its connection was not affected by test mocks and could hang for
+minutes on an unreachable database. Fixed on both sides:
+
+- All PostgreSQL connections now go through `store._connect`, which sets
+  `connect_timeout=5` — a dead database fails fast in production instead of
+  piling up API requests and processing jobs.
+- `test_http_api` pins `DATABASE_URL`, `SUMOPOD_API_KEY`, and `LLM_API_KEY` to
+  empty for the whole class, so results no longer depend on the host shell.
+- Verified: the full 64-test suite passes with both a polluted environment
+  (unreachable database DSN + fake provider key) and a clean one.

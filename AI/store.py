@@ -140,6 +140,17 @@ def _require_deps() -> None:
         raise RuntimeError("pgvector is not installed. Run: pip install pgvector")
 
 
+def _connect(dsn: str):
+    """Open a PostgreSQL connection with a bounded wait.
+
+    libpq connects without a timeout by default: when the database is
+    unreachable the caller waits for the OS-level TCP timeout (often minutes),
+    which piles up API requests and processing jobs. Five seconds is plenty on
+    any realistic network and fails fast on a dead endpoint.
+    """
+    return psycopg.connect(dsn, connect_timeout=5)
+
+
 def default_dsn() -> str | None:
     return os.environ.get(DATABASE_URL_ENV)
 
@@ -171,7 +182,7 @@ class PgVectorStore:
             GROUP BY d.id, dv.id, dv.original_filename, dv.version_number
             ORDER BY dv.original_filename, dv.version_number DESC
         """
-        with psycopg.connect(self.dsn) as conn:
+        with _connect(self.dsn) as conn:
             rows = conn.execute(sql).fetchall()
         return [
             {
@@ -205,7 +216,7 @@ class PgVectorStore:
             GROUP BY dv.original_filename, dv.page_count, dv.file_size, dv.created_at
             ORDER BY dv.original_filename
         """
-        with psycopg.connect(self.dsn) as conn:
+        with _connect(self.dsn) as conn:
             rows = conn.execute(sql, access_params).fetchall()
         return [
             {
@@ -229,7 +240,7 @@ class PgVectorStore:
             WHERE dv.id = %s AND d.deleted_at IS NULL
             GROUP BY d.id, dv.id, dv.original_filename, dv.version_number, dv.checksum
         """
-        with psycopg.connect(self.dsn) as conn:
+        with _connect(self.dsn) as conn:
             row = conn.execute(sql, (document_version_id,)).fetchone()
         if row is None:
             return None
@@ -252,7 +263,7 @@ class PgVectorStore:
         chunks: list[dict[str, Any]],
     ) -> None:
         """Replace one version's chunks atomically; the version must exist."""
-        with psycopg.connect(self.dsn) as conn:
+        with _connect(self.dsn) as conn:
             with conn.transaction():
                 conn.execute(
                     "DELETE FROM chunks WHERE document_version_id = %s",
@@ -281,7 +292,7 @@ class PgVectorStore:
             ORDER BY dv.version_number DESC
             LIMIT 1
         """
-        with psycopg.connect(self.dsn) as conn:
+        with _connect(self.dsn) as conn:
             with conn.transaction():
                 row = conn.execute(select_sql, (filename,)).fetchone()
                 if row is None:
@@ -297,7 +308,7 @@ class PgVectorStore:
     def store_embeddings(self, vectors: list[list[float]], chunk_ids: list[str]) -> None:
         if len(vectors) != len(chunk_ids):
             raise ValueError("embedding vector count does not match chunk count")
-        with psycopg.connect(self.dsn) as conn:
+        with _connect(self.dsn) as conn:
             register_vector(conn)
             with conn.transaction():
                 for chunk_id, vector in zip(chunk_ids, vectors):
@@ -347,7 +358,7 @@ class PgVectorStore:
             LIMIT %s
         """
         params = [query_vector, *filter_params, query_vector, top_k]
-        with psycopg.connect(self.dsn) as conn:
+        with _connect(self.dsn) as conn:
             register_vector(conn)
             rows = conn.execute(sql, params).fetchall()
 
@@ -385,7 +396,7 @@ class PgVectorStore:
             WHERE c.chunk_id = ANY(%s)
               AND {' AND '.join(access_conditions)}
         """
-        with psycopg.connect(self.dsn) as conn:
+        with _connect(self.dsn) as conn:
             rows = conn.execute(sql, [ids, *access_params]).fetchall()
         chunks = {
             row[0]: {
@@ -444,12 +455,13 @@ class PgVectorStore:
     def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False, *, scope: AccessScope) -> dict[str, Any]:
         """TF-IDF fallback when vector search fails or finds nothing."""
         try:
-            import psycopg as _psycopg
             from retrieval.tfidf import TfidfRetriever
             dsn = default_dsn()
             if not dsn:
                 return no_answer_response()
-            with _psycopg.connect(dsn) as conn:
+            if psycopg is None:
+                raise RuntimeError("psycopg is not installed. Run: pip install 'psycopg[binary]'")
+            with _connect(dsn) as conn:
                 with conn.cursor() as cur:
                     # Jalur cadangan ini memuat seluruh chunk sekaligus, jadi
                     # justru di sini penyaring akses paling wajib ada.

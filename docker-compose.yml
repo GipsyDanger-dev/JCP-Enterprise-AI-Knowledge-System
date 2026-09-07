@@ -17,6 +17,8 @@ services:
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       SEED_USER_EMAIL: ${SEED_USER_EMAIL:-}
       SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-}
+      # Opsional: kosong berarti login Google tidak tersedia di backend.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       BACKEND_PORT: ${BACKEND_PORT:-8000}
       TSC_WATCHFILE: UsePolling
     ports:
@@ -40,7 +42,6 @@ services:
     working_dir: /app
     volumes:
       - ./AI:/app
-      - ./backend/tmp:/app/tmp
     environment:
       SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
       # Endpoint dan model provider ikut dari .env: tanpa ini container selalu
@@ -73,7 +74,10 @@ services:
       target: development
     command: npm run dev -- --host 0.0.0.0
     environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+      # Single origin: browser hanya melihat /api, vite dev server meneruskannya
+      # ke backend lewat jaringan internal Docker.
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+      BACKEND_PROXY_URL: http://backend:8000
     ports:
       - "5173:5173"
     volumes:

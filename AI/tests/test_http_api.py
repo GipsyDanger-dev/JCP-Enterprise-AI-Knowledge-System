@@ -17,7 +17,16 @@ except ImportError:  # pragma: no cover - optional dependencies
 class HttpApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        environment = mock.patch.dict(os.environ, {"WORKER_TOKEN": "integration-test-worker"})
+        # Steril terhadap lingkungan: variabel di bawah mengubah pemilihan store
+        # (DATABASE_URL -> PgVectorStore) atau membuat jalur jawaban mencoba LLM
+        # asli (SUMOPOD_API_KEY/LLM_API_KEY), sehingga hasil test jadi tergantung
+        # mesin yang menjalankannya. Nilai kosong dianggap tidak di-set.
+        environment = mock.patch.dict(os.environ, {
+            "WORKER_TOKEN": "integration-test-worker",
+            "DATABASE_URL": "",
+            "SUMOPOD_API_KEY": "",
+            "LLM_API_KEY": "",
+        })
         environment.start()
         cls.addClassCleanup(environment.stop)
         cls.client = TestClient(http_api.app, headers={"X-Worker-Token": "integration-test-worker"})

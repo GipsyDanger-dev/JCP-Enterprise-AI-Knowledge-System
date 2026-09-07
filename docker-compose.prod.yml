@@ -3,6 +3,9 @@ services:
     ports: !reset []
     environment:
       BACKEND_PORT: 8000
+      # Google login bersifat opsional; nilainya boleh kosong untuk
+      # deployment organisasi yang tidak memakainya.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     build:
       context: ./backend
       target: production
