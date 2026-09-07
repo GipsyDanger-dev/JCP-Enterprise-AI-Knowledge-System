@@ -31,10 +31,11 @@ async function main() {
   const organizations = [];
   for (const label of ['alpha', 'beta']) {
     const username = `${label}_${suffix}`;
-    const workspace = await call('/workspaces', owner.accessToken, 'POST', { name: `Test ${label} ${suffix}`, adminName: `Admin ${label}`, adminUsername: username, adminPassword: credentials.password, employeeNumber: 'ADM-01', division: 'Operations', jobTitle: 'Administrator', aiProfile: label === 'beta' ? 'sleman' : 'general' }, 201);
+    const workspace = await call('/workspaces', owner.accessToken, 'POST', { name: `Test ${label} ${suffix}`, adminName: `Admin ${label}`, adminUsername: username, adminPassword: credentials.password, ...(label === 'beta' ? { employeeNumber: 'ADM-01', division: 'Operations', jobTitle: 'Administrator' } : {}), aiProfile: label === 'beta' ? 'sleman' : 'general' }, 201);
     const admin = await login(username);
     assert.equal(admin.user.workspaceId, workspace.id);
     assert.equal(admin.user.isPlatformOwner, false);
+    await call('/users', admin.accessToken, 'POST', { username: `incomplete_${label}_${suffix}`, displayName: 'Incomplete employee', password: credentials.password, role: 'PEGAWAI' }, 400);
     const employeeUsername = `staff_${label}_${suffix}`;
     const employee = await call('/users', admin.accessToken, 'POST', { username: employeeUsername, displayName: `Staff ${label}`, password: credentials.password, employeeNumber: 'EMP-01', division: 'Operations', jobTitle: 'Employee', role: 'PEGAWAI' }, 201);
     const employeeLogin = await login(employeeUsername);

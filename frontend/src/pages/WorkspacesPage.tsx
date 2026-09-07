@@ -38,14 +38,14 @@ export function WorkspacesPage() {
     finally { setSaving(false) }
   }
 
-  const fields = [
-    ['name', isId ? 'Nama organisasi' : 'Organization name', 'text'],
-    ['adminName', isId ? 'Nama admin' : 'Admin name', 'text'],
-    ['adminUsername', 'Username admin', 'text'],
-    ['adminPassword', isId ? 'Password admin' : 'Admin password', 'password'],
-    ['employeeNumber', isId ? 'Nomor karyawan' : 'Employee number', 'text'],
-    ['division', isId ? 'Divisi' : 'Division', 'text'],
-    ['jobTitle', isId ? 'Jabatan' : 'Job title', 'text'],
+  const fields: Array<[string, string, 'text' | 'password', boolean]> = [
+    ['name', isId ? 'Nama organisasi' : 'Organization name', 'text', false],
+    ['adminName', isId ? 'Nama admin' : 'Admin name', 'text', false],
+    ['adminUsername', 'Username admin', 'text', false],
+    ['adminPassword', isId ? 'Password admin' : 'Admin password', 'password', false],
+    ['employeeNumber', isId ? 'Nomor karyawan (opsional)' : 'Employee number (optional)', 'text', true],
+    ['division', isId ? 'Divisi (opsional)' : 'Division (optional)', 'text', true],
+    ['jobTitle', isId ? 'Jabatan (opsional)' : 'Job title (optional)', 'text', true],
   ]
   return <div className="standard-page">
     <PageHeading eyebrow={isId ? 'Administrasi platform' : 'Platform administration'} title={isId ? 'Organisasi' : 'Organizations'} detail={`${items.length} ${isId ? 'workspace organisasi' : 'organization workspaces'}`} action={<button className="primary-button" onClick={() => { setError(''); setOpen(true) }}><Plus size={17} />{isId ? 'Buat organisasi' : 'Create organization'}</button>} />
@@ -56,7 +56,7 @@ export function WorkspacesPage() {
     </tbody></table></div>
     {open && <div className="modal-overlay" onClick={() => !saving && setOpen(false)}><form className="modal-card" onSubmit={submit} onClick={(event) => event.stopPropagation()}>
       <div className="modal-header"><h2>{isId ? 'Buat organisasi' : 'Create organization'}</h2><button type="button" className="icon-button" title={isId ? 'Tutup' : 'Close'} disabled={saving} onClick={() => setOpen(false)}><X size={18} /></button></div>
-      <div className="modal-body">{fields.map(([name, label, type]) => <div className="upload-field" key={name}><label htmlFor={`org-${name}`}>{label}</label><input id={`org-${name}`} name={name} type={type} required minLength={name === 'adminPassword' ? 12 : 2} maxLength={name === 'adminPassword' ? 128 : 80} autoComplete={type === 'password' ? 'new-password' : 'off'} disabled={saving} /></div>)}
+      <div className="modal-body">{fields.map(([name, label, type, optional]) => <div className="upload-field" key={name}><label htmlFor={`org-${name}`}>{label}</label><input id={`org-${name}`} name={name} type={type} required={!optional} minLength={name === 'adminPassword' ? 12 : 2} maxLength={name === 'adminPassword' ? 128 : 80} autoComplete={type === 'password' ? 'new-password' : 'off'} disabled={saving} /></div>)}
         <div className="upload-field"><label htmlFor="org-ai-profile">{isId ? 'Profil AI' : 'AI profile'}</label><select id="org-ai-profile" name="aiProfile" defaultValue="general" disabled={saving}><option value="general">{isId ? 'Umum' : 'General'}</option><option value="sleman">Sleman</option></select></div>
         {error && <p className="inline-alert" role="alert">{error}</p>}
       </div>

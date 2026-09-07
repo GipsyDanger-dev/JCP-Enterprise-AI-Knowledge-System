@@ -27,6 +27,10 @@ const SAFE_USER_SELECT = {
   updatedAt: true,
 } satisfies Prisma.UserSelect;
 
+function normalizeUser<T extends { employeeNumber: string | null; division: string | null; jobTitle: string | null }>(user: T) {
+  return { ...user, employeeNumber: user.employeeNumber ?? '', division: user.division ?? '', jobTitle: user.jobTitle ?? '' };
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -39,7 +43,7 @@ export class UsersService {
       where: { accountType: AccountType.COMPANY, workspaceId: actor.workspaceId },
       orderBy: { createdAt: 'asc' },
       select: SAFE_USER_SELECT,
-    });
+    }).then((users) => users.map(normalizeUser));
   }
 
   /**
@@ -91,7 +95,7 @@ export class UsersService {
           targetId: user.id,
           metadata: { username: user.username, role: user.role },
         });
-        return user;
+        return normalizeUser(user);
       });
     } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -139,7 +143,7 @@ export class UsersService {
         targetId: id,
         metadata: input as unknown as Prisma.InputJsonValue,
       });
-      return updated;
+      return normalizeUser(updated);
     });
   }
 
