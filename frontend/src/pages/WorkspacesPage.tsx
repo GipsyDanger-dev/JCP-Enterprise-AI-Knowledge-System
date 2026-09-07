@@ -50,7 +50,7 @@ export function WorkspacesPage() {
   return <div className="standard-page">
     <PageHeading eyebrow={isId ? 'Administrasi platform' : 'Platform administration'} title={isId ? 'Organisasi' : 'Organizations'} detail={`${items.length} ${isId ? 'workspace organisasi' : 'organization workspaces'}`} action={<button className="primary-button" onClick={() => { setError(''); setOpen(true) }}><Plus size={17} />{isId ? 'Buat organisasi' : 'Create organization'}</button>} />
     {!open && error && <p className="inline-alert" role="alert">{error}</p>}
-    <div className="table-wrap"><table className="data-table"><thead><tr><th>{isId ? 'Organisasi' : 'Organization'}</th><th>{isId ? 'Anggota' : 'Members'}</th><th>{isId ? 'Profil AI' : 'AI profile'}</th><th>Status</th></tr></thead><tbody>
+    <div className="data-table"><table><thead><tr><th>{isId ? 'Organisasi' : 'Organization'}</th><th>{isId ? 'Anggota' : 'Members'}</th><th>{isId ? 'Profil AI' : 'AI profile'}</th><th>Status</th></tr></thead><tbody>
       {items.map((item) => <tr key={item.id}><td><Building2 size={16} /> {item.name}</td><td>{item._count.users}</td><td>{item.aiProfile === 'sleman' ? 'Sleman' : (isId ? 'Umum' : 'General')}</td><td>{item.isActive ? (isId ? 'Aktif' : 'Active') : (isId ? 'Nonaktif' : 'Inactive')}</td></tr>)}
       {!items.length && <tr><td colSpan={4}>{loading ? (isId ? 'Memuat...' : 'Loading...') : (isId ? 'Belum ada organisasi.' : 'No organizations yet.')}</td></tr>}
     </tbody></table></div>
