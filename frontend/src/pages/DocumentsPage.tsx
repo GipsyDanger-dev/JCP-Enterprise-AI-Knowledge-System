@@ -5,14 +5,14 @@ import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { UploadModal } from '@/components/UploadModal'
 import { DocumentAccessModal } from '@/components/DocumentAccessModal'
-import { downloadDocument, getDocumentBlob, getDocumentChunks, listDocumentCategories, updateDocumentAccess, type DocumentChunk } from '@/api/documents'
+import { downloadDocument, getDocumentBlob, getDocumentChunks, listDocumentCategories, type DocumentChunk } from '@/api/documents'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import type { DocumentItem } from '@/types/domain'
 import type { ApiDocumentCategory } from '@/api/types'
 import { assignRequiredReading, completeRequiredReading, listMyRequiredReadings, requiredReadingReport, updateRequiredReadingProgress, type RequiredReadingReport } from '@/api/requiredReadings'
-import { getUserReferenceData, listUsers } from '@/api/users'
-import type { ApiUnitKerja, ApiUser } from '@/api/types'
+import { listUsers } from '@/api/users'
+import type { ApiUser } from '@/api/types'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -226,7 +226,7 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
 
 export function DocumentsPage() {
   const { token } = useAuth()
-  const { documents, role, uploadError, removeDocument, registerUploadedDocument, applyDocumentAccess, language } = useWorkspace()
+  const { documents, role, uploadError, removeDocument, registerUploadedDocument, language } = useWorkspace()
   const canManage = role === 'admin'
   const isId = language === 'id'
   const [searchParams, setSearchParams] = useSearchParams()
@@ -256,16 +256,6 @@ export function DocumentsPage() {
   const [readingReport, setReadingReport] = useState<RequiredReadingReport[]>([])
   const [selectedDivision, setSelectedDivision] = useState('')
   const [assignmentError, setAssignmentError] = useState<string | null>(null)
-
-  // Dialog atur akses. Hanya super admin yang melihatnya: mengunci dokumen ke
-  // unit kerja adalah keputusan tingkat organisasi.
-  const [accessDoc, setAccessDoc] = useState<DocumentItem | null>(null)
-  const [accessCategoryId, setAccessCategoryId] = useState('')
-  const [accessRestrict, setAccessRestrict] = useState(false)
-  const [accessUnitId, setAccessUnitId] = useState('')
-  const [accessSaving, setAccessSaving] = useState(false)
-  const [accessError, setAccessError] = useState<string | null>(null)
-  const [unitKerjaList, setUnitKerjaList] = useState<ApiUnitKerja[]>([])
 
   useEffect(() => {
     if (!requestedDocumentId || selectedDoc) return
@@ -297,15 +287,6 @@ export function DocumentsPage() {
     }).catch(() => { if (active) { setEmployees([]); setSelectedEmployeeIds([]); setReadingReport([]) } })
     return () => { active = false }
   }, [assignmentDoc, token])
-
-  useEffect(() => {
-    if (!accessDoc || !token || unitKerjaList.length > 0) return
-    let batal = false
-    getUserReferenceData(token)
-      .then((data) => { if (!batal) setUnitKerjaList(data.unitKerja) })
-      .catch(() => { if (!batal) setUnitKerjaList([]) })
-    return () => { batal = true }
-  }, [accessDoc, token, unitKerjaList.length])
 
   useEffect(() => {
     let batal = false
@@ -369,38 +350,6 @@ export function DocumentsPage() {
       if (selectedDoc?.id === id) setSelectedDoc(null)
     }
   }
-  const openAccessDialog = (document: DocumentItem) => {
-    setAccessCategoryId(document.categoryId ?? '')
-    setAccessRestrict(Boolean(document.unitKerja))
-    setAccessUnitId(document.unitKerja?.id ?? '')
-    setAccessError(null)
-    setAccessDoc(document)
-  }
-
-  const saveAccess = async () => {
-    if (!accessDoc || !token || accessSaving) return
-    if (accessRestrict && !accessUnitId) {
-      setAccessError(isId ? 'Pilih unit kerja yang boleh membaca dokumen ini.' : 'Choose the work unit allowed to read this document.')
-      return
-    }
-    setAccessSaving(true)
-    setAccessError(null)
-    try {
-      const updated = await updateDocumentAccess(accessDoc.id, {
-        categoryId: accessCategoryId || null,
-        // null berarti kuncinya dilepas: dokumen kembali terbuka untuk semua
-        // pegawai. Dibedakan dari tidak mengirim field sama sekali.
-        unitKerjaId: accessRestrict ? accessUnitId : null,
-      }, token)
-      applyDocumentAccess(updated)
-      setAccessDoc(null)
-    } catch (error) {
-      setAccessError(error instanceof Error ? error.message : (isId ? 'Perubahan akses gagal disimpan.' : 'Access change could not be saved.'))
-    } finally {
-      setAccessSaving(false)
-    }
-  }
-
   const assignReading = async () => {
     if (!token || !assignmentDoc || selectedAssignableEmployeeIds.length === 0) return
     setAssigning(true)
@@ -486,7 +435,7 @@ export function DocumentsPage() {
               <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>
                 {canManage
-                  ? <><button className="icon-button" title={isId ? 'Atur akses dokumen' : 'Manage document access'} onClick={(e) => { e.stopPropagation(); openAccessDialog(document) }}><Building2 size={16} /></button>{document.status === 'Ready' && <button className="icon-button" title={isId ? 'Jadikan wajib baca' : 'Assign required reading'} onClick={(e) => { e.stopPropagation(); setSelectedDivision(''); setAssignmentError(null); setSelectedEmployeeIds([]); setAssignmentView('assign'); setAssignmentDoc(document) }}><BookOpenCheck size={16} /></button>}<button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
+                  ? <>{document.status === 'Ready' && <button className="icon-button" title={isId ? 'Jadikan wajib baca' : 'Assign required reading'} onClick={(e) => { e.stopPropagation(); setSelectedDivision(''); setAssignmentError(null); setSelectedEmployeeIds([]); setAssignmentView('assign'); setAssignmentDoc(document) }}><BookOpenCheck size={16} /></button>}<button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
                   : <button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button>}
               </td>
             </tr>
@@ -502,79 +451,6 @@ export function DocumentsPage() {
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
       <DocumentAccessModal open={showDocumentAccess} onClose={() => setShowDocumentAccess(false)} />
 
-      {/* Atur akses: kategori sebagai penanda subjek, penanda unit sebagai
-          satu-satunya pembatas siapa yang boleh membaca dan menanyakannya. */}
-      {accessDoc && (
-        <div className="modal-overlay" onClick={() => !accessSaving && setAccessDoc(null)}>
-          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h2>{isId ? 'Atur akses dokumen' : 'Document access'}</h2>
-                <p className="modal-copy">{accessDoc.name}</p>
-              </div>
-              <button className="icon-button" onClick={() => setAccessDoc(null)} disabled={accessSaving}><X size={18} /></button>
-            </div>
-            <div className="modal-body">
-              <div className="upload-field">
-                <label><FolderOpen size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Kategori' : 'Category'}</label>
-                <div className="upload-collection-grid">
-                  {categories.map((category) => (
-                    <button
-                      key={category.id}
-                      type="button"
-                      className={`upload-collection-chip ${accessCategoryId === category.id ? 'active' : ''}`}
-                      onClick={() => setAccessCategoryId(accessCategoryId === category.id ? '' : category.id)}
-                      disabled={accessSaving}
-                    >
-                      {category.name}
-                    </button>
-                  ))}
-                </div>
-                <p className="field-hint">
-                  {isId
-                    ? 'Penanda subjek untuk pencarian dan filter. Tidak membatasi siapa pun.'
-                    : 'A subject label for search and filtering. It restricts nobody.'}
-                </p>
-              </div>
-
-              <div className="upload-field">
-                <label><Building2 size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Batasi ke unit kerja' : 'Restrict to work unit'}</label>
-                <label className="upload-restrict-toggle">
-                  <input
-                    type="checkbox"
-                    checked={accessRestrict}
-                    onChange={(event) => setAccessRestrict(event.target.checked)}
-                    disabled={accessSaving}
-                  />
-                  <span>{isId ? 'Hanya untuk satu unit kerja tertentu' : 'Only for one specific work unit'}</span>
-                </label>
-                {accessRestrict && (
-                  <div className="select-wrapper" style={{ marginTop: 8 }}>
-                    <select value={accessUnitId} onChange={(event) => setAccessUnitId(event.target.value)} disabled={accessSaving}>
-                      <option value="">{isId ? '— Pilih unit kerja —' : '— Select work unit —'}</option>
-                      {unitKerjaList.map((unit) => (
-                        <option key={unit.id} value={unit.id}>{unit.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <p className="field-hint">
-                  {isId
-                    ? 'Terkunci berarti hanya unit itu yang bisa membuka dokumennya dan mendapat jawabannya dari Asisten AI. Lepas centang untuk membukanya kembali bagi seluruh pegawai.'
-                    : 'Locked means only that unit can open the document and get answers from it in the AI assistant. Uncheck to reopen it to every employee.'}
-                </p>
-              </div>
-              {accessError && <div className="upload-error-msg" role="alert">{accessError}</div>}
-            </div>
-            <div className="modal-actions">
-              <button className="secondary-button" onClick={() => setAccessDoc(null)} disabled={accessSaving}>{isId ? 'Batal' : 'Cancel'}</button>
-              <button className="primary-button" onClick={saveAccess} disabled={accessSaving}>
-                {accessSaving ? (isId ? 'Menyimpan…' : 'Saving…') : (isId ? 'Simpan' : 'Save')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {assignmentDoc && (
         <div className="modal-overlay" onClick={handleCloseAssignment}>
           <div className="modal-card assignment-modal" onClick={(event) => event.stopPropagation()}>
