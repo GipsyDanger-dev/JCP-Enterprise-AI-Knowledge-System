@@ -19,6 +19,10 @@ export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: 
   const isId = language === 'id'
   const isAdmin = user?.isAdmin ?? false
   const isPersonal = user?.accountType === 'PERSONAL'
+  const isPlatformOwner = user?.isPlatformOwner ?? false
+  const profileName = isPlatformOwner && !isPersonal ? (workspaceName || 'Jogja Creative') : (user?.displayName ?? person.name)
+  const profileLabel = isPlatformOwner && !isPersonal ? (isId ? 'Pembuat aplikasi' : 'App builder') : (isPersonal ? (isId ? 'Ruang pribadi' : 'Personal workspace') : workspaceName)
+  const profileInitials = isPlatformOwner && !isPersonal ? 'JC' : person.initials
   return (
     <aside className={[menuOpen ? 'sidebar open' : 'sidebar', collapsed ? 'collapsed' : ''].filter(Boolean).join(' ')}>
       <div className="brand-lockup">
@@ -29,14 +33,14 @@ export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: 
       <button className="mobile-close" title={isId ? 'Tutup navigasi' : 'Close navigation'} onClick={onClose}><X size={20} /></button>
       {!collapsed && (
         <div className="sidebar-user-info">
-          {user?.photoUrl ? <img className="avatar" src={user.photoUrl} alt="" style={{ objectFit: 'cover' }} /> : <span className="avatar">{person.initials}</span>}
+          {user?.photoUrl ? <img className="avatar" src={user.photoUrl} alt="" style={{ objectFit: 'cover' }} /> : <span className="avatar">{profileInitials}</span>}
           <div>
-            <strong>{user?.displayName ?? person.name}</strong>
-            <small className="workspace-label">{isPersonal ? (isId ? 'Ruang pribadi' : 'Personal workspace') : workspaceName}</small>
+            <strong>{profileName}</strong>
+            <small className="workspace-label">{profileLabel}</small>
           </div>
         </div>
       )}
-      {collapsed && <div className="sidebar-user-avatar">{user?.photoUrl ? <img className="avatar" src={user.photoUrl} alt="" style={{ objectFit: 'cover' }} /> : <span className="avatar">{person.initials}</span>}</div>}
+      {collapsed && <div className="sidebar-user-avatar">{user?.photoUrl ? <img className="avatar" src={user.photoUrl} alt="" style={{ objectFit: 'cover' }} /> : <span className="avatar">{profileInitials}</span>}</div>}
       <nav aria-label="Primary navigation">
         {!collapsed && <p>{isId ? 'Ruang kerja' : 'Workspace'}</p>}
         {navigation.map(({ id, label, icon: Icon }) => {
