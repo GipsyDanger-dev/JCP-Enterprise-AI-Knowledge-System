@@ -11,6 +11,12 @@ const DEFAULT_PORT = 5173
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const fileEnv = loadEnv(mode, repoRoot, 'FRONTEND_PORT')
+  // Support both the shared root env and the conventional frontend/.env.
+  // The frontend-local value wins so local Vite settings can override shared
+  // defaults without exposing backend-only variables.
+  const sharedViteEnv = loadEnv(mode, repoRoot, 'VITE_')
+  const frontendViteEnv = loadEnv(mode, process.cwd(), 'VITE_')
+  const googleClientId = frontendViteEnv.VITE_GOOGLE_CLIENT_ID || sharedViteEnv.VITE_GOOGLE_CLIENT_ID
   const port = Number(process.env.FRONTEND_PORT ?? fileEnv.FRONTEND_PORT) || DEFAULT_PORT
 
   return {
@@ -18,6 +24,9 @@ export default defineConfig(({ mode }) => {
     // prefixed with VITE_, so secrets such as GOOGLE_CLIENT_ID counterparts
     // without that prefix remain server-side.
     envDir: repoRoot,
+    define: googleClientId
+      ? { 'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(googleClientId) }
+      : undefined,
     plugins: [react()],
     resolve: {
       alias: {

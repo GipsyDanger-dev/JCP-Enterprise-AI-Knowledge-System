@@ -771,6 +771,10 @@ button { cursor: pointer; }
 .role-badge { display: inline-block; padding: 3px 10px; border-radius: var(--radius-xl); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: .05em; }
 .role-badge.admin { background: var(--brand-100); color: var(--brand-800); }
 .role-badge.user { background: var(--success-bg); color: var(--success); }
+
+/* Detail anggota workspace di halaman organisasi (platform owner). */
+.member-subtext { display: block; font-size: var(--fs-2xs); color: var(--text-secondary); }
+.modal-hint { font-size: var(--fs-sm); color: var(--text-secondary); margin: 0 0 var(--space-3); }
 .users-loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 48px 0; color: var(--text-muted); font-size: var(--fs-sm); }
 .empty-row { text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: var(--fs-sm); }
 .clickable-row { cursor: pointer; }

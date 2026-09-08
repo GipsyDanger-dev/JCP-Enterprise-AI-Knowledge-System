@@ -33,13 +33,18 @@ except ImportError:  # pragma: no cover - optional dependency
     ) from None
 
 from config import DEFAULT_MODEL, EMBEDDING_MODEL, EMBEDDINGS_ENABLED
-from generation.guardrails import QUICK_SUGGESTIONS, is_out_of_scope, out_of_scope_response
+from generation.guardrails import is_out_of_scope, out_of_scope_response
 from knowledge_base import KnowledgeBase
 from provider_errors import ProviderError
 from store import AccessScope, PgVectorStore, default_dsn, ingest_file_to_pg, ingest_to_pg
 
 PROJECT_DIR = Path(__file__).resolve().parent
 DEFAULT_INDEX = PROJECT_DIR / "knowledge_base.json"
+
+
+def provider_api_key() -> str | None:
+    """Support SlemaN's provider name while keeping unified .env compatible."""
+    return os.environ.get("SUMOPOD_API_KEY") or os.environ.get("AI_PROVIDER_API_KEY")
 
 def require_worker_token(request: Request, x_worker_token: str | None = Header(default=None)) -> None:
     if request.url.path == "/health":
@@ -126,60 +131,64 @@ def health() -> dict[str, Any]:
 
 
 # Patterns for general chat (greetings, small talk, general knowledge)
-GENERAL_CHAT_PATTERNS = [
+SMALL_TALK_PATTERNS = [
     r'^(halo|hai|hi|hey|hello|selamat|morning|pagi|siang|sore|malam)[\s!.?]*$',
     r'^(apa kabar|how are you|kabar)[\s!.?]*$',
     r'^(siapa (kamu|anda|nama)|who are you|kenalan)[\s!.?]*$',
     r'^(terima kasih|thank|thanks|makasih|thx)[\s!.?]*$',
     r'^(bye|dadah|selamat tinggal|see you|sampai jumpa)[\s!.?]*$',
     r'^(tolong|help|bantuan|bisa bantu)[\s!.?]*$',
-    r'^(apa itu|what is|what are|gimana|bagaimana|how)[\s]?$',
-    r'^(ceritain|cerita|tell me|explain)[\s]?$',
     r'^(oks?|ok|baik|baiklah|siap|ready|noted)[\s!.?]*$',
 ]
+INCOMPLETE_PATTERNS = [
+    r'^(apa itu|what is|what are|gimana|bagaimana|how)[\s]?$',
+    r'^(ceritain|cerita|tell me|explain)[\s]?$',
+]
+GENERAL_CHAT_PATTERNS = SMALL_TALK_PATTERNS + INCOMPLETE_PATTERNS
 
-def is_general_chat(query: str, workspace_type: str = "COMPANY") -> bool:
-    """Detect if query is general chat, not document-specific."""
+def is_general_chat(query: str, workspace_type: str = "COMPANY", has_topic: bool = False) -> bool:
+    """Detect greetings without classifying document topics by keywords."""
     q = query.strip().lower()
-    
-    # Check off-topic first - these are NOT document queries
     if is_out_of_scope(q, workspace_type):
         return True
-    
-    # Check general chat patterns
-    for pattern in GENERAL_CHAT_PATTERNS:
-        if re.match(pattern, q, re.IGNORECASE):
-            return True
-    
-    return False
+    if any(re.match(pattern, q, re.IGNORECASE) for pattern in SMALL_TALK_PATTERNS):
+        return True
+    return (not has_topic) and any(
+        re.match(pattern, q, re.IGNORECASE) for pattern in INCOMPLETE_PATTERNS
+    )
 
 
 SMART_RESPONSES = {
-    'halo': 'Halo! Saya siap membantu mencari dan menjelaskan informasi dari dokumen yang dapat Anda akses.',
-    'hai': 'Hai! Silakan tanyakan apa pun yang berkaitan dengan file di workspace Anda.',
-    'hi': 'Hi! I can help answer questions using the documents available in your workspace.',
-    'apa kabar': 'Kabar baik! Saya siap membantu memahami dokumen di workspace Anda.',
-    'siapa': 'Saya adalah asisten berbasis dokumen. Jawaban saya disusun dari isi file yang tersedia di workspace Anda.',
-    'terima kasih': 'Sama-sama! Silakan tanyakan hal lain dari dokumen Anda.',
-    'thanks': 'You\'re welcome! Feel free to ask another question about your documents.',
-    'help': 'Saya dapat mencari informasi, menjelaskan bagian tertentu, membandingkan, dan merangkum dokumen di workspace Anda.',
-    'bantuan': 'Silakan tanyakan isi file, minta ringkasan, cari poin penting, atau bandingkan informasi antar dokumen.',
-    'ok': 'Baik! Silakan ajukan pertanyaan tentang dokumen Anda.',
-    'siap': 'Siap! Saya menunggu pertanyaan tentang dokumen Anda.',
+    'halo': 'Halo! Saya Enterprise AI. Saya menjawab dari dokumen resmi yang tersimpan di sistem ini. Silakan ketik pertanyaan Anda, atau pilih salah satu topik di bawah.',
+    'hai': 'Hai! Saya menjawab berdasarkan dokumen resmi yang tersimpan di sistem ini. Silakan ajukan pertanyaan.',
+    'hi': 'Hi! I answer questions from the official documents stored in this system.',
+    'apa kabar': 'Kabar baik! Saya siap membantu mencari informasi dari dokumen yang tersimpan.',
+    'siapa': 'Saya Enterprise AI, asisten berbasis dokumen. Jawaban saya diambil dari dokumen resmi yang tersimpan di sistem ini.',
+    'terima kasih': 'Sama-sama! Silakan tanyakan hal lain dari dokumen yang tersimpan.',
+    'thanks': "You're welcome! Feel free to ask anything else about the stored documents.",
+    'help': 'Saya bisa mencari isi dokumen, menjelaskan ketentuan, dan menunjukkan sumbernya.',
+    'bantuan': 'Saya bisa mencari isi dokumen, menjelaskan ketentuan, dan menunjukkan sumbernya.',
+    'ok': 'Baik! Silakan ketik pertanyaan Anda tentang dokumen yang tersimpan.',
+    'siap': 'Siap! Saya menunggu pertanyaan Anda tentang dokumen yang tersimpan.',
 }
 
-DEFAULT_GENERAL_RESPONSE = 'Saya siap membantu menjawab berdasarkan dokumen yang tersedia di workspace Anda.'
+DEFAULT_GENERAL_RESPONSE = 'Halo! Saya Enterprise AI. Saya menjawab dari dokumen resmi yang tersimpan di sistem ini. Silakan ketik pertanyaan Anda.'
 
 
-def general_chat_response(query: str, model: str, workspace_type: str = "COMPANY") -> dict[str, Any]:
-    """Smart keyword-based response for general chat with off-topic guardrails."""
+def suggested_questions(store: PgVectorStore | KnowledgeBase, scope: AccessScope | None) -> list[str]:
+    """Build suggestions from the same corpus and access scope as retrieval."""
+    try:
+        if isinstance(store, PgVectorStore):
+            return [] if scope is None else store.suggested_questions(scope=scope)
+        return store.suggested_questions()
+    except Exception as exc:
+        print(f"[AI] Suggestion build failed: {exc}")
+        return []
+
+
+def general_chat_response(query: str, suggestions: list[str]) -> dict[str, Any]:
+    """Return a greeting response with corpus-derived suggestions."""
     q = query.strip().lower()
-    
-    # Check for off-topic content first
-    if is_out_of_scope(q, workspace_type):
-        return out_of_scope_response(workspace_type)
-    
-    # Check for known patterns (greetings, small talk)
     for keyword, response in SMART_RESPONSES.items():
         if keyword in q:
             return {
@@ -187,7 +196,7 @@ def general_chat_response(query: str, model: str, workspace_type: str = "COMPANY
                 "citations": [],
                 "grounded": False,
                 "retrieval": [],
-                "suggestions": QUICK_SUGGESTIONS,
+                "suggestions": suggestions,
             }
     
     return {
@@ -195,7 +204,7 @@ def general_chat_response(query: str, model: str, workspace_type: str = "COMPANY
         "citations": [],
         "grounded": False,
         "retrieval": [],
-        "suggestions": QUICK_SUGGESTIONS,
+        "suggestions": suggestions,
     }
 
 
@@ -211,22 +220,28 @@ def ask(request: AskRequest) -> dict[str, Any]:
     """Page/section retrieval -> (optional LLM) -> answer + citations."""
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="query must not be empty")
+    store = current_store()
+    scope: AccessScope | None = None
+    if isinstance(store, PgVectorStore):
+        # Access boundaries are required before even generating suggestions.
+        scope = AccessScope.from_payload(request.access)
+        if scope is None:
+            raise HTTPException(status_code=400, detail="access scope is required")
+
     # Guardrails evaluate the new user question before a local topic label is applied.
     if is_out_of_scope(request.query, request.workspace_type):
-        return out_of_scope_response(request.workspace_type)
-    if is_general_chat(request.query, request.workspace_type) and not request.conversation_topic:
-        return general_chat_response(
-            request.query, request.model or DEFAULT_MODEL, request.workspace_type,
-        )
+        return out_of_scope_response(suggested_questions(store, scope))
+    if is_general_chat(
+        request.query,
+        request.workspace_type,
+        has_topic=bool(request.conversation_topic),
+    ):
+        return general_chat_response(request.query, suggested_questions(store, scope))
 
     retrieval_query = contextualize_query(request.query, request.conversation_topic)
 
     try:
-        store = current_store()
         if isinstance(store, PgVectorStore):
-            scope = AccessScope.from_payload(request.access)
-            if scope is None:
-                raise HTTPException(status_code=400, detail="access scope is required")
             return store.ask(
                 retrieval_query, top_k=request.top_k, use_llm=request.use_llm,
                 model=request.model or DEFAULT_MODEL, filters=request.filters,
@@ -265,7 +280,7 @@ def ingest_documents(request: IngestRequest) -> dict[str, Any]:
                 store,
                 str(request.document_version_id),
                 embed=request.embed,
-                api_key=os.environ.get("AI_PROVIDER_API_KEY"),
+                api_key=provider_api_key(),
             )
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
@@ -321,7 +336,7 @@ async def ingest_file(
                 store,
                 str(document_version_id),
                 embed=embed,
-                api_key=os.environ.get("SUMOPOD_API_KEY"),
+                api_key=provider_api_key(),
             )
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error

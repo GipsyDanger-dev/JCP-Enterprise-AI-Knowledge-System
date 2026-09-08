@@ -48,6 +48,25 @@ CLARIFY_RULE = (
 )
 
 
+_QUESTION_OPENERS = (
+    "apa", "apakah", "bagaimana", "gimana", "berapa", "kapan", "siapa",
+    "mengapa", "kenapa", "dimana", "di mana", "bolehkah", "adakah",
+    "jelaskan", "ringkas", "sebutkan", "tolong", "carikan", "cari",
+    "what", "how", "when", "who", "why", "where",
+)
+
+
+def looks_like_topic_phrase(query: str) -> bool:
+    """Detect a short topic label that has no explicit question yet."""
+    text = query.strip().lower()
+    if not text or "?" in text:
+        return False
+    words = text.split()
+    if len(words) > 5:
+        return False
+    return not any(text.startswith(opener) for opener in _QUESTION_OPENERS)
+
+
 def _format_size(size_bytes: int | None) -> str:
     if not size_bytes:
         return "ukuran tidak tercatat"
@@ -102,6 +121,12 @@ def build_messages(
             + format_inventory(documents)
         )
     bagian.append(f"Konteks dokumen yang dapat diakses pengguna:\n{context}")
+    if allow_clarify and looks_like_topic_phrase(query):
+        bagian.append(
+            f"Catatan: pengguna hanya menyebut topik \"{query.strip()}\" tanpa pertanyaan "
+            "yang jelas. Jangan menebak maksudnya — balas dengan type clarify dan "
+            "susun pilihan dari sudut pandang berbeda yang benar-benar ada di konteks."
+        )
     system = SYSTEM_PROMPT + CLARIFY_RULE if allow_clarify else SYSTEM_PROMPT
     if ai_profile == "sleman":
         system += " Konteks workspace adalah dokumen pemerintahan Sleman. Pertahankan istilah unit kerja, jenis produk hukum, nomor, tahun, dan status peraturan sesuai sumber. Jangan menganggap rancangan sebagai aturan yang sudah berlaku."

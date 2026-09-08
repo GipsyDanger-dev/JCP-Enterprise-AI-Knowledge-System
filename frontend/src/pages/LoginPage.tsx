@@ -167,7 +167,6 @@ export function LoginPage() {
             </div>
 
             <div className="login-card-header">
-              <span className="login-eyebrow">{isId ? 'SATU WORKSPACE, DUA JENIS AKUN' : 'ONE WORKSPACE, TWO ACCOUNT TYPES'}</span>
               <h1>{accountType === 'company'
                 ? (isId ? 'Selamat datang kembali' : 'Welcome back')
                 : (personalMode === 'login'

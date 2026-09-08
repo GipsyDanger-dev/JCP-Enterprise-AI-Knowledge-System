@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 import uuid
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from ingestion.sections import extract_sections
 from retrieval.search import build_retriever
 from generation.citations import citations_from_matches
 from generation.guardrails import is_no_answer, no_answer_response
+from generation.suggestions import questions_from_topics
 from generation.llm import DEFAULT_MODEL, generate_answer
 from config import EMBEDDING_MODEL
 
@@ -107,6 +109,15 @@ class KnowledgeBase:
         self.embeddings = {chunk["chunk_id"]: vector for chunk, vector in zip(self.chunks, vectors)}
         return len(vectors)
 
+    def suggested_questions(self) -> list[str]:
+        """Build suggestions from this index instead of a fixed topic list."""
+        topics = [
+            {"section_title": chunk.get("section_title", ""), "filename": chunk.get("filename", "")}
+            for chunk in self.chunks
+        ]
+        random.shuffle(topics)
+        return questions_from_topics(topics)
+
     def ask(self, query: str, top_k: int = 5, minimum_score: float | None = None,
             use_llm: bool = False, model: str = DEFAULT_MODEL,
             retriever: str = "auto", api_key: str | None = None,
@@ -118,7 +129,7 @@ class KnowledgeBase:
         threshold = engine.minimum_score if minimum_score is None else minimum_score
         matches = [(score, chunk) for score, chunk in engine.search(query, top_k, filters=filters) if score >= threshold]
         if not matches:
-            return no_answer_response()
+            return no_answer_response(self.suggested_questions())
         citations = citations_from_matches(matches)
         if use_llm:
             answer = generate_answer(
@@ -128,7 +139,7 @@ class KnowledgeBase:
         else:
             answer = matches[0][1]["text"]
         if is_no_answer(answer):
-            return no_answer_response()
+            return no_answer_response(self.suggested_questions())
         return {
             "answer": answer,
             "citations": citations,

@@ -13,82 +13,67 @@ from typing import Any
 from config import NO_ANSWER
 
 OUT_OF_SCOPE = (
-    "Saya hanya dapat membantu menjawab pertanyaan seputar dokumen perusahaan, "
-    "seperti SOP, kebijakan, prosedur, dan informasi internal."
+    "Saya hanya dapat membantu menjawab pertanyaan yang jawabannya ada pada "
+    "dokumen resmi yang tersimpan di sistem ini."
 )
 
-OUT_OF_SCOPE_PERSONAL = (
-    "Saya hanya dapat mengikuti instruksi sistem dan menjawab berdasarkan "
-    "dokumen yang tersedia di workspace Personal Anda."
-)
-
-QUICK_SUGGESTIONS = [
-    "Ringkas dokumen yang tersedia.",
-    "Apa poin penting dari dokumen saya?",
-    "Jelaskan informasi utama beserta sumbernya.",
-    "Apakah ada informasi yang berbeda antar dokumen?",
-]
+# Backward-compatible alias for callers that still import this constant.
+OUT_OF_SCOPE_PERSONAL = OUT_OF_SCOPE
 
 _ARITHMETIC_QUERY = re.compile(
     r"^\s*(?:berapa\s+|hitung(?:kan)?\s+)?\d+(?:[.,]\d+)?\s*"
     r"(?:[+\-*/x×÷]\s*\d+(?:[.,]\d+)?)+\s*(?:berapa|hasil(?:nya)?|=)?\s*\??\s*$",
     re.IGNORECASE,
 )
-_OFF_TOPIC_KEYWORDS = (
-    "politik", "presiden", "gubernur", "partai", "agama", "allah", "tuhan",
-    "cuaca", "hujan", "sepak bola", "basket", "film", "musik", "artis",
-    "iphone", "android", "samsung", "sakit", "demam", "obat", "dokter",
-    "resep", "masakan", "wisata", "jalan-jalan", "bitcoin", "crypto",
-)
-_PROMPT_INJECTION_KEYWORDS = (
-    "ignore previous", "abaikan instruksi", "lupakan instruksi",
-    "system prompt", "developer message",
-)
-_DOCUMENT_KEYWORDS = (
-    "sop", "kebijakan", "prosedur", "dokumen", "cuti", "izin", "reimbursement",
-    "biaya", "tunjangan", "perjalanan dinas", "karyawan", "hrd", "perusahaan",
-)
-_GENERAL_PERSON_QUERY = re.compile(
-    r"^\s*(?:siapa|siapakah|who\s+is)\s+(?:itu\s+)?[a-z][a-z .'-]{1,80}\??\s*$",
-    re.IGNORECASE,
+_PROMPT_INJECTION_PHRASES = (
+    "ignore previous", "ignore all previous", "disregard previous",
+    "abaikan instruksi", "lupakan instruksi", "abaikan aturan di atas",
 )
 
 
-def no_answer_response(workspace_type: str = "COMPANY") -> dict[str, Any]:
+def no_answer_response(
+    suggestions: list[str] | None = None,
+    workspace_type: str | None = None,
+) -> dict[str, Any]:
+    """Return the fixed no-evidence answer with corpus-derived suggestions."""
+    # ``workspace_type`` remains accepted for old callers; suggestions now come
+    # from the same filtered corpus as retrieval instead of a stale fixed list.
+    if isinstance(suggestions, str):
+        suggestions = None
     return {
         "answer": NO_ANSWER,
         "citations": [],
         "grounded": False,
         "retrieval": [],
-        "suggestions": QUICK_SUGGESTIONS,
+        "suggestions": list(suggestions or []),
     }
 
 
-def out_of_scope_response(workspace_type: str = "COMPANY") -> dict[str, Any]:
+def out_of_scope_response(
+    suggestions: list[str] | None = None,
+    workspace_type: str | None = None,
+) -> dict[str, Any]:
+    if isinstance(suggestions, str):
+        suggestions = None
     return {
-        "answer": OUT_OF_SCOPE_PERSONAL if workspace_type == "PERSONAL" else OUT_OF_SCOPE,
+        "answer": OUT_OF_SCOPE,
         "citations": [],
         "grounded": False,
         "retrieval": [],
-        "suggestions": QUICK_SUGGESTIONS,
+        "suggestions": list(suggestions or []),
     }
 
 
 def is_out_of_scope(query: str, workspace_type: str = "COMPANY") -> bool:
+    """Reject only arithmetic and explicit prompt-injection attempts.
+
+    Domain keyword lists reject valid questions when the archive changes. The
+    retrieval result is the source of truth for document scope.
+    """
     normalized = query.strip().lower()
-    if any(keyword in normalized for keyword in _PROMPT_INJECTION_KEYWORDS):
-        return True
-    # Personal workspace dapat berisi dokumen dari bidang apa pun. Validitas
-    # jawaban ditentukan oleh retrieval dan citation, bukan daftar topik HR.
-    if workspace_type == "PERSONAL":
-        return False
     if _ARITHMETIC_QUERY.match(normalized):
         return True
-    if any(keyword in normalized for keyword in _OFF_TOPIC_KEYWORDS):
-        return True
-    return bool(_GENERAL_PERSON_QUERY.match(normalized)) and not any(
-        keyword in normalized for keyword in _DOCUMENT_KEYWORDS
-    )
+    return any(phrase in normalized for phrase in _PROMPT_INJECTION_PHRASES)
 
 
 def is_no_answer(answer: str) -> bool:

@@ -109,25 +109,40 @@ export class AuthService {
     if (!user) {
       const existingEmailOwner = await this.prisma.user.findUnique({ where: { email } });
       if (existingEmailOwner) {
-        // Never silently link Google to a password/company account. Linking requires
-        // explicit proof through the existing account and is a separate flow.
-        throw new ConflictException('This email is already registered with another sign-in method');
+        // Google already verified ownership of this email. Linking is safe for a
+        // PERSONAL account, but must never convert a company-issued account into
+        // a Google login or overwrite an existing Google identity.
+        if (existingEmailOwner.accountType !== AccountType.PERSONAL || !existingEmailOwner.isActive) {
+          throw new ConflictException('This email is already registered with another sign-in method');
+        }
+        if (existingEmailOwner.googleSubject && existingEmailOwner.googleSubject !== googleSubject) {
+          throw new ConflictException('This email is already linked to another Google account');
+        }
+        user = await this.prisma.user.update({
+          where: { id: existingEmailOwner.id },
+          data: {
+            googleSubject,
+            ...(existingEmailOwner.photoUrl ? {} : { photoUrl: googlePayload.picture ?? null }),
+          },
+        });
       }
 
-      user = await this.prisma.user.create({
-        data: {
-          email,
-          displayName: googlePayload.name?.trim() || email.split('@')[0],
-          photoUrl: googlePayload.picture,
-          accountType: AccountType.PERSONAL,
-          googleSubject,
-          workspace: { create: { name: googlePayload.name?.trim() || email.split('@')[0], type: AccountType.PERSONAL } },
-          role: UserRole.USER,
-          isAdmin: false,
-          isActive: true,
-        },
-      });
-      isNewAccount = true;
+      if (!user) {
+        user = await this.prisma.user.create({
+          data: {
+            email,
+            displayName: googlePayload.name?.trim() || email.split('@')[0],
+            photoUrl: googlePayload.picture,
+            accountType: AccountType.PERSONAL,
+            googleSubject,
+            workspace: { create: { name: googlePayload.name?.trim() || email.split('@')[0], type: AccountType.PERSONAL } },
+            role: UserRole.USER,
+            isAdmin: false,
+            isActive: true,
+          },
+        });
+        isNewAccount = true;
+      }
     }
 
     if (!user.isActive || user.accountType !== AccountType.PERSONAL) {

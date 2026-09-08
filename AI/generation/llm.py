@@ -67,10 +67,19 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
                     allow_clarify: bool = False, ai_profile: str = "general",
                     workspace_type: str = "COMPANY") -> str:
     """Ask the configured LLM to answer using intact page/section contexts only."""
-    key = api_key or os.environ.get(AI_PROVIDER_API_KEY_ENV)
+    key = (
+        api_key
+        or os.environ.get("SUMOPOD_API_KEY")
+        or os.environ.get(AI_PROVIDER_API_KEY_ENV)
+    )
     if not key:
         raise ProviderConfigurationError(AI_PROVIDER_API_KEY_ENV)
-    if not AI_PROVIDER_BASE_URL:
+    base_url = (
+        os.environ.get("SUMOPOD_BASE_URL")
+        or os.environ.get("AI_PROVIDER_BASE_URL")
+        or AI_PROVIDER_BASE_URL
+    ).rstrip("/")
+    if not base_url:
         raise ProviderConfigurationError("AI_PROVIDER_BASE_URL")
     body_fields: dict[str, Any] = {
         "model": model,
@@ -87,7 +96,7 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
         body_fields["response_format"] = {"type": "json_object"}
     payload = json.dumps(body_fields).encode("utf-8")
     request = urllib.request.Request(
-        f"{AI_PROVIDER_BASE_URL}/chat/completions",
+        f"{base_url}/chat/completions",
         data=payload,
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
         method="POST",

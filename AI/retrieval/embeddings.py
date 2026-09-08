@@ -26,10 +26,15 @@ from retrieval.filters import match_metadata
 
 
 def _api_key(api_key: str | None) -> str:
-    key = api_key or os.environ.get(AI_PROVIDER_API_KEY_ENV)
+    key = api_key or os.environ.get("SUMOPOD_API_KEY") or os.environ.get(AI_PROVIDER_API_KEY_ENV)
     if not key:
         raise ProviderConfigurationError(AI_PROVIDER_API_KEY_ENV)
-    if not AI_PROVIDER_BASE_URL:
+    base_url = (
+        os.environ.get("SUMOPOD_BASE_URL")
+        or os.environ.get("AI_PROVIDER_BASE_URL")
+        or AI_PROVIDER_BASE_URL
+    ).rstrip("/")
+    if not base_url:
         raise ProviderConfigurationError("AI_PROVIDER_BASE_URL")
     return key
 
@@ -44,12 +49,17 @@ def embed_texts(
     if not texts:
         return []
     key = _api_key(api_key)
+    base_url = (
+        os.environ.get("SUMOPOD_BASE_URL")
+        or os.environ.get("AI_PROVIDER_BASE_URL")
+        or AI_PROVIDER_BASE_URL
+    ).rstrip("/")
     vectors: list[list[float]] = []
     for start in range(0, len(texts), batch_size):
         batch = texts[start:start + batch_size]
         payload = json.dumps({"model": model, "input": batch}).encode("utf-8")
         request = urllib.request.Request(
-            f"{AI_PROVIDER_BASE_URL}/embeddings",
+            f"{base_url}/embeddings",
             data=payload,
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             method="POST",

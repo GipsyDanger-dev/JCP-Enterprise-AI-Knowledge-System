@@ -24,6 +24,29 @@ interface AiAskResult {
   awaiting_choice?: boolean;
 }
 
+// Pertanyaan definisional seperti "apa itu retribusi daerah" membuka topik
+// baru, walaupun mengandung kata rujukan "itu".
+const DEFINITIONAL_OPENER = /^(apa|apakah|siapa)\s+itu\b|^apa\s+yang\s+dimaksud\b/;
+
+// Penanda kalimat yang sengaja menggantung pada jawaban sebelumnya.
+const FOLLOW_UP_OPENER = /^(berarti|jadi|kalau\s+(begitu|gitu|iya|tidak|ya)|lalu|terus|trus|selain\s+itu|apalagi|apa\s+lagi|bagaimana\s+dengan|gimana\s+dengan|sedangkan|kalau\s+untuk)\b/;
+const REFERENCE_WORD = /\b(itu|tersebut|tadi|sebelumnya|barusan|di\s+atas)\b/;
+const ELLIPSIS_WORD = /^(apa|apakah|kenapa|mengapa|berapa|kapan|siapa|bagaimana|gimana|dimana|mana|saja|aja|juga|lagi|ya|dong|sih|kah|dan|atau|yang|begitu|gitu|demikian|lalu|terus)$|nya$/;
+
+/**
+ * Konteks room hanya dipakai ketika pertanyaan memang bergantung pada
+ * giliran sebelumnya. Topik baru harus memulai retrieval dari pertanyaannya
+ * sendiri agar konteks lama tidak menutupi dokumen yang relevan.
+ */
+export function isFollowUpQuestion(question: string): boolean {
+  const text = question.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!text || DEFINITIONAL_OPENER.test(text)) return false;
+  if (FOLLOW_UP_OPENER.test(text) || REFERENCE_WORD.test(text)) return true;
+
+  const words = text.replace(/[?!.,]+$/g, '').split(' ');
+  return words.length <= 4 && words.every((word) => ELLIPSIS_WORD.test(word));
+}
+
 export interface ChatCitation {
   documentId: string;
   documentVersionId: string;
@@ -55,8 +78,11 @@ export class ChatService {
     fromSuggestion?: boolean,
   ) {
     const conversation = await this.resolveConversation(question, actor, conversationId);
-    const contextChunkIds = await this.getContextChunkIds(conversation.id);
-    const conversationTopic = await this.getConversationTopic(conversation.id);
+    const isFollowUp = isFollowUpQuestion(question);
+    const contextChunkIds = isFollowUp ? await this.getContextChunkIds(conversation.id) : [];
+    const conversationTopic = isFollowUp
+      ? await this.getConversationTopic(conversation.id)
+      : undefined;
     const access = await this.accessScope(actor);
 
     await this.prisma.message.create({
