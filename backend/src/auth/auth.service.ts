@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -10,11 +11,16 @@ import { AccountType, AuditAction, AuditActorType, Prisma, User, UserRole } from
 import { OAuth2Client } from 'google-auth-library';
 import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
+import { trialDurationDays } from '../config/env.util';
 import { JwtPayload } from './auth.types';
 import { GoogleLoginDto } from './dto/google-login.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterPersonalDto } from './dto/register-personal.dto';
+import { RegisterCompanyDto } from './dto/register-company.dto';
+import { CheckCompanyAvailabilityDto } from './dto/check-company-availability.dto';
+import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import { hashPassword, verifyPassword } from './password.util';
+import { BillingService } from '../billing/billing.service';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +29,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly billing: BillingService,
   ) {}
 
   async login(input: LoginDto, ipAddress?: string, userAgent?: string) {
@@ -77,6 +84,100 @@ export class AuthService {
       }
       throw error;
     }
+  }
+
+  async registerCompany(
+    input: RegisterCompanyDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    if (input.password !== input.confirmPassword) {
+      throw new BadRequestException('Password confirmation does not match');
+    }
+    if (input.onboardingMode === 'SUBSCRIBE') this.billing.assertPaymentConfigured();
+    const email = input.adminEmail.trim().toLowerCase();
+    const username = input.adminUsername.trim().toLowerCase();
+    const passwordHash = await hashPassword(input.password);
+    const trialStartedAt = new Date();
+    const trialEndsAt = new Date(trialStartedAt.getTime() + trialDurationDays() * 24 * 60 * 60 * 1000);
+
+    try {
+      const result = await this.prisma.$transaction(async (transaction) => {
+        const workspace = await transaction.workspace.create({
+          data: {
+            name: input.organizationName.trim(),
+            type: AccountType.COMPANY,
+            subscriptionStatus: input.onboardingMode === 'SUBSCRIBE' ? 'PENDING_PAYMENT' : 'TRIAL',
+            trialStartedAt: input.onboardingMode === 'TRIAL' ? trialStartedAt : null,
+            trialEndsAt: input.onboardingMode === 'TRIAL' ? trialEndsAt : null,
+            subscriptionPlan: input.onboardingMode === 'TRIAL' ? 'trial' : null,
+            users: {
+              create: {
+                email,
+                username,
+                displayName: input.adminName.trim(),
+                passwordHash,
+                accountType: AccountType.COMPANY,
+                role: UserRole.SUPER_ADMIN,
+                isAdmin: true,
+                isActive: input.onboardingMode === 'TRIAL',
+              },
+            },
+            categories: {
+              create: [
+                { name: 'Operations', key: 'operations' },
+                { name: 'HR', key: 'hr' },
+                { name: 'Finance', key: 'finance' },
+              ],
+            },
+          },
+          include: { users: { where: { username }, take: 1 } },
+        });
+        const createdUser = workspace.users[0];
+        if (!createdUser) throw new Error('Company administrator could not be created');
+        await transaction.auditLog.create({
+          data: {
+            actorType: AuditActorType.USER,
+            actorUserId: createdUser.id,
+            action: AuditAction.USER_CREATED,
+            targetType: 'WORKSPACE',
+            targetId: workspace.id,
+            workspaceId: workspace.id,
+            metadata: { onboardingMode: input.onboardingMode, subscriptionStatus: input.onboardingMode === 'TRIAL' ? 'TRIAL' : 'PENDING_PAYMENT' },
+          },
+        });
+        return { createdUser, workspaceId: workspace.id };
+      });
+
+      if (input.onboardingMode === 'SUBSCRIBE') {
+        const order = await this.billing.createInitialOrder(result.workspaceId, {
+          planSlug: input.planSlug,
+          cycle: input.cycle,
+          couponCode: input.couponCode,
+        });
+        return { onboardingMode: 'SUBSCRIBE', orderId: order.id, paymentUrl: order.paymentUrl, expiresAt: order.expiresAt };
+      }
+      return this.issueApplicationSession(result.createdUser, 'PASSWORD', ipAddress, userAgent, true);
+    } catch (error: unknown) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Username or email is already registered');
+      }
+      throw error;
+    }
+  }
+
+  async checkCompanyAvailability(input: CheckCompanyAvailabilityDto) {
+    const username = input.adminUsername.trim().toLowerCase();
+    const email = input.adminEmail.trim().toLowerCase();
+    const [usernameOwner, emailOwner] = await Promise.all([
+      this.prisma.user.findUnique({ where: { username }, select: { id: true } }),
+      this.prisma.user.findUnique({ where: { email }, select: { id: true } }),
+    ]);
+
+    return {
+      usernameAvailable: !usernameOwner,
+      emailAvailable: !emailOwner,
+    };
   }
 
   async googleLogin(input: GoogleLoginDto, ipAddress?: string, userAgent?: string) {
@@ -161,6 +262,7 @@ export class AuthService {
   ) {
     const workspace = await this.prisma.workspace.findUnique({ where: { id: user.workspaceId } });
     if (!workspace?.isActive || workspace.type !== user.accountType) throw new UnauthorizedException('Authentication required');
+    await this.assertWorkspaceAvailable(workspace);
     const unitKerja = user.unitKerjaId ? await this.prisma.unitKerja.findFirst({ where: { id: user.unitKerjaId, workspaceId: user.workspaceId }, select: { id: true, code: true, name: true } }) : null;
     const sessionId = randomUUID();
     const payload: JwtPayload = {
@@ -224,7 +326,65 @@ export class AuthService {
     return {
       accessToken,
       tokenType: 'Bearer',
-      user: { ...this.safeProfile(user), unitKerja },
+      user: { ...this.safeProfile(user), unitKerja, workspaceSubscription: this.subscriptionProfile(workspace) },
+    };
+  }
+
+  async updateOwnProfile(actor: JwtPayload, input: UpdateOwnProfileDto) {
+    if (actor.accountType !== AccountType.PERSONAL) {
+      throw new ForbiddenException('Only personal accounts can edit their own profile');
+    }
+
+    const data: Prisma.UserUpdateInput = {};
+    if (input.displayName !== undefined) data.displayName = input.displayName.trim();
+    if (input.username !== undefined) data.username = input.username.trim().toLowerCase();
+    if (input.employeeNumber !== undefined) data.employeeNumber = input.employeeNumber.trim().toUpperCase() || null;
+    if (input.division !== undefined) data.division = input.division.trim() || null;
+    if (input.jobTitle !== undefined) data.jobTitle = input.jobTitle.trim() || null;
+
+    try {
+      const updated = await this.prisma.user.update({
+        where: { id: actor.sub },
+        data,
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          employeeNumber: true,
+          division: true,
+          jobTitle: true,
+        },
+      });
+      return {
+        ...updated,
+        username: updated.username ?? '',
+        employeeNumber: updated.employeeNumber ?? '',
+        division: updated.division ?? '',
+        jobTitle: updated.jobTitle ?? '',
+      };
+    } catch (error: unknown) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Username is already registered');
+      }
+      throw error;
+    }
+  }
+
+  private async assertWorkspaceAvailable(workspace: { id: string; subscriptionStatus: 'PENDING_PAYMENT' | 'TRIAL' | 'ACTIVE' | 'EXPIRED'; trialEndsAt: Date | null }) {
+    if (workspace.subscriptionStatus === 'PENDING_PAYMENT') throw new UnauthorizedException('Workspace payment is pending');
+    if (workspace.subscriptionStatus === 'TRIAL' && workspace.trialEndsAt && workspace.trialEndsAt <= new Date()) {
+      await this.prisma.workspace.update({ where: { id: workspace.id }, data: { subscriptionStatus: 'EXPIRED' } });
+      throw new UnauthorizedException('Workspace trial has expired');
+    }
+    if (workspace.subscriptionStatus === 'EXPIRED') throw new UnauthorizedException('Workspace trial has expired');
+  }
+
+  private subscriptionProfile(workspace: { subscriptionStatus: string; trialStartedAt: Date | null; trialEndsAt: Date | null; subscriptionPlan: string | null }) {
+    return {
+      status: workspace.subscriptionStatus,
+      trialStartedAt: workspace.trialStartedAt,
+      trialEndsAt: workspace.trialEndsAt,
+      plan: workspace.subscriptionPlan,
     };
   }
 
@@ -280,6 +440,8 @@ export class AuthService {
         accountType: AccountType.COMPANY,
       };
     }
-    return { sub: user.id, ...this.safeProfile(user), unitKerja: user.unitKerja };
+    const workspace = await this.prisma.workspace.findUnique({ where: { id: user.workspaceId } });
+    if (workspace) await this.assertWorkspaceAvailable(workspace);
+    return { sub: user.id, ...this.safeProfile(user), unitKerja: user.unitKerja, workspaceSubscription: workspace ? this.subscriptionProfile(workspace) : null };
   }
 }

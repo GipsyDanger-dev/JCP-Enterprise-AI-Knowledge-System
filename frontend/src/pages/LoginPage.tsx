@@ -12,7 +12,7 @@ import {
   UserPlus,
   UserRound,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, errorMessage } from '@/api/client'
 import { LogoMark } from '@/components/Logo'
 import { GoogleSignInButton } from '@/components/GoogleSignInButton'
@@ -82,7 +82,11 @@ export function LoginPage() {
       await login(username.trim(), password)
       navigate('/', { replace: true })
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 401 ? (isId ? 'Username atau kata sandi salah.' : 'Invalid username or password.') : errorMessage(err))
+      if (err instanceof ApiError && err.status === 401 && err.message.toLowerCase().includes('trial')) {
+        setError(isId ? 'Masa trial workspace ini sudah berakhir. Silakan berlangganan untuk melanjutkan.' : 'This workspace trial has expired. Subscribe to continue.')
+      } else {
+        setError(err instanceof ApiError && err.status === 401 ? (isId ? 'Username atau kata sandi salah.' : 'Invalid username or password.') : errorMessage(err))
+      }
     } finally {
       setSubmitting(false)
     }
@@ -226,6 +230,7 @@ export function LoginPage() {
                 <button className="login-submit" type="submit" disabled={submitting}>
                   {submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Memverifikasi…' : 'Verifying…'}</> : (isId ? 'Masuk ke workspace' : 'Enter workspace')}
                 </button>
+                <p className="register-back-link"><Link to="/register/company">{isId ? 'Belum punya workspace? Mulai trial gratis' : 'Do not have a workspace? Start a free trial'}</Link></p>
               </form>
             ) : (
               <form className="login-form-centered" onSubmit={handlePersonalSubmit} noValidate>

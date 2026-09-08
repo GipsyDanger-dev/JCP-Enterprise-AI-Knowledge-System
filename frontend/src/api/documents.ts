@@ -110,7 +110,6 @@ export function downloadDocument(id: string, filename: string, token?: string): 
   const a = document.createElement('a')
   a.href = url
   a.setAttribute('download', filename)
-  // For auth, we open in new tab (browser handles auth via cookie or we use fetch)
   fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
     .then(r => r.blob())
     .then(blob => {
@@ -119,5 +118,5 @@ export function downloadDocument(id: string, filename: string, token?: string): 
       a.click()
       URL.revokeObjectURL(blobUrl)
     })
-    .catch(() => {/* ignore */})
+    .catch(() => undefined)
 }

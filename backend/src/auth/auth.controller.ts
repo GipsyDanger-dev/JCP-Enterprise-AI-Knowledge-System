@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Ip, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Ip, Post, Put, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -17,6 +17,9 @@ import { GoogleLoginDto } from './dto/google-login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { RegisterPersonalDto } from './dto/register-personal.dto';
+import { RegisterCompanyDto } from './dto/register-company.dto';
+import { CheckCompanyAvailabilityDto } from './dto/check-company-availability.dto';
+import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -47,6 +50,26 @@ export class AuthController {
     @Headers('user-agent') userAgent?: string,
   ) {
     return this.authService.registerPersonal(input, ip, userAgent);
+  }
+
+  @Post('register/company')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a COMPANY workspace with an immediate trial' })
+  @ApiCreatedResponse({ description: 'JWT access token and COMPANY admin profile' })
+  @ApiConflictResponse({ description: 'Username or email is already registered' })
+  registerCompany(
+    @Body() input: RegisterCompanyDto,
+    @Ip() ip?: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.authService.registerCompany(input, ip, userAgent);
+  }
+
+  @Post('register/company/check')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Check company administrator username and email availability' })
+  checkCompanyAvailability(@Body() input: CheckCompanyAvailabilityDto) {
+    return this.authService.checkCompanyAvailability(input);
   }
 
   @Post('google')
@@ -81,5 +104,15 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Missing, invalid, or expired token' })
   async me(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.getProfile(user.sub);
+  }
+
+  @Put('me/profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update the current personal profile' })
+  @ApiOkResponse({ description: 'Updated personal profile' })
+  @ApiConflictResponse({ description: 'The username is already registered' })
+  updateOwnProfile(@Body() input: UpdateOwnProfileDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.authService.updateOwnProfile(user, input);
   }
 }

@@ -43,7 +43,6 @@ export function MessageList({ messages, currentSender, isId, bottomRef, onEdit, 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingText, setEditingText] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
-  // Group messages by date
   const dateGroups = useMemo<DateGroup[]>(() => {
     const groups: DateGroup[] = []
     let currentGroup: DateGroup | null = null
@@ -82,7 +81,6 @@ export function MessageList({ messages, currentSender, isId, bottomRef, onEdit, 
                   <span className="messaging-sender-name">{msg.senderName}</span>
                 )}
                 <div className={`messaging-bubble ${isMine ? 'sent' : 'received'}`}>
-                  {/* Attachments */}
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className="mc-bubble-attachments">
                       {msg.attachments.map((att) => (
@@ -90,7 +88,6 @@ export function MessageList({ messages, currentSender, isId, bottomRef, onEdit, 
                       ))}
                     </div>
                   )}
-                  {/* Text content */}
                   {msg.content && (
                     <div className="messaging-bubble-content">
                       {editingId === msg.id ? (

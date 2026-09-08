@@ -25,7 +25,6 @@ export function MessagingPage() {
   const [isTyping, setIsTyping] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Load conversation
   useEffect(() => {
     if (!user || !token) return
     let cancelled = false
@@ -53,7 +52,6 @@ export function MessagingPage() {
 
   const prevMsgCountRef = useRef(0)
 
-  // Real-time updates via SSE — no polling needed.
   useEffect(() => {
     if (!token) return
     return subscribeMessaging(token, (event) => {
@@ -72,12 +70,10 @@ export function MessagingPage() {
     })
   }, [conversationId, token, setUnreadMessages])
 
-  // Reset unread count when opening messages
   useEffect(() => {
     setUnreadMessages(0)
   }, [setUnreadMessages])
 
-  // Broadcast typing while composing; stop 2.5s after the last keystroke.
   const typingTimerRef = useRef<number | null>(null)
   const notifyTyping = () => {
     if (!conversationId || !token) return
@@ -93,7 +89,6 @@ export function MessagingPage() {
     if (conversationId && token) sendTypingStatus(conversationId, false, token).catch(() => {})
   }, [conversationId, token])
 
-  // Auto scroll only when new messages are added or on first load
   useEffect(() => {
     if (messages.length > prevMsgCountRef.current || isTyping) {
       bottomRef.current?.scrollIntoView({ behavior: prevMsgCountRef.current === 0 ? 'auto' : 'smooth' })

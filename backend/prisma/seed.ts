@@ -99,6 +99,22 @@ async function seedUnitKerjaDanKategori(): Promise<void> {
   }
 }
 
+async function seedBillingPlans(): Promise<void> {
+  await prisma.billingPlan.upsert({
+    where: { slug: 'starter' },
+    update: { isActive: true },
+    create: {
+      slug: 'starter',
+      name: 'Starter',
+      description: 'Paket awal untuk workspace perusahaan',
+      monthlyAmount: 99000,
+      yearlyAmount: 990000,
+      maxMembers: 25,
+    },
+  });
+  console.log('Seeded billing plan: starter');
+}
+
 /**
  * Pindahkan pengguna dan penanda dokumen dari unit kerja yang sudah dihapus ke
  * penggantinya, lalu buang baris lamanya.
@@ -150,10 +166,9 @@ async function pindahkanUnitLama(): Promise<void> {
 async function main(): Promise<void> {
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
   if (!workspace || workspace.type !== 'COMPANY') throw new Error('Seed requires an existing company workspace');
-  if (workspace.aiProfile === 'sleman') {
-    await seedUnitKerjaDanKategori();
-    await pindahkanUnitLama();
-  }
+  await seedUnitKerjaDanKategori();
+  await seedBillingPlans();
+  await pindahkanUnitLama();
 
   const adminEmail = requiredEnvironment('SEED_ADMIN_EMAIL').toLowerCase();
   const userEmail = requiredEnvironment('SEED_USER_EMAIL').toLowerCase();
@@ -164,7 +179,7 @@ async function main(): Promise<void> {
     UserRole.SUPER_ADMIN, true,
     'SEED_ADMIN_EMAIL', 'SEED_ADMIN_PASSWORD',
     'Local Admin', 'ADM-0001', 'Dinas Hukum & Peradilan', 'Kepala Subbagian',
-    workspace.aiProfile === 'sleman' ? 'HUKUM' : null,
+    'HUKUM',
   );
 
   // Pegawai contoh, sengaja ditempatkan di Dinas Koperasi: dengan begitu batas
@@ -174,7 +189,7 @@ async function main(): Promise<void> {
     UserRole.PEGAWAI, false,
     'SEED_USER_EMAIL', 'SEED_USER_PASSWORD',
     'Nadia Putri', 'EMP-0001', 'Dinas Koperasi, UMKM & Ekonomi',
-    'Staf / Pelaksana', workspace.aiProfile === 'sleman' ? 'KOPERASI' : null,
+    'Staf / Pelaksana', 'KOPERASI',
   );
 }
 

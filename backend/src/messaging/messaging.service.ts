@@ -121,7 +121,6 @@ export class MessagingService {
       },
     });
 
-    // Update conversation and recipient unread count
     const existing = await this.prisma.directConversation.findUnique({
       where: { id: convId },
       select: { unreadCount: true },
@@ -129,10 +128,8 @@ export class MessagingService {
     const currentUnread = existing?.unreadCount ?? 0;
     let nextUnread = 0;
     if (sender === 'employee') {
-      // Message from employee: increases unread for admin (> 0)
       nextUnread = currentUnread < 0 ? 1 : currentUnread + 1;
     } else {
-      // Message from admin: increases unread for employee (< 0)
       nextUnread = currentUnread > 0 ? -1 : currentUnread - 1;
     }
 
@@ -169,7 +166,6 @@ export class MessagingService {
     });
     if (!conv) return { success: true };
 
-    // Admin clears employee's unread messages (> 0); Employee clears admin's unread messages (< 0)
     if (actor.isAdmin && conv.unreadCount > 0) {
       await this.prisma.directConversation.update({
         where: { id: conversationId },

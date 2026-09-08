@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Check, Globe, Moon, Palette, Sun, User } from 'lucide-react'
+import { Check, Globe, LoaderCircle, Moon, Palette, Save, Sun, User } from 'lucide-react'
 import { ShieldCheck } from 'lucide-react'
+import { ApiError, errorMessage } from '@/api/client'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
@@ -23,15 +24,32 @@ function getStoredFontSize(): FontSize {
 }
 
 export function SettingsPage() {
-  const { user } = useAuth()
+  const { user, updateOwnProfile } = useAuth()
   const { role, language, setLanguage } = useWorkspace()
   const [theme, setTheme] = useState<'light' | 'dark'>(getStoredTheme)
   const [fontSize, setFontSize] = useState<FontSize>(getStoredFontSize)
   const [notifications, setNotifications] = useState(isNotificationsEnabled)
   const [browserNotif, setBrowserNotif] = useState(isBrowserNotificationsEnabled)
   const [emailDigest, setEmailDigest] = useState(false)
+  const [profileName, setProfileName] = useState('')
+  const [profileUsername, setProfileUsername] = useState('')
+  const [profileEmployeeNumber, setProfileEmployeeNumber] = useState('')
+  const [profileDivision, setProfileDivision] = useState('')
+  const [profileJobTitle, setProfileJobTitle] = useState('')
+  const [profileError, setProfileError] = useState('')
+  const [profileSaved, setProfileSaved] = useState(false)
+  const [savingProfile, setSavingProfile] = useState(false)
 
-  // Apply theme to <html> and persist
+  const isPersonal = user?.accountType === 'PERSONAL'
+
+  useEffect(() => {
+    setProfileName(user?.displayName ?? '')
+    setProfileUsername(user?.username ?? '')
+    setProfileEmployeeNumber(user?.employeeNumber ?? '')
+    setProfileDivision(user?.division ?? '')
+    setProfileJobTitle(user?.jobTitle ?? '')
+  }, [user])
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem(THEME_KEY, theme)
@@ -43,13 +61,11 @@ export function SettingsPage() {
     localStorage.setItem(FONT_SIZE_KEY, fontSize)
   }, [fontSize])
 
-  // Apply initial theme on mount
   useEffect(() => {
     const stored = getStoredTheme()
     document.documentElement.setAttribute('data-theme', stored)
   }, [])
 
-  // Persist notification toggles
   useEffect(() => {
     setNotificationsEnabled(notifications)
   }, [notifications])
@@ -61,6 +77,40 @@ export function SettingsPage() {
 
   const isId = language === 'id'
 
+  const saveProfile = async () => {
+    setProfileError('')
+    setProfileSaved(false)
+    const name = profileName.trim()
+    const username = profileUsername.trim()
+    if (name.length < 2) {
+      setProfileError(isId ? 'Nama minimal 2 karakter.' : 'Name must be at least 2 characters.')
+      return
+    }
+    if (username.length < 3 || !/^[a-zA-Z0-9_.-]+$/.test(username)) {
+      setProfileError(isId ? 'Username minimal 3 karakter dan hanya boleh berisi huruf, angka, titik, garis bawah, atau strip.' : 'Username must be at least 3 characters and use only letters, numbers, periods, underscores, or hyphens.')
+      return
+    }
+    setSavingProfile(true)
+    try {
+      await updateOwnProfile({
+        displayName: name,
+        username,
+        employeeNumber: profileEmployeeNumber.trim(),
+        division: profileDivision.trim(),
+        jobTitle: profileJobTitle.trim(),
+      })
+      setProfileSaved(true)
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setProfileError(isId ? 'Username sudah digunakan.' : 'This username is already in use.')
+      } else {
+        setProfileError(errorMessage(error))
+      }
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
   return (
     <div className="standard-page">
       <PageHeading
@@ -70,7 +120,6 @@ export function SettingsPage() {
       />
 
       <div className="settings-grid">
-        {/* Profile section */}
         <section className="settings-section">
           <div className="settings-section-header">
             <span className="settings-icon"><User size={18} /></span>
@@ -95,35 +144,39 @@ export function SettingsPage() {
               <label>{isId ? 'Nama' : 'Name'}</label>
               <input
                 type="text"
-                value={user?.displayName ?? ''}
-                disabled
-                className="disabled-input"
+                value={profileName}
+                onChange={(event) => { setProfileName(event.target.value); setProfileSaved(false) }}
+                disabled={!isPersonal || savingProfile}
+                className={!isPersonal ? 'disabled-input' : undefined}
               />
-              <small>{isId ? 'Dikelola oleh administrator.' : 'Managed by administrator.'}</small>
+              <small>{isPersonal ? (isId ? 'Anda dapat mengubah nama profil.' : 'You can update your profile name.') : (isId ? 'Dikelola oleh administrator.' : 'Managed by administrator.')}</small>
             </div>
             <div className="settings-field">
               <label>{isId ? 'Username' : 'Username'}</label>
               <input
                 type="text"
-                value={user?.username ?? ''}
-                disabled
-                className="disabled-input"
+                value={profileUsername}
+                onChange={(event) => { setProfileUsername(event.target.value); setProfileSaved(false) }}
+                disabled={!isPersonal || savingProfile}
+                className={!isPersonal ? 'disabled-input' : undefined}
               />
-              <small>{isId ? 'Dikelola oleh administrator.' : 'Managed by administrator.'}</small>
+              <small>{isPersonal ? (isId ? 'Username digunakan untuk masuk.' : 'Your username is used to sign in.') : (isId ? 'Dikelola oleh administrator.' : 'Managed by administrator.')}</small>
             </div>
-            <div className="settings-field">
-              <label>{isId ? 'Nomor karyawan' : 'Employee number'}</label>
-              <input type="text" value={user?.employeeNumber ?? ''} disabled className="disabled-input" />
-            </div>
-            <div className="settings-field">
-              <label>{isId ? 'Divisi' : 'Division'}</label>
-              <input type="text" value={user?.division ?? ''} disabled className="disabled-input" />
-            </div>
-            <div className="settings-field">
-              <label>{isId ? 'Jabatan' : 'Job title'}</label>
-              <input type="text" value={user?.jobTitle ?? ''} disabled className="disabled-input" />
-            </div>
-            <div className="settings-field">
+            {!isPersonal && <>
+              <div className="settings-field">
+                <label>{isId ? 'Nomor karyawan' : 'Employee number'}</label>
+                <input type="text" value={profileEmployeeNumber} disabled className="disabled-input" />
+              </div>
+              <div className="settings-field">
+                <label>{isId ? 'Divisi' : 'Division'}</label>
+                <input type="text" value={profileDivision} disabled className="disabled-input" />
+              </div>
+              <div className="settings-field">
+                <label>{isId ? 'Jabatan' : 'Job title'}</label>
+                <input type="text" value={profileJobTitle} disabled className="disabled-input" />
+              </div>
+            </>}
+            {!isPersonal && <div className="settings-field">
               <label>Role</label>
               <div className="settings-role-display">
                 <span className="settings-role-text">
@@ -131,12 +184,11 @@ export function SettingsPage() {
                 </span>
                 <small>{isId ? 'Ditetapkan oleh administrator workspace' : 'Assigned by workspace administrator'}</small>
               </div>
-            </div>
+            </div>}
           </div>
         </section>
 
-        {/* Workspace section */}
-        <section className="settings-section">
+        {!isPersonal && <section className="settings-section">
           <div className="settings-section-header">
             <span className="settings-icon"><ShieldCheck size={18} /></span>
             <div>
@@ -162,9 +214,8 @@ export function SettingsPage() {
               <span>{role === 'admin' ? (isId ? 'Semua divisi' : 'All divisions') : (isId ? '1 divisi' : '1 division')}</span>
             </div>
           </div>
-        </section>
+        </section>}
 
-        {/* Appearance section */}
         <section className="settings-section">
           <div className="settings-section-header">
             <span className="settings-icon"><Palette size={18} /></span>
@@ -174,7 +225,6 @@ export function SettingsPage() {
             </div>
           </div>
           <div className="settings-form">
-            {/* Theme */}
             <div className="settings-field">
               <label>{isId ? 'Tema' : 'Theme'}</label>
               <div className="settings-theme-grid">
@@ -210,6 +260,14 @@ export function SettingsPage() {
                 </button>
               </div>
             </div>
+            {isPersonal && <div className="settings-profile-actions">
+              {profileError && <span className="settings-profile-status error" role="alert">{profileError}</span>}
+              {profileSaved && <span className="settings-profile-status success" role="status">{isId ? 'Profil berhasil disimpan.' : 'Profile saved.'}</span>}
+              <button type="button" className="primary-button" onClick={saveProfile} disabled={savingProfile}>
+                {savingProfile ? <LoaderCircle size={15} className="spin" /> : <Save size={15} />}
+                {savingProfile ? (isId ? 'Menyimpan…' : 'Saving…') : (isId ? 'Simpan profil' : 'Save profile')}
+              </button>
+            </div>}
 
             <div className="settings-field">
               <label>{isId ? 'Ukuran font' : 'Font size'}</label>
@@ -233,7 +291,6 @@ export function SettingsPage() {
               </div>
             </div>
 
-            {/* Language */}
             <div className="settings-field">
               <label><Globe size={14} style={{ marginRight: 6, verticalAlign: -2 }} />{isId ? 'Bahasa' : 'Language'}</label>
               <div className="settings-language-options">
@@ -267,7 +324,6 @@ export function SettingsPage() {
 
             <div className="settings-divider" />
 
-            {/* Notifications */}
             <div className="settings-switch-row">
               <div className="settings-switch-info">
                 <label>{isId ? 'Suara notifikasi' : 'Notification sound'}</label>
@@ -278,7 +334,6 @@ export function SettingsPage() {
               </button>
             </div>
 
-            {/* Browser notifications */}
             <div className="settings-switch-row">
               <div className="settings-switch-info">
                 <label>{isId ? 'Notifikasi browser' : 'Browser notifications'}</label>
@@ -291,7 +346,6 @@ export function SettingsPage() {
               </button>
             </div>
 
-            {/* Email digest */}
             <div className="settings-switch-row">
               <div className="settings-switch-info">
                 <label>{isId ? 'Ringkasan email' : 'Email digest'}</label>

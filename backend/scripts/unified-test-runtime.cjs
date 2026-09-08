@@ -18,6 +18,9 @@ Object.assign(config, { WORKER_TOKEN: credentials.worker, JWT_SECRET: credential
 // Integration fixtures exercise local retrieval without making paid provider calls.
 config.SUMOPOD_API_KEY = '';
 config.LLM_API_KEY = '';
+config.AI_PROVIDER_API_KEY = '';
+config.AI_PROVIDER_BASE_URL = '';
+config.AI_EMBEDDINGS_ENABLED = 'false';
 
 async function main() {
   if (process.argv[2] === 'seed') {

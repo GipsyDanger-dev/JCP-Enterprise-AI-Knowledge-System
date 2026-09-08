@@ -92,15 +92,14 @@ cd AI && pip install -r requirements.txt && cd ..
 
 ### 4. Setup Database
 
-Database bersifat eksternal (misal Neon atau PostgreSQL milik sendiri dengan
-ekstensi `vector`) — compose **tidak** menyediakan service postgres. Isi
-`DATABASE_URL` dan `AI_DATABASE_URL` di `.env`, lalu:
+Database production bersifat eksternal (misal Neon atau PostgreSQL milik
+sendiri dengan ekstensi `vector`). Isi `DATABASE_URL` dan `AI_DATABASE_URL` di
+`.env`, lalu:
 
 ```bash
-# Bila seluruh stack dijalankan melalui Docker, Backend menjalankan migration
-# otomatis. Seed akun awal dilakukan satu kali setelah Backend aktif.
-docker compose up -d backend
-docker compose exec backend npm run prisma:seed
+# Backend menjalankan migration saat container production mulai.
+docker compose -f docker-compose.prod.yml --env-file .env up -d backend
+docker compose -f docker-compose.prod.yml --env-file .env exec backend npm run prisma:seed
 ```
 
 ### 5. Start Services
@@ -361,10 +360,10 @@ pm2 startup
 ```bash
 # 1. Setup
 cp .env.example .env
-nano .env
+nano .env  # isi DATABASE_URL, AI_DATABASE_URL, JWT_SECRET, WORKER_TOKEN, AI provider
 
-# 2. Build & deploy
-docker compose -f docker-compose.prod.yml up -d --build
+# 2. Build & deploy production stack (database eksternal)
+docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 ```
 
 Satu origin: Nginx pada service frontend (port 5173) menyajikan aset SPA
@@ -373,11 +372,9 @@ ke host. Login Google bersifat opsional — kosongkan `GOOGLE_CLIENT_ID` dan
 `VITE_GOOGLE_CLIENT_ID` bila tidak dipakai.
 
 ```bash
-# 3. Run migrations
-docker compose exec backend npx prisma migrate deploy
-
-# 4. Seed users
-docker compose exec backend npm run prisma:seed
+# 3. Verify and seed once if required
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml exec backend npm run prisma:seed
 ```
 
 ### Option 3: Kubernetes
@@ -482,7 +479,7 @@ Access via API: `GET /audit-logs` (Admin only)
 | `503 WORKER_TOKEN is not configured` | Set `WORKER_TOKEN` on the AI service |
 | `401 Valid worker token required` | Backend `WORKER_TOKEN` differs from the AI service value |
 | `Document stuck at QUEUED` | Check AI engine is running |
-| `Cannot connect to database` | Pastikan Docker Desktop aktif dan container `postgres` healthy |
+| `Cannot connect to database` | Pastikan `DATABASE_URL`/`AI_DATABASE_URL` menunjuk PostgreSQL yang dapat diakses dan memiliki ekstensi `vector` |
 | `CORS error` | Ensure frontend URL is allowed |
 
 ### Reset Database

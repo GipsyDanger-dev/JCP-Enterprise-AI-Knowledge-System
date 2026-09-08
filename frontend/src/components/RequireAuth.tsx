@@ -9,9 +9,6 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-/**
- * role="admin" → requires isAdmin flag (super admin)
- */
 export function RequireRole({ role, children }: { role: 'admin' | 'user'; children: ReactNode }) {
   const { user } = useAuth()
   if (!user) return <Navigate to="/" replace />
@@ -23,5 +20,12 @@ export function RequireCompanyAccount({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   if (!user) return <Navigate to="/" replace />
   if (user.accountType === 'PERSONAL') return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+export function RequirePlatformOwner({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  if (!user.isPlatformOwner) return <Navigate to="/" replace />
   return <>{children}</>
 }

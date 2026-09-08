@@ -29,7 +29,6 @@ export class DocumentProcessorService implements OnModuleInit {
     let activeDocId: string | null = null;
 
     try {
-      // Find oldest QUEUED job
       const job = await this.prisma.processingJob.findFirst({
         where: {
           status: 'QUEUED',
@@ -64,7 +63,6 @@ export class DocumentProcessorService implements OnModuleInit {
 
       this.logger.log(`Processing: ${filename} (job ${job.id})`);
 
-      // Mark as PROCESSING
       await this.prisma.processingJob.update({
         where: { id: job.id },
         data: { status: 'PROCESSING', startedAt: new Date(), attemptCount: { increment: 1 } },
@@ -74,7 +72,6 @@ export class DocumentProcessorService implements OnModuleInit {
         data: { status: 'PROCESSING' },
       });
 
-      // Read file from storage
       const fileContent = await this.storage.read(versionId);
       const content = Buffer.from(fileContent);
 
@@ -98,7 +95,6 @@ export class DocumentProcessorService implements OnModuleInit {
       const result = await ingestResponse.json();
       this.logger.log(`Ingested ${filename}: ${JSON.stringify(result)}`);
 
-      // Mark as COMPLETED
       const completedAt = new Date();
       await this.prisma.processingJob.update({
         where: { id: job.id },
@@ -113,7 +109,6 @@ export class DocumentProcessorService implements OnModuleInit {
     } catch (error) {
       this.logger.error(`❌ Processing failed: ${error instanceof Error ? error.message : error}`);
 
-      // Mark the exact failed job (if any) as FAILED
       try {
         if (activeJobId && activeDocId) {
           await this.prisma.processingJob.update({
@@ -129,7 +124,7 @@ export class DocumentProcessorService implements OnModuleInit {
             data: { status: 'FAILED' },
           });
         }
-      } catch { /* ignore cleanup errors */ }
+      } catch { }
     } finally {
       this.processing = false;
     }

@@ -53,21 +53,132 @@ enum AccountType {
   PERSONAL
 }
 
+enum WorkspaceSubscriptionStatus {
+  PENDING_PAYMENT
+  TRIAL
+  ACTIVE
+  EXPIRED
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum PaymentOrderStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+}
+
 model Workspace {
-  id        String      @id @default(uuid()) @db.Uuid
-  name      String
-  type      AccountType @default(COMPANY)
-  aiProfile String      @default("general") @map("ai_profile")
-  isActive  Boolean     @default(true) @map("is_active")
-  createdAt DateTime    @default(now()) @map("created_at")
-  users     User[]
-  documents Document[]
-  categories DocumentCategory[]
-  units     UnitKerja[]
-  announcements Announcement[]
-  auditLogs AuditLog[]
+  id                     String                      @id @default(uuid()) @db.Uuid
+  name                   String
+  type                   AccountType                 @default(COMPANY)
+  isActive               Boolean                     @default(true) @map("is_active")
+  subscriptionStatus     WorkspaceSubscriptionStatus @default(ACTIVE) @map("subscription_status")
+  trialStartedAt         DateTime?                   @map("trial_started_at")
+  trialEndsAt            DateTime?                   @map("trial_ends_at")
+  subscriptionPlan       String?                     @map("subscription_plan")
+  currentPeriodStartedAt DateTime?                   @map("current_period_started_at")
+  currentPeriodEndsAt    DateTime?                   @map("current_period_ends_at")
+  createdAt              DateTime                    @default(now()) @map("created_at")
+  users                  User[]
+  documents              Document[]
+  categories             DocumentCategory[]
+  units                  UnitKerja[]
+  announcements          Announcement[]
+  auditLogs              AuditLog[]
+  paymentOrders          PaymentOrder[]
 
   @@map("workspaces")
+}
+
+model BillingPlan {
+  id            String         @id @default(uuid()) @db.Uuid
+  slug          String         @unique
+  name          String
+  description   String?
+  monthlyAmount Int            @map("monthly_amount")
+  yearlyAmount  Int            @map("yearly_amount")
+  maxMembers    Int?           @map("max_members")
+  isActive      Boolean        @default(true) @map("is_active")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  paymentOrders PaymentOrder[]
+
+  @@map("billing_plans")
+}
+
+model Coupon {
+  id              String         @id @default(uuid()) @db.Uuid
+  code            String         @unique
+  discountType    DiscountType   @map("discount_type")
+  value           Int
+  startsAt        DateTime?      @map("starts_at")
+  endsAt          DateTime?      @map("ends_at")
+  maxRedemptions  Int?           @map("max_redemptions")
+  redemptionCount Int            @default(0) @map("redemption_count")
+  isActive        Boolean        @default(true) @map("is_active")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  paymentOrders   PaymentOrder[]
+
+  @@map("coupons")
+}
+
+model PaymentOrder {
+  id                String             @id @default(uuid()) @db.Uuid
+  workspaceId       String             @map("workspace_id") @db.Uuid
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  planId            String             @map("plan_id") @db.Uuid
+  plan              BillingPlan        @relation(fields: [planId], references: [id], onDelete: Restrict)
+  couponId          String?            @map("coupon_id") @db.Uuid
+  coupon            Coupon?            @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  provider          String             @default("sumopod")
+  providerPaymentId String?            @unique @map("provider_payment_id")
+  providerOrderId   String             @unique @map("provider_order_id")
+  cycle             BillingCycle
+  status            PaymentOrderStatus @default(PENDING)
+  subtotal          Int
+  discountAmount    Int                @default(0) @map("discount_amount")
+  totalAmount       Int                @map("total_amount")
+  providerFee       Int?               @map("provider_fee")
+  providerNetAmount Int?               @map("provider_net_amount")
+  currency          String             @default("IDR")
+  couponSnapshot    Json?              @map("coupon_snapshot")
+  paymentLinkUrl    String?            @map("payment_link_url")
+  expiresAt         DateTime           @map("expires_at")
+  paidAt            DateTime?          @map("paid_at")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  events            PaymentEvent[]
+
+  @@index([workspaceId, status])
+  @@index([expiresAt, status])
+  @@map("payment_orders")
+}
+
+model PaymentEvent {
+  id                String        @id @default(uuid()) @db.Uuid
+  provider          String
+  eventId           String        @unique @map("event_id")
+  providerPaymentId String?       @map("provider_payment_id")
+  paymentOrderId    String?       @map("payment_order_id") @db.Uuid
+  paymentOrder      PaymentOrder? @relation(fields: [paymentOrderId], references: [id], onDelete: SetNull)
+  eventType         String        @map("event_type")
+  payload           Json
+  receivedAt        DateTime      @default(now()) @map("received_at")
+
+  @@index([provider, providerPaymentId])
+  @@index([paymentOrderId])
+  @@map("payment_events")
 }
 
 enum DocumentType {
@@ -223,37 +334,37 @@ model Document {
 /// mengubah tipe enum PostgreSQL. Isi awalnya versi sementara sampai daftar
 /// resmi dari Perbup SOTK didapat; menggantinya cukup lewat seed.
 model UnitKerja {
-  workspaceId String @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  id         String             @id @default(uuid()) @db.Uuid
-  name       String
-  code       String
-  isActive   Boolean            @default(true) @map("is_active")
-  createdAt  DateTime           @default(now()) @map("created_at")
-  users      User[]
-  documents  Document[]
-  categories DocumentCategory[] @relation("CategoryAccess")
+  workspaceId String             @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String             @id @default(uuid()) @db.Uuid
+  name        String
+  code        String
+  isActive    Boolean            @default(true) @map("is_active")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  users       User[]
+  documents   Document[]
+  categories  DocumentCategory[] @relation("CategoryAccess")
 
-  @@index([name])
   @@unique([workspaceId, code])
+  @@index([name])
   @@map("unit_kerja")
 }
 
 model DocumentCategory {
-  workspaceId String @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  id        String      @id @default(uuid()) @db.Uuid
-  name      String
-  key       String
+  workspaceId String      @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String      @id @default(uuid()) @db.Uuid
+  name        String
+  key         String
   // Daftar kosong berarti terbuka untuk semua pegawai yang sudah login.
   // Hak akses sengaja ditempel di kategori: menandai ratusan dokumen satu per
   // satu terlalu rawan salah, sedangkan kategori cukup ditandai sekali.
-  units     UnitKerja[] @relation("CategoryAccess")
-  documents Document[]
-  createdAt DateTime    @default(now()) @map("created_at")
+  units       UnitKerja[] @relation("CategoryAccess")
+  documents   Document[]
+  createdAt   DateTime    @default(now()) @map("created_at")
 
-  @@index([name])
   @@unique([workspaceId, key])
+  @@index([name])
   @@map("document_categories")
 }
 
@@ -291,17 +402,17 @@ model AppNotification {
 }
 
 model Announcement {
-  workspaceId String @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  id          String   @id @default(uuid()) @db.Uuid
-  title       String   @db.VarChar(180)
-  body        String   @db.Text
-  isActive    Boolean  @default(true) @map("is_active")
-  publishedAt DateTime @default(now()) @map("published_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  createdById String   @map("created_by_id") @db.Uuid
-  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  workspaceId String             @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String             @id @default(uuid()) @db.Uuid
+  title       String             @db.VarChar(180)
+  body        String             @db.Text
+  isActive    Boolean            @default(true) @map("is_active")
+  publishedAt DateTime           @default(now()) @map("published_at")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  createdById String             @map("created_by_id") @db.Uuid
+  createdBy   User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
   reads       AnnouncementRead[]
 
   @@index([isActive, publishedAt])

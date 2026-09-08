@@ -13,6 +13,7 @@ import { UsersModule } from './users/users.module';
 import { RequiredReadingsModule } from './required-readings/required-readings.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AnnouncementsModule } from './announcements/announcements.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AnnouncementsModule } from './announcements/announcements.module';
     RequiredReadingsModule,
     NotificationsModule,
     AnnouncementsModule,
+    BillingModule,
   ],
   controllers: [HealthController, WorkspacesController],
 })

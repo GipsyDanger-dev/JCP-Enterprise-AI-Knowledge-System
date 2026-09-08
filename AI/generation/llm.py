@@ -64,7 +64,7 @@ def unwrap_clarify_envelope(content: str) -> str:
 def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
                     model: str = DEFAULT_MODEL, api_key: str | None = None,
                     documents: list[dict[str, Any]] | None = None,
-                    allow_clarify: bool = False, ai_profile: str = "general",
+                    allow_clarify: bool = False,
                     workspace_type: str = "COMPANY") -> str:
     """Ask the configured LLM to answer using intact page/section contexts only."""
     key = (
@@ -85,7 +85,7 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
         "model": model,
         "messages": build_messages(
             query, matches, documents, allow_clarify,
-            ai_profile=ai_profile, workspace_type=workspace_type,
+            workspace_type=workspace_type,
         ),
         "temperature": 0.2,
     }

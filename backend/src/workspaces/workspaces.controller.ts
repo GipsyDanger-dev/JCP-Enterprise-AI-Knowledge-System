@@ -32,7 +32,6 @@ class CreateWorkspaceDto {
   @IsOptional() @IsString() @Length(1, 120) division?: string;
   @Transform(({ value }: { value: unknown }) => typeof value === 'string' && !value.trim() ? undefined : value)
   @IsOptional() @IsString() @Length(1, 120) jobTitle?: string;
-  @IsIn(['general', 'sleman']) aiProfile: string = 'general';
 }
 
 class UpdateWorkspaceMemberDto {
@@ -81,7 +80,7 @@ export class WorkspacesController {
   @Get('current')
   current(@CurrentUser() actor: AuthenticatedUser) {
     return this.prisma.workspace.findUniqueOrThrow({
-      where: { id: actor.workspaceId }, select: { id: true, name: true, type: true, aiProfile: true },
+      where: { id: actor.workspaceId }, select: { id: true, name: true, type: true, subscriptionStatus: true, trialEndsAt: true },
     });
   }
 
@@ -89,7 +88,7 @@ export class WorkspacesController {
   list(@CurrentUser() actor: AuthenticatedUser) {
     this.assertOwner(actor);
     return this.prisma.workspace.findMany({ where: { type: 'COMPANY' },
-      select: { id: true, name: true, aiProfile: true, isActive: true, createdAt: true, _count: { select: { users: true } } },
+      select: { id: true, name: true, isActive: true, subscriptionStatus: true, trialEndsAt: true, createdAt: true, _count: { select: { users: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -103,13 +102,13 @@ export class WorkspacesController {
     const jobTitle = input.jobTitle?.trim() || null;
     return this.prisma.$transaction(async (tx) => {
       const workspace = await tx.workspace.create({ data: {
-        name: input.name.trim(), type: 'COMPANY', aiProfile: input.aiProfile,
+        name: input.name.trim(), type: 'COMPANY',
         users: { create: { username: input.adminUsername.trim().toLowerCase(), displayName: input.adminName.trim(),
           passwordHash, accountType: 'COMPANY', role: 'SUPER_ADMIN', isAdmin: true,
           employeeNumber, division, jobTitle } },
         ...(division ? { units: { create: { name: division, code: 'DEFAULT' } } } : {}),
         categories: { create: [{ name: 'Operations', key: 'operations' }, { name: 'HR', key: 'hr' }, { name: 'Finance', key: 'finance' }] },
-      }, select: { id: true, name: true, type: true, aiProfile: true } });
+      }, select: { id: true, name: true, type: true, subscriptionStatus: true, trialEndsAt: true } });
       await this.auditLogs.record(tx, {
         actorType: AuditActorType.USER,
         actorUserId: actor.sub,

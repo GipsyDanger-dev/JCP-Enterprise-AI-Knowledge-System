@@ -31,7 +31,7 @@ async function main() {
   const organizations = [];
   for (const label of ['alpha', 'beta']) {
     const username = `${label}_${suffix}`;
-    const workspace = await call('/workspaces', owner.accessToken, 'POST', { name: `Test ${label} ${suffix}`, adminName: `Admin ${label}`, adminUsername: username, adminPassword: credentials.password, ...(label === 'beta' ? { employeeNumber: 'ADM-01', division: 'Operations', jobTitle: 'Administrator' } : {}), aiProfile: label === 'beta' ? 'sleman' : 'general' }, 201);
+    const workspace = await call('/workspaces', owner.accessToken, 'POST', { name: `Test ${label} ${suffix}`, adminName: `Admin ${label}`, adminUsername: username, adminPassword: credentials.password, ...(label === 'beta' ? { employeeNumber: 'ADM-01', division: 'Operations', jobTitle: 'Administrator' } : {}) }, 201);
     const admin = await login(username);
     assert.equal(admin.user.workspaceId, workspace.id);
     assert.equal(admin.user.isPlatformOwner, false);

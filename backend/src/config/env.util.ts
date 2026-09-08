@@ -42,3 +42,8 @@ export function aiServiceHeaders(): Record<string, string> {
     'X-Worker-Token': workerToken(),
   };
 }
+
+export function trialDurationDays(): number {
+  const raw = Number.parseInt(process.env.TRIAL_DURATION_DAYS ?? '', 10);
+  return Number.isFinite(raw) && raw >= 1 && raw <= 90 ? raw : 7;
+}

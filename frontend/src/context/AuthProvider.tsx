@@ -6,8 +6,10 @@ import {
   logout as apiLogout,
   me as apiMe,
   registerPersonal as apiRegisterPersonal,
+  registerCompany as apiRegisterCompany,
+  updateOwnProfile as apiUpdateOwnProfile,
 } from '@/api/auth'
-import type { ApiUser } from '@/api/types'
+import type { ApiUser, OwnProfileResponse } from '@/api/types'
 import { AuthContext } from './authContextValue'
 
 /**
@@ -45,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             isAdmin: (profile as any).isAdmin ?? false,
             accountType: profile.accountType ?? 'COMPANY',
             photoUrl: (profile as any).photoUrl,
+            workspaceSubscription: profile.workspaceSubscription ?? null,
           })
         }
       })
@@ -87,6 +90,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user)
   }, [])
 
+  const registerCompany = useCallback(async (input: Parameters<typeof apiRegisterCompany>[0]) => {
+    const response = await apiRegisterCompany(input)
+    if ('accessToken' in response) {
+      localStorage.setItem(TOKEN_KEY, response.accessToken)
+      setToken(response.accessToken)
+      setUser(response.user)
+    }
+    return response
+  }, [])
+
+  const updateOwnProfile = useCallback(async (data: Partial<OwnProfileResponse>) => {
+    const currentToken = localStorage.getItem(TOKEN_KEY)
+    if (!currentToken) throw new Error('Authentication required')
+    const updated = await apiUpdateOwnProfile(currentToken, data)
+    setUser((current) => current ? { ...current, ...updated } : current)
+    return updated
+  }, [])
+
   const logout = useCallback(async () => {
     const currentToken = localStorage.getItem(TOKEN_KEY)
     if (currentToken) {
@@ -103,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, registerPersonal, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, registerPersonal, registerCompany, updateOwnProfile, logout }}>
       {children}
     </AuthContext.Provider>
   )

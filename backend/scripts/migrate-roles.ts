@@ -3,7 +3,6 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  // Step 1: Add new enum values (PostgreSQL doesn't support DROP VALUE)
   const newValues = [
     'SUPER_ADMIN',
     'DINAS_PENDIDIKAN', 'DINAS_KESEHATAN', 'DINAS_PUPR', 'DINAS_SOSIAL',
@@ -24,7 +23,6 @@ async function main() {
     }
   }
 
-  // Step 2: Update existing data
   const adminResult = await prisma.$executeRawUnsafe(
     `UPDATE users SET role = 'SUPER_ADMIN', is_admin = true WHERE role = 'ADMIN'::"UserRole"`
   );

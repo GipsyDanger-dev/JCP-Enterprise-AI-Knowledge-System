@@ -31,7 +31,6 @@ def build_retriever(knowledge_base: Any, mode: str = "auto", api_key: str | None
         return VectorRetriever(knowledge_base.chunks, knowledge_base.embeddings, api_key=api_key)
     if mode == "tfidf":
         return TfidfRetriever(knowledge_base.chunks)
-    # auto
     if EMBEDDINGS_ENABLED and knowledge_base.embeddings and _has_api_key(api_key):
         return VectorRetriever(knowledge_base.chunks, knowledge_base.embeddings, api_key=api_key)
     return TfidfRetriever(knowledge_base.chunks)

@@ -164,8 +164,7 @@ export class ChatService {
    * bisa dikutip AI untuk unit lain meski dokumennya tak muncul di daftar.
    */
   private async accessScope(actor: AuthenticatedUser) {
-    const workspace = await this.prisma.workspace.findUniqueOrThrow({ where: { id: actor.workspaceId }, select: { aiProfile: true } });
-    const boundary = { workspace_id: actor.workspaceId, uploaded_by_id: actor.accountType === 'PERSONAL' ? actor.sub : null, ai_profile: workspace.aiProfile };
+    const boundary = { workspace_id: actor.workspaceId, uploaded_by_id: actor.accountType === 'PERSONAL' ? actor.sub : null };
     const filter = allowedCategoryFilter(actor);
     if (actor.isAdmin || actor.accountType === 'PERSONAL') {
       return { ...boundary, is_admin: actor.isAdmin, allowed_category_ids: [] as string[], unit_kerja_id: null };

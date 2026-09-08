@@ -102,7 +102,6 @@ def build_messages(
     matches: list[tuple[float, dict[str, Any]]],
     documents: list[dict[str, Any]] | None = None,
     allow_clarify: bool = False,
-    ai_profile: str = "general",
     workspace_type: str = "COMPANY",
 ) -> list[dict[str, str]]:
     context = "\n\n".join(
@@ -128,8 +127,6 @@ def build_messages(
             "susun pilihan dari sudut pandang berbeda yang benar-benar ada di konteks."
         )
     system = SYSTEM_PROMPT + CLARIFY_RULE if allow_clarify else SYSTEM_PROMPT
-    if ai_profile == "sleman":
-        system += " Konteks workspace adalah dokumen pemerintahan Sleman. Pertahankan istilah unit kerja, jenis produk hukum, nomor, tahun, dan status peraturan sesuai sumber. Jangan menganggap rancangan sebagai aturan yang sudah berlaku."
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": "\n\n".join(bagian)},

@@ -1,4 +1,4 @@
-import { Activity, Building2, ChevronsLeft, ChevronsRight, CircleHelp, Clock, LogOut, MessageCircle, Settings, X } from 'lucide-react'
+import { Activity, Building2, ChevronsLeft, ChevronsRight, CircleHelp, Clock, CreditCard, LogOut, MessageCircle, Settings, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { authHeaders, request } from '@/api/client'
@@ -63,6 +63,7 @@ export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: 
       </nav>
       <div className="sidebar-lower">
         {user?.isPlatformOwner && <NavLink to="/workspaces" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'} onClick={onClose} title={isId ? 'Organisasi' : 'Organizations'}><Building2 size={18} />{!collapsed && <span>{isId ? 'Organisasi' : 'Organizations'}</span>}</NavLink>}
+        {user?.isPlatformOwner && <NavLink to="/billing" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'} onClick={onClose} title={isId ? 'Billing' : 'Billing'}><CreditCard size={18} />{!collapsed && <span>Billing</span>}</NavLink>}
         <NavLink to="/help" title={collapsed ? (isId ? 'Pusat bantuan' : 'Help center') : undefined} className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} onClick={onClose}><CircleHelp size={18} />{!collapsed && <span>{isId ? 'Pusat bantuan' : 'Help center'}</span>}</NavLink>
         <NavLink to="/settings" title={collapsed ? (isId ? 'Pengaturan' : 'Settings') : undefined} className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} onClick={onClose}><Settings size={18} />{!collapsed && <span>{isId ? 'Pengaturan' : 'Settings'}</span>}</NavLink>
         <button className="nav-item" title={isId ? 'Keluar' : 'Log out'} onClick={logout}><LogOut size={18} />{!collapsed && <span>{isId ? 'Keluar' : 'Log out'}</span>}</button>

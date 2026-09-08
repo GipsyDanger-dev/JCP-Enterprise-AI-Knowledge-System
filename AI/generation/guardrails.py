@@ -29,6 +29,7 @@ _PROMPT_INJECTION_PHRASES = (
     "ignore previous", "ignore all previous", "disregard previous",
     "abaikan instruksi", "lupakan instruksi", "abaikan aturan di atas",
 )
+_GENERAL_PERSON_QUERY = re.compile(r"^\s*(?:siapa itu|who is)\s+.+", re.IGNORECASE)
 
 
 def no_answer_response(
@@ -72,6 +73,8 @@ def is_out_of_scope(query: str, workspace_type: str = "COMPANY") -> bool:
     """
     normalized = query.strip().lower()
     if _ARITHMETIC_QUERY.match(normalized):
+        return True
+    if workspace_type != "PERSONAL" and _GENERAL_PERSON_QUERY.match(normalized):
         return True
     return any(phrase in normalized for phrase in _PROMPT_INJECTION_PHRASES)
 

@@ -46,7 +46,6 @@ def main():
     api_key = os.environ.get("AI_PROVIDER_API_KEY")
 
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
-        # Check pgvector
         try:
             row = conn.execute("SELECT 1 FROM pg_extension WHERE extname = 'vector'").fetchone()
             has_pgvector = row is not None
@@ -65,7 +64,6 @@ def main():
             doc_id = str(uuid4())
             version_id = str(uuid4())
 
-            # Check if already ingested
             existing = conn.execute(
                 "SELECT id FROM document_versions WHERE original_filename = %s",
                 (filename,),
@@ -74,14 +72,11 @@ def main():
                 print(f"   ⏭️  Already ingested, skipping")
                 continue
 
-            # Parse
             pages = read_document(path)
             sections = extract_sections(path.suffix.lower(), path, pages)
             chunks = chunk_pages(pages, filename, version_id, 1, sections=sections)
             print(f"   Parsed: {len(pages)} pages, {len(chunks)} chunks")
 
-            # Insert document + version + file
-            # Get an admin user ID
             admin_row = conn.execute("SELECT id FROM users WHERE role = 'ADMIN' LIMIT 1").fetchone()
             admin_id = admin_row[0] if admin_row else None
 
@@ -105,7 +100,6 @@ def main():
             )
             print(f"   ✅ Document + version + file created")
 
-            # Insert chunks
             for chunk in chunks:
                 conn.execute(
                     """INSERT INTO chunks (chunk_id, document_version_id, page_number, section_title, text)
@@ -115,7 +109,6 @@ def main():
                 )
             print(f"   ✅ {len(chunks)} chunks stored")
 
-            # Generate embeddings
             if has_pgvector and api_key and chunks:
                 print(f"   🧠 Generating embeddings...")
                 texts = [c["text"] for c in chunks]
@@ -130,7 +123,6 @@ def main():
             else:
                 print(f"   ⚠️  Embeddings skipped (pgvector={has_pgvector}, api_key={'yes' if api_key else 'no'})")
 
-            # Update document status
             conn.execute("UPDATE documents SET status = 'READY' WHERE id = %s", (doc_id,))
             print(f"   ✅ Document status → READY (doc_id={doc_id})")
 

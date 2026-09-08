@@ -67,7 +67,6 @@ class AccessScope:
     is_admin: bool = False
     workspace_id: str | None = None
     uploaded_by_id: str | None = None
-    ai_profile: str = "general"
     allowed_category_ids: tuple[str, ...] = ()
     #: Unit kerja penanya. None berarti belum ditempatkan di unit mana pun,
     #: sehingga dokumen bertanda unit tidak satu pun boleh dibacanya.
@@ -95,7 +94,6 @@ class AccessScope:
         return cls(
             workspace_id=workspace_id,
             uploaded_by_id=uploaded_by_id,
-            ai_profile="sleman" if payload.get("ai_profile") == "sleman" else "general",
             is_admin=bool(payload.get("is_admin")),
             allowed_category_ids=tuple(str(i) for i in ids),
             unit_kerja_id=str(unit) if unit else None,
@@ -169,7 +167,6 @@ class PgVectorStore:
             )
         self.model = model
 
-    # ---------- backend document metadata ----------
 
     def list_documents(self) -> list[dict[str, Any]]:
         """List active backend document versions and their indexed chunk count."""
@@ -334,7 +331,6 @@ class PgVectorStore:
                 )
         return True
 
-    # ---------- embeddings ----------
 
     def store_embeddings(self, vectors: list[list[float]], chunk_ids: list[str]) -> None:
         if len(vectors) != len(chunk_ids):
@@ -348,7 +344,6 @@ class PgVectorStore:
                         (vector, chunk_id),
                     )
 
-    # ---------- retrieval ----------
 
     def search(
         self,
@@ -465,7 +460,6 @@ class PgVectorStore:
                 # teks dokumen, jadi ikut dikirim sebagai konteks.
                 documents=self.document_metadata(scope=scope),
                 allow_clarify=allow_clarify,
-                ai_profile=scope.ai_profile,
                 workspace_type=workspace_type,
             )
             if use_llm
@@ -545,7 +539,6 @@ class PgVectorStore:
             filters=filters, workspace_type=workspace_type,
         )
 
-    # ---------- orchestration ----------
 
     def ask(
         self,

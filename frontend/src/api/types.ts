@@ -1,13 +1,11 @@
 /** Kontrak API mengikuti response aktual Backend NestJS/Prisma. */
 
-/* ============ Error ============ */
 export interface ApiErrorBody {
   statusCode?: number
   message?: string | string[]
   error?: string
 }
 
-/* ============ Auth & Users ============ */
 // SUPER_ADMIN dan PEGAWAI adalah tingkat wewenang yang dipakai sekarang.
 // Sisanya nilai lama yang masih mungkin tersimpan di akun lawas.
 export type ApiRole = 'SUPER_ADMIN' | 'ADMIN_UNIT' | 'PEGAWAI' | 'ADMIN' | 'USER' | 'BENDAHARA' | 'SEKRETARIS' | 'OPERASIONAL' | 'HUMAS'
@@ -41,6 +39,14 @@ export interface ApiUser {
   isAdmin?: boolean
   isActive?: boolean
   photoUrl?: string | null
+  workspaceSubscription?: WorkspaceSubscription | null
+}
+
+export interface WorkspaceSubscription {
+  status: 'PENDING_PAYMENT' | 'TRIAL' | 'ACTIVE' | 'EXPIRED'
+  trialStartedAt: string | null
+  trialEndsAt: string | null
+  plan: string | null
 }
 
 export interface LoginRequest {
@@ -55,6 +61,24 @@ export interface PersonalRegisterRequest {
   email: string
   password: string
   confirmPassword: string
+}
+
+export interface CompanyRegisterRequest {
+  organizationName: string
+  adminName: string
+  adminUsername: string
+  adminEmail: string
+  password: string
+  confirmPassword: string
+  onboardingMode: 'TRIAL' | 'SUBSCRIBE'
+  planSlug?: string
+  cycle?: 'MONTHLY' | 'YEARLY'
+  couponCode?: string
+}
+
+export interface CompanyAvailabilityResponse {
+  usernameAvailable: boolean
+  emailAvailable: boolean
 }
 
 export interface LoginResponse {
@@ -79,6 +103,23 @@ export interface MeResponse {
   unitKerja?: ApiUnitKerja | null
   isAdmin?: boolean
   photoUrl?: string | null
+  workspaceSubscription?: WorkspaceSubscription | null
+}
+
+export interface OwnProfileResponse {
+  id: string
+  displayName: string
+  username: string
+  employeeNumber: string
+  division: string
+  jobTitle: string
+}
+
+export interface CompanyCheckoutResponse {
+  onboardingMode: 'SUBSCRIBE'
+  orderId: string
+  paymentUrl: string | null
+  expiresAt: string
 }
 
 export interface CreateUserRequest {
@@ -104,7 +145,6 @@ export interface UpdateUserRequest {
   photoUrl?: string
 }
 
-/* ============ Documents ============ */
 export type ApiDocumentStatus =
   | 'UPLOADED'
   | 'QUEUED'
@@ -175,7 +215,6 @@ export interface DeleteDocumentResponse {
   deletedAt: string
 }
 
-/* ============ Chat (target contract; Backend masih skeleton) ============ */
 export interface Citation {
   documentId: string
   documentVersionId: string
@@ -235,7 +274,6 @@ export interface ConversationDetail {
   messages: ConversationMessage[]
 }
 
-/* ============ Messaging (Employee ↔ Admin) ============ */
 export type MessageSender = 'employee' | 'admin'
 
 export type AttachmentType = 'image' | 'file'

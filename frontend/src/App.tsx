@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { DashboardLayout } from '@/components/DashboardLayout'
-import { RequireAuth, RequireCompanyAccount, RequireRole } from '@/components/RequireAuth'
+import { RequireAuth, RequireCompanyAccount, RequirePlatformOwner, RequireRole } from '@/components/RequireAuth'
 import { AuthProvider } from '@/context/AuthProvider'
 import { WorkspaceProvider } from '@/context/WorkspaceProvider'
 import { ActivityPage } from '@/pages/ActivityPage'
@@ -17,6 +17,10 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { UsersPage } from '@/pages/UsersPage'
 import { AnnouncementsPage } from '@/pages/AnnouncementsPage'
 import { WorkspacesPage } from '@/pages/WorkspacesPage'
+import { CompanyRegisterPage } from '@/pages/CompanyRegisterPage'
+import { CompanyPricingPage } from '@/pages/CompanyPricingPage'
+import { BillingReturnPage } from '@/pages/BillingReturnPage'
+import { BillingPage } from '@/pages/BillingPage'
 
 function ThemeInitializer() {
   useEffect(() => {
@@ -38,10 +42,14 @@ export default function App() {
         <WorkspaceProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register/company" element={<CompanyRegisterPage />} />
+            <Route path="/register/company/pricing" element={<CompanyPricingPage />} />
+            <Route path="/billing/return" element={<BillingReturnPage />} />
             <Route element={<RequireAuth><DashboardLayout /></RequireAuth>}>
               <Route index element={<OverviewPage />} />
               <Route path="documents" element={<DocumentsPage />} />
               <Route path="workspaces" element={<WorkspacesPage />} />
+              <Route path="billing" element={<RequirePlatformOwner><BillingPage /></RequirePlatformOwner>} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="announcements" element={<RequireCompanyAccount><AnnouncementsPage /></RequireCompanyAccount>} />
               <Route path="users" element={<RequireRole role="admin"><UsersPage /></RequireRole>} />

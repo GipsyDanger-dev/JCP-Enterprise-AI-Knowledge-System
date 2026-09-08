@@ -5,13 +5,22 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { resolve } from 'node:path';
 import { AppModule } from './app.module';
 
-const { json, urlencoded } = require('express');
+const { json, raw, urlencoded } = require('express');
 
-loadEnvironment({ path: resolve(__dirname, '../.env'), override: false, quiet: true });
+for (const envPath of [
+  resolve(process.cwd(), '.env'),
+  resolve(process.cwd(), '../.env'),
+  resolve(__dirname, '../.env'),
+  resolve(__dirname, '../../.env'),
+  resolve(__dirname, '../../../.env'),
+]) {
+  loadEnvironment({ path: envPath, override: false, quiet: true });
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   // Attachments are sent as base64 JSON; allow the 10 MB client limit plus encoding overhead.
+  app.use('/billing/webhooks/sumopod', raw({ type: 'application/json', limit: '1mb' }));
   app.use(json({ limit: '20mb' }));
   app.use(urlencoded({ extended: true, limit: '20mb' }));
   app.enableCors();

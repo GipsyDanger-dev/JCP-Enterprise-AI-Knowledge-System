@@ -3,7 +3,6 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  // Migrate old roles to new ones
   await prisma.$executeRawUnsafe(`UPDATE users SET role = 'OPERASIONAL' WHERE role = 'BAPPEDA'::"UserRole"`);
   console.log('Migrated BAPPEDA -> OPERASIONAL');
 

@@ -27,7 +27,6 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('Authentication required');
       }
 
-      // Fire-and-forget update of lastActiveAt
       this.prisma.session.update({
         where: { id: session.id },
         data: { lastActiveAt: new Date() }
@@ -39,10 +38,19 @@ export class JwtAuthGuard implements CanActivate {
       // tanpa menunggu yang bersangkutan login ulang.
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, email: true, username: true, role: true, isAdmin: true, isActive: true, displayName: true, unitKerjaId: true, jobTitle: true, division: true, accountType: true, workspaceId: true, isPlatformOwner: true, workspace: { select: { isActive: true, type: true } } },
+        select: { id: true, email: true, username: true, role: true, isAdmin: true, isActive: true, displayName: true, unitKerjaId: true, jobTitle: true, division: true, accountType: true, workspaceId: true, isPlatformOwner: true, workspace: { select: { isActive: true, type: true, subscriptionStatus: true, trialEndsAt: true } } },
       });
 
       if (!user?.isActive || !user.workspace.isActive || user.accountType !== user.workspace.type || user.workspaceId !== payload.workspaceId) throw new UnauthorizedException('Authentication required');
+      if (user.workspace.subscriptionStatus === 'PENDING_PAYMENT') {
+        throw new UnauthorizedException('Workspace payment is pending');
+      }
+      if (user.workspace.subscriptionStatus === 'EXPIRED' || (user.workspace.subscriptionStatus === 'TRIAL' && user.workspace.trialEndsAt && user.workspace.trialEndsAt <= new Date())) {
+        if (user.workspace.subscriptionStatus === 'TRIAL') {
+          await this.prisma.workspace.update({ where: { id: user.workspaceId }, data: { subscriptionStatus: 'EXPIRED' } });
+        }
+        throw new UnauthorizedException('Workspace trial has expired');
+      }
       request.user = { sub: user.id, username: user.username ?? user.email ?? '', role: user.role, isAdmin: user.accountType === 'COMPANY' && user.isAdmin, unitKerjaId: user.unitKerjaId, jobTitle: user.jobTitle, division: user.division, displayName: user.displayName, sid: payload.sid, workspaceId: user.workspaceId, accountType: user.accountType, isPlatformOwner: user.isPlatformOwner };
       return true;
     } catch {

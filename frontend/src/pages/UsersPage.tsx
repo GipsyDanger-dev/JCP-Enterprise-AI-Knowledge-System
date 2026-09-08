@@ -27,7 +27,6 @@ export function UsersPage() {
   const [unitKerjaList, setUnitKerjaList] = useState<ApiUnitKerja[]>([])
   const [jabatanList, setJabatanList] = useState<string[]>([])
 
-  // Create form
   const [showForm, setShowForm] = useState(false)
   const [formName, setFormName] = useState('')
   const [formUsername, setFormUsername] = useState('')
@@ -39,7 +38,6 @@ export function UsersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  // Edit form
   const [editingUser, setEditingUser] = useState<ApiUser | null>(null)
   const [editName, setEditName] = useState('')
   const [editUsername, setEditUsername] = useState('')
@@ -205,7 +203,6 @@ export function UsersPage() {
         }
       />
 
-      {/* Role filter */}
       <div className="users-filter">
         <button className={`filter-chip ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
           {isId ? 'Semua' : 'All'} ({users.length})
@@ -218,10 +215,8 @@ export function UsersPage() {
         </button>
       </div>
 
-      {/* Error banner */}
       {error && <div className="upload-error-banner">{error}</div>}
 
-      {/* Table */}
       {loading ? (
         <div className="users-loading"><Loader2 size={20} className="spin" /> Memuat data pengguna…</div>
       ) : (
@@ -279,7 +274,6 @@ export function UsersPage() {
         </div>
       )}
 
-      {/* Edit user modal */}
       {editingUser && (
         <div className="modal-overlay" onClick={() => setEditingUser(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -390,7 +384,6 @@ export function UsersPage() {
         </div>
       )}
 
-      {/* Create user modal */}
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>

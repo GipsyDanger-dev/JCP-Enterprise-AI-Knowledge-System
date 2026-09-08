@@ -38,7 +38,6 @@ export function MessageComposer({ onSend, onTyping, disabled, placeholder, isId 
       if (accepted.length > 0) setAttachments((prev) => [...prev, ...accepted])
       if (errors.length > 0) setFileError(errors[0])
     } catch {
-      // ignore errors
     } finally {
       setUploading(false)
     }
@@ -60,7 +59,6 @@ export function MessageComposer({ onSend, onTyping, disabled, placeholder, isId 
 
   return (
     <form className="mc-composer" onSubmit={handleSubmit}>
-      {/* Attachment preview */}
       {attachments.length > 0 && (
         <div className="mc-attachments-preview">
           {attachments.map((att) => (
@@ -82,10 +80,8 @@ export function MessageComposer({ onSend, onTyping, disabled, placeholder, isId 
         </div>
       )}
 
-      {/* Error */}
       {fileError && <div className="mc-file-error"><span>{fileError}</span><button type="button" onClick={() => setFileError(null)}><X size={14} /></button></div>}
 
-      {/* Input row */}
       <div className="mc-input-row">
         <input
           type="file"

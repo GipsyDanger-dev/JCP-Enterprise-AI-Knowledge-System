@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { PageHeading } from '@/components/PageHeading'
 
-type Organization = { id: string; name: string; aiProfile: string; isActive: boolean; _count: { users: number } }
+type Organization = { id: string; name: string; isActive: boolean; subscriptionStatus: 'PENDING_PAYMENT' | 'TRIAL' | 'ACTIVE' | 'EXPIRED'; trialEndsAt: string | null; _count: { users: number } }
 
 type WorkspaceMember = {
   id: string
@@ -108,11 +108,11 @@ export function WorkspacesPage() {
   return <div className="standard-page">
     <PageHeading eyebrow={isId ? 'Administrasi platform' : 'Platform administration'} title={isId ? 'Organisasi' : 'Organizations'} detail={`${items.length} ${isId ? 'workspace organisasi' : 'organization workspaces'}`} action={<button className="primary-button" onClick={() => { setError(''); setOpen(true) }}><Plus size={17} />{isId ? 'Buat organisasi' : 'Create organization'}</button>} />
     {!open && !detail && error && <p className="inline-alert" role="alert">{error}</p>}
-    <div className="data-table"><table><thead><tr><th>{isId ? 'Organisasi' : 'Organization'}</th><th>{isId ? 'Anggota' : 'Members'}</th><th>{isId ? 'Profil AI' : 'AI profile'}</th><th>Status</th><th></th></tr></thead><tbody>
+    <div className="data-table"><table><thead><tr><th>{isId ? 'Organisasi' : 'Organization'}</th><th>{isId ? 'Anggota' : 'Members'}</th><th>{isId ? 'Langganan' : 'Subscription'}</th><th>Status</th><th></th></tr></thead><tbody>
       {items.map((item) => <tr key={item.id}>
         <td><Building2 size={16} /> {item.name}</td>
         <td>{item._count.users}</td>
-        <td>{item.aiProfile === 'sleman' ? 'Sleman' : (isId ? 'Umum' : 'General')}</td>
+        <td>{item.subscriptionStatus === 'TRIAL' ? `${isId ? 'Trial sampai' : 'Trial until'} ${item.trialEndsAt ? new Date(item.trialEndsAt).toLocaleDateString(isId ? 'id-ID' : 'en-US') : '-'}` : item.subscriptionStatus === 'PENDING_PAYMENT' ? (isId ? 'Menunggu pembayaran' : 'Pending payment') : (item.subscriptionStatus === 'ACTIVE' ? (isId ? 'Aktif' : 'Active') : (isId ? 'Berakhir' : 'Expired'))}</td>
         <td>{item.isActive ? (isId ? 'Aktif' : 'Active') : (isId ? 'Nonaktif' : 'Inactive')}</td>
         <td><button className="secondary-button" onClick={() => openMembers(item.id)}><Users size={15} />{isId ? 'Kelola anggota' : 'Manage members'}</button></td>
       </tr>)}
@@ -122,7 +122,6 @@ export function WorkspacesPage() {
     {open && <div className="modal-overlay" onClick={() => !saving && setOpen(false)}><form className="modal-card" onSubmit={submit} onClick={(event) => event.stopPropagation()}>
       <div className="modal-header"><h2>{isId ? 'Buat organisasi' : 'Create organization'}</h2><button type="button" className="icon-button" title={isId ? 'Tutup' : 'Close'} disabled={saving} onClick={() => setOpen(false)}><X size={18} /></button></div>
       <div className="modal-body">{fields.map(([name, label, type, optional]) => <div className="upload-field" key={name}><label htmlFor={`org-${name}`}>{label}</label><input id={`org-${name}`} name={name} type={type} required={!optional} minLength={name === 'adminPassword' ? 12 : 2} maxLength={name === 'adminPassword' ? 128 : 80} autoComplete={type === 'password' ? 'new-password' : 'off'} disabled={saving} /></div>)}
-        <div className="upload-field"><label htmlFor="org-ai-profile">{isId ? 'Profil AI' : 'AI profile'}</label><select id="org-ai-profile" name="aiProfile" defaultValue="general" disabled={saving}><option value="general">{isId ? 'Umum' : 'General'}</option><option value="sleman">Sleman</option></select></div>
         {error && <p className="inline-alert" role="alert">{error}</p>}
       </div>
       <div className="modal-actions"><button type="button" className="secondary-button" disabled={saving} onClick={() => setOpen(false)}>{isId ? 'Batal' : 'Cancel'}</button><button className="primary-button" disabled={saving}><Plus size={17} />{saving ? (isId ? 'Menyimpan...' : 'Saving...') : (isId ? 'Buat organisasi' : 'Create organization')}</button></div>

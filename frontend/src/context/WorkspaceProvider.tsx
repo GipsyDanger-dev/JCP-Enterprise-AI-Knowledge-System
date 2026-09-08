@@ -44,7 +44,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Role mengikuti akun yang login
   useEffect(() => {
     setRole(user?.accountType === 'COMPANY' && user.isAdmin ? 'admin' : 'employee')
   }, [user])
@@ -293,7 +292,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (location.pathname === '/chat' && !new URLSearchParams(location.search).get('conversation')) {
         navigate(`/chat?conversation=${res.conversationId}`, { replace: true })
       }
-      // Update the existing message with AI response
       setChatHistory((prev) => prev.map((msg) =>
         msg.id === messageId
           ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, suggestions: res.suggestions ?? [], awaitingChoice: res.awaitingChoice ?? false, error: null }

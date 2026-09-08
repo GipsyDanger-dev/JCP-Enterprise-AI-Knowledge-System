@@ -26,12 +26,10 @@ export function AdminInboxPage() {
   const [, setError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Reset unread count when opening inbox
   useEffect(() => {
     setUnreadMessages(0)
   }, [setUnreadMessages])
 
-  // Load conversations
   const loadConversations = useCallback(async () => {
     if (!token) return
     setLoading(true)
@@ -47,7 +45,6 @@ export function AdminInboxPage() {
 
   useEffect(() => { loadConversations() }, [loadConversations])
 
-  // Real-time SSE keeps the inbox list and the open thread current.
   useEffect(() => {
     if (!token) return
     return subscribeMessaging(token, (event) => {
@@ -80,7 +77,6 @@ export function AdminInboxPage() {
     })
   }, [token, selectedConv?.id, setUnreadMessages])
 
-  // Load messages when conversation selected & mark as read
   useEffect(() => {
     if (!selectedConv || !token) return
     let cancelled = false
@@ -98,12 +94,10 @@ export function AdminInboxPage() {
 
   const prevMsgCountRef = useRef(0)
 
-  // Reset message count ref when changing conversation
   useEffect(() => {
     prevMsgCountRef.current = 0
   }, [selectedConv?.id])
 
-  // Broadcast typing while composing; stop 2.5s after the last keystroke.
   const typingTimerRef = useRef<number | null>(null)
   const notifyTyping = () => {
     if (!selectedConv || !token) return
@@ -120,7 +114,6 @@ export function AdminInboxPage() {
     if (selectedConvId && token) sendTypingStatus(selectedConvId, false, token).catch(() => {})
   }, [selectedConvId, token])
 
-  // Auto scroll only when new messages are added or on initial conversation load
   useEffect(() => {
     if (messages.length > prevMsgCountRef.current || isTyping) {
       bottomRef.current?.scrollIntoView({ behavior: prevMsgCountRef.current === 0 ? 'auto' : 'smooth' })
@@ -135,7 +128,6 @@ export function AdminInboxPage() {
     try {
       const msg = await sendAdminMessage(selectedConv.id, { content, attachments }, token)
       setMessages((prev) => [...prev, msg])
-      // Update conversation list
       setConversations((prev) =>
         prev.map((c) =>
           c.id === selectedConv.id
@@ -181,7 +173,6 @@ export function AdminInboxPage() {
       />
 
       <div className="inbox-layout">
-        {/* Conversation list */}
         <div className={`inbox-list ${selectedConv ? 'inbox-list-hidden-mobile' : ''}`}>
           <div className="inbox-list-header">
             <div>
@@ -219,7 +210,6 @@ export function AdminInboxPage() {
           )}
         </div>
 
-        {/* Chat area */}
         <div className={`inbox-chat ${selectedConv ? 'inbox-chat-active' : ''}`}>
           {!selectedConv ? (
             <div className="inbox-chat-empty">
@@ -228,7 +218,6 @@ export function AdminInboxPage() {
             </div>
           ) : (
             <>
-              {/* Chat header */}
               <div className="inbox-chat-header">
                 <button className="icon-button inbox-back-btn" onClick={() => setSelectedConv(null)}>
                   <ArrowLeft size={18} />
@@ -241,7 +230,6 @@ export function AdminInboxPage() {
                 <span className="inbox-thread-status">{isId ? 'Aktif' : 'Active'}</span>
               </div>
 
-              {/* Messages */}
               <div className="inbox-messages">
                 {loadingMessages ? (
                   <div className="messaging-loading">
@@ -255,7 +243,6 @@ export function AdminInboxPage() {
                 )}
               </div>
 
-              {/* Composer */}
               <MessageComposer
                 onSend={handleSend}
                 onTyping={notifyTyping}

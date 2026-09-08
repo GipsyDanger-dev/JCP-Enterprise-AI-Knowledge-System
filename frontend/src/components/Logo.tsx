@@ -1,7 +1,3 @@
-/**
- * Custom SVG logo for Enterprise AI Knowledge System.
- * Combines brain/neural + document + spark elements.
- */
 export function Logo({ size = 56, className = '' }: { size?: number; className?: string }) {
   return (
     <svg
@@ -13,10 +9,8 @@ export function Logo({ size = 56, className = '' }: { size?: number; className?:
       className={className}
       aria-label="Enterprise AI logo"
     >
-      {/* Background rounded square */}
       <rect width="56" height="56" rx="14" fill="url(#logo-bg)" />
 
-      {/* Brain / neural network shape */}
       <path
         d="M28 12C20.268 12 14 18.268 14 26c0 4.8 2.4 9 6 11.4V42a2 2 0 002 2h16a2 2 0 002-2v-4.6c3.6-2.4 6-6.6 6-11.4 0-7.732-6.268-14-14-14z"
         fill="rgba(255,255,255,.12)"
@@ -24,27 +18,23 @@ export function Logo({ size = 56, className = '' }: { size?: number; className?:
         strokeWidth="1"
       />
 
-      {/* Neural nodes */}
       <circle cx="22" cy="23" r="2.5" fill="#ff7043" />
       <circle cx="34" cy="23" r="2.5" fill="#ff7043" />
       <circle cx="28" cy="30" r="2.5" fill="#ff9a76" />
       <circle cx="22" cy="35" r="2" fill="#ffb896" opacity=".7" />
       <circle cx="34" cy="35" r="2" fill="#ffb896" opacity=".7" />
 
-      {/* Neural connections */}
       <line x1="22" y1="23" x2="34" y2="23" stroke="rgba(255,112,67,.4)" strokeWidth="1" />
       <line x1="22" y1="23" x2="28" y2="30" stroke="rgba(255,112,67,.4)" strokeWidth="1" />
       <line x1="34" y1="23" x2="28" y2="30" stroke="rgba(255,112,67,.4)" strokeWidth="1" />
       <line x1="28" y1="30" x2="22" y2="35" stroke="rgba(255,112,67,.3)" strokeWidth="1" />
       <line x1="28" y1="30" x2="34" y2="35" stroke="rgba(255,112,67,.3)" strokeWidth="1" />
 
-      {/* Document icon at bottom */}
       <rect x="23" y="40" width="10" height="8" rx="1.5" fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.25)" strokeWidth=".75" />
       <line x1="25.5" y1="42.5" x2="30.5" y2="42.5" stroke="rgba(255,255,255,.35)" strokeWidth=".75" strokeLinecap="round" />
       <line x1="25.5" y1="44.5" x2="29" y2="44.5" stroke="rgba(255,255,255,.25)" strokeWidth=".75" strokeLinecap="round" />
       <line x1="25.5" y1="46.5" x2="28" y2="46.5" stroke="rgba(255,255,255,.2)" strokeWidth=".75" strokeLinecap="round" />
 
-      {/* Sparkle accents */}
       <path d="M42 14l1.5 3 3 1.5-3 1.5L42 23l-1.5-3-3-1.5 3-1.5z" fill="#ff7043" opacity=".8" />
       <path d="M13 18l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" fill="#ff9a76" opacity=".5" />
 
@@ -59,9 +49,6 @@ export function Logo({ size = 56, className = '' }: { size?: number; className?:
   )
 }
 
-/**
- * Smaller logo variant for sidebar / form header.
- */
 export function LogoMark({ size = 32, className = '' }: { size?: number; className?: string }) {
   return (
     <svg

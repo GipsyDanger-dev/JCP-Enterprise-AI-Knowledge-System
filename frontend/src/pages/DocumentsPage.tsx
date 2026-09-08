@@ -123,7 +123,6 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [canRenderOriginal, doc.id, doc.status, extension, token])
 
-  // Group chunks by page
   const pages = useMemo(() => {
     const map = new Map<number, DocumentChunk[]>()
     chunks.forEach((c) => {
@@ -137,7 +136,6 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
   return (
     <div className="doc-viewer-overlay" onClick={onClose}>
       <div className="doc-viewer" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
         <div className="doc-viewer-header">
           <div className="doc-viewer-title">
             <FileText size={20} />
@@ -167,7 +165,6 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
           </div>
         </div>
 
-        {/* Content */}
         <div className="doc-viewer-content" ref={viewerRef} onScroll={trackReading}>
           {doc.status !== 'Ready' && (
             <div className="doc-viewer-status">
@@ -500,7 +497,6 @@ export function DocumentsPage() {
         </table>
       </div>
 
-      {/* Document detail — full-screen viewer */}
       {selectedDoc && (
         <DocViewer doc={selectedDoc} isId={isId} canManage={canManage} token={token} requiredReadingId={requiredReadingId} onClose={handleCloseDocument} onDelete={handleDelete} onChunksLoaded={setDocChunks} chunks={docChunks} chunksLoading={chunksLoading} setChunksLoading={setChunksLoading} />
       )}

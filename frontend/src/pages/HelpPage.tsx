@@ -35,7 +35,6 @@ export function HelpPage() {
   const FAQ = isId ? FAQ_ID : FAQ_EN
   const faqRef = useRef<HTMLDivElement>(null)
 
-  // Panduan memulai: open FAQ items 0-2 (upload, citation, formats)
   const scrollToGuide = useCallback(() => {
     setOpenIndex(0)
     setTimeout(() => {
@@ -52,7 +51,6 @@ export function HelpPage() {
       />
 
       <div className="help-grid">
-        {/* Quick links */}
         <section className="help-section">
           <h3>{isId ? 'Tautan cepat' : 'Quick links'}</h3>
           <div className="help-links">
@@ -83,7 +81,6 @@ export function HelpPage() {
           </div>
         </section>
 
-        {/* FAQ */}
         <section className="help-section" ref={faqRef}>
           <h3>{isId ? 'Pertanyaan yang sering diajukan' : 'Frequently asked questions'}</h3>
           <div className="faq-list">
@@ -103,7 +100,6 @@ export function HelpPage() {
           </div>
         </section>
 
-        {/* Contact */}
         <section className="help-section">
           <h3>{isId ? 'Hubungi dukungan' : 'Contact support'}</h3>
           <div className="help-contact-grid">

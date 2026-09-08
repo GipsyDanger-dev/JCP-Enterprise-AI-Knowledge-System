@@ -50,7 +50,6 @@ def run_case(kb: KnowledgeBase, case: dict, top_k: int, retriever: str,
     filename = source.get("filename")
     page = source.get("page")
 
-    # 1. Retrieval: expected source chunk ada di raw top-k (sebelum threshold).
     engine = build_retriever(kb, mode=retriever)
     raw = [chunk for _, chunk in engine.search(question, top_k)]
     retrieval_ok = any(
@@ -59,7 +58,6 @@ def run_case(kb: KnowledgeBase, case: dict, top_k: int, retriever: str,
     )
     checks.append(("retrieval", retrieval_ok))
 
-    # 2 & 3: grounded answer + citation dari kontrak ask().
     result = kb.ask(question, top_k=top_k, use_llm=use_llm, model=model, retriever=retriever)
     citation_ok = any(
         c["filename"] == filename and (page is None or c["page_number"] == page)
@@ -67,7 +65,6 @@ def run_case(kb: KnowledgeBase, case: dict, top_k: int, retriever: str,
     )
     checks.append(("citation", citation_ok))
 
-    # 2. Answer: hanya dicek saat --llm dipakai (tanpa LLM, answer = teks chunk).
     if "answer_contains" in expected and use_llm:
         answer_ok = all(keyword.lower() in result["answer"].lower() for keyword in expected["answer_contains"])
         checks.append(("answer", answer_ok))
