@@ -12,6 +12,9 @@ export interface ChatMessage {
   citations: Citation[]
   suggestions: string[]
   awaitingChoice: boolean
+  /** Saran yang sudah dipilih pengguna. Terisi = daftar saran pesan ini
+   *  sudah dipakai dan tidak boleh diklik lagi. */
+  chosenSuggestion: string | null
   error: string | null
   timestamp: number
 }

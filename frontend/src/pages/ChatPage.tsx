@@ -51,14 +51,14 @@ function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: {
         <div className="assistant-message no-answer">
           <div className="answer-label"><AlertTriangle size={16} /> Enterprise AI</div>
           <p>{msg.error}</p>
-          {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} onSelect={onSuggestion} />}
+          {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} chosen={msg.chosenSuggestion} onSelect={onSuggestion} />}
         </div>
       )}
       {msg.answer && (
         <div className="assistant-message">
           <div className="answer-label"><Sparkles size={16} /> Enterprise AI</div>
           <div className="answer-copy">{renderAnswer(msg.answer)}</div>
-          {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} onSelect={onSuggestion} />}
+          {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} chosen={msg.chosenSuggestion} onSelect={onSuggestion} />}
           {msg.citations.length > 0 && (
             <div className="citations">
               {msg.citations.map((c, i) => (
@@ -95,12 +95,27 @@ function renderAnswer(answer: string) {
   })
 }
 
-function SuggestionList({ suggestions, onSelect }: { suggestions: string[]; onSelect: (value: string) => void }) {
+// `chosen` terisi begitu salah satu saran dipilih. Seluruh daftar ikut mati,
+// bukan hanya tombol yang diklik: saran-saran ini satu paket pilihan untuk satu
+// jawaban, jadi setelah dijawab tidak ada lagi yang relevan untuk dipencet.
+function SuggestionList({ suggestions, chosen, onSelect }: { suggestions: string[]; chosen: string | null; onSelect: (value: string) => void }) {
+  const isAnswered = chosen !== null
   return (
     <div className="chat-suggestions">
       <span>Coba tanyakan:</span>
       <div>
-        {suggestions.map((suggestion) => <button key={suggestion} type="button" onClick={() => onSelect(suggestion)}>{suggestion}</button>)}
+        {suggestions.map((suggestion) => (
+          <button
+            key={suggestion}
+            type="button"
+            className={suggestion === chosen ? 'is-chosen' : undefined}
+            disabled={isAnswered}
+            aria-pressed={suggestion === chosen}
+            onClick={() => onSelect(suggestion)}
+          >
+            {suggestion}
+          </button>
+        ))}
       </div>
     </div>
   )

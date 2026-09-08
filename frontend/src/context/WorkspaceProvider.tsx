@@ -260,6 +260,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       citations: [],
       suggestions: [],
       awaitingChoice: false,
+      chosenSuggestion: null,
       error: null,
       timestamp: Date.now(),
     }])
@@ -293,6 +294,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // supaya aplikasi tidak mempertanyakan usulannya sendiri.
   const askQuestion = (value: string) => {
     setQuestion(value)
+    // Saran adalah pilihan sekali pakai: begitu satu dipilih, seluruh daftar
+    // milik pesan terakhir dikunci supaya pertanyaan yang sama tidak bisa
+    // dikirim ulang dengan mengklik tombolnya lagi.
+    setChatHistory((prev) => (prev.length === 0 ? prev : prev.map((msg, index) => (
+      index === prev.length - 1 && msg.suggestions.length > 0 && msg.chosenSuggestion === null
+        ? { ...msg, chosenSuggestion: value }
+        : msg
+    ))))
     sendQuestion(value, true)
   }
 
@@ -360,6 +369,8 @@ function toWorkspaceHistory(conversation: ConversationDetail): ChatMessage[] {
         answer: '',
         citations: [],
         suggestions: [],
+        awaitingChoice: false,
+        chosenSuggestion: null,
         error: null,
         timestamp: new Date(message.createdAt).getTime(),
       })
