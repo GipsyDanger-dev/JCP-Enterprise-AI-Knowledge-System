@@ -91,7 +91,7 @@ class AskResponse(BaseModel):
 class IngestRequest(BaseModel):
     input_dir: str  # path relative to the AI service container/workdir
     document_version_id: UUID | None = None  # required by the PostgreSQL store
-    embed: bool = True
+    embed: bool = EMBEDDINGS_ENABLED
     model: str | None = None
 
 
@@ -308,7 +308,7 @@ def ingest_documents(request: IngestRequest) -> dict[str, Any]:
 async def ingest_file(
     file: UploadFile = File(...),
     document_version_id: UUID | None = Form(None),
-    embed: bool = Form(True),
+    embed: bool = Form(EMBEDDINGS_ENABLED),
     model: str | None = Form(None),
 ) -> dict[str, Any]:
     """Ingest one uploaded file sent as multipart from the Backend.

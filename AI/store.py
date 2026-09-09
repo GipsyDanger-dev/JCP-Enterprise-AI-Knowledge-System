@@ -598,7 +598,7 @@ def ingest_file_to_pg(
     filename: str,
     store: PgVectorStore,
     document_version_id: str,
-    embed: bool = True,
+    embed: bool = EMBEDDINGS_ENABLED,
     api_key: str | None = None,
 ) -> list[dict[str, Any]]:
     """Ingest one uploaded file (raw bytes) for an existing backend DocumentVersion.
@@ -632,7 +632,7 @@ def ingest_to_pg(
     input_dir: Path,
     store: PgVectorStore,
     document_version_id: str,
-    embed: bool = True,
+    embed: bool = EMBEDDINGS_ENABLED,
     api_key: str | None = None,
 ) -> list[dict[str, Any]]:
     """Ingest exactly one file for an existing backend DocumentVersion."""

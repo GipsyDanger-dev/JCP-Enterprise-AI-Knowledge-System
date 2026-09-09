@@ -6,6 +6,12 @@ import { aiServiceUrl, workerToken } from '../config/env.util';
 
 const POLL_INTERVAL_MS = 3000;
 
+function embeddingsEnabled(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(
+    (process.env.AI_EMBEDDINGS_ENABLED ?? '').trim().toLowerCase(),
+  );
+}
+
 @Injectable()
 export class DocumentProcessorService implements OnModuleInit {
   private readonly logger = new Logger(DocumentProcessorService.name);
@@ -79,7 +85,7 @@ export class DocumentProcessorService implements OnModuleInit {
       const form = new FormData();
       form.append('file', new Blob([content], { type: mimeType }), filename);
       form.append('document_version_id', versionId);
-      form.append('embed', process.env.AI_EMBEDDINGS_ENABLED !== 'false' ? 'true' : 'false');
+      form.append('embed', embeddingsEnabled() ? 'true' : 'false');
 
       const ingestResponse = await fetch(`${this.aiBaseUrl}/ingest-file`, {
         method: 'POST',
