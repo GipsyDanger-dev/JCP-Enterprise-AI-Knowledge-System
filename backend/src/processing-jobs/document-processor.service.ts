@@ -5,6 +5,12 @@ import { Inject } from '@nestjs/common';
 import { aiServiceUrl, workerToken } from '../config/env.util';
 
 const POLL_INTERVAL_MS = 3000;
+const AI_INGEST_MAX_ATTEMPTS = 3;
+const AI_INGEST_RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
 
 function embeddingsEnabled(): boolean {
   return ['1', 'true', 'yes', 'on'].includes(
@@ -81,21 +87,50 @@ export class DocumentProcessorService implements OnModuleInit {
       const fileContent = await this.storage.read(versionId);
       const content = Buffer.from(fileContent);
 
-      // Stream the file to the AI service as multipart — no shared filesystem needed.
-      const form = new FormData();
-      form.append('file', new Blob([content], { type: mimeType }), filename);
-      form.append('document_version_id', versionId);
-      form.append('embed', embeddingsEnabled() ? 'true' : 'false');
+      let ingestResponse: Response | null = null;
+      for (let attempt = 1; attempt <= AI_INGEST_MAX_ATTEMPTS; attempt += 1) {
+        const form = new FormData();
+        form.append('file', new Blob([content], { type: mimeType }), filename);
+        form.append('document_version_id', versionId);
+        form.append('embed', embeddingsEnabled() ? 'true' : 'false');
 
-      const ingestResponse = await fetch(`${this.aiBaseUrl}/ingest-file`, {
-        method: 'POST',
-        headers: { 'X-Worker-Token': workerToken() },
-        body: form,
-      });
+        let response: Response;
+        try {
+          response = await fetch(`${this.aiBaseUrl}/ingest-file`, {
+            method: 'POST',
+            headers: { 'X-Worker-Token': workerToken() },
+            body: form,
+          });
+        } catch (error) {
+          if (attempt === AI_INGEST_MAX_ATTEMPTS) throw error;
+          this.logger.warn(
+            `AI ingest attempt ${attempt}/${AI_INGEST_MAX_ATTEMPTS} errored; retrying: ${
+              error instanceof Error ? error.message : error
+            }`,
+          );
+          await delay(attempt * 1000);
+          continue;
+        }
 
-      if (!ingestResponse.ok) {
-        const errorText = await ingestResponse.text();
-        throw new Error(`AI ingest failed (${ingestResponse.status}): ${errorText}`);
+        if (response.ok) {
+          ingestResponse = response;
+          break;
+        }
+
+        const errorText = await response.text();
+        const retryable = AI_INGEST_RETRYABLE_STATUSES.has(response.status);
+        if (!retryable || attempt === AI_INGEST_MAX_ATTEMPTS) {
+          throw new Error(`AI ingest failed (${response.status}): ${errorText}`);
+        }
+
+        this.logger.warn(
+          `AI ingest attempt ${attempt}/${AI_INGEST_MAX_ATTEMPTS} failed (${response.status}); retrying`,
+        );
+        await delay(attempt * 1000);
+      }
+
+      if (!ingestResponse) {
+        throw new Error('AI ingest failed without a response');
       }
 
       const result = await ingestResponse.json();
