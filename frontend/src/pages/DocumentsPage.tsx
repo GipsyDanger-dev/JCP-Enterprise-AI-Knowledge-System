@@ -516,8 +516,14 @@ export function DocumentsPage() {
           finally { setRenameSaving(false) }
         }}>
           <div className="modal-header"><h2>{isId ? 'Ubah nama dokumen' : 'Rename document'}</h2><button type="button" className="icon-button" aria-label={isId ? 'Tutup' : 'Close'} disabled={renameSaving} onClick={() => setRenameDoc(null)}><X size={18} /></button></div>
-          <div className="modal-body"><label className="upload-field">{isId ? 'Nama dokumen' : 'Document title'}<input required maxLength={255} value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} autoFocus /></label>{renameError && <p role="alert">{renameError}</p>}</div>
-          <div className="modal-footer"><button type="button" className="secondary-button" disabled={renameSaving} onClick={() => setRenameDoc(null)}>{isId ? 'Batal' : 'Cancel'}</button><button className="primary-button" disabled={renameSaving || !renameTitle.trim()}>{isId ? 'Simpan' : 'Save'}</button></div>
+          <div className="modal-body">
+            {renameError && <div className="upload-error-msg" role="alert">{renameError}</div>}
+            <div className="upload-field">
+              <label htmlFor="rename-document-title">{isId ? 'Nama dokumen' : 'Document title'}</label>
+              <input id="rename-document-title" required maxLength={255} value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} autoFocus />
+            </div>
+          </div>
+          <div className="modal-actions"><button type="button" className="secondary-button" disabled={renameSaving} onClick={() => setRenameDoc(null)}>{isId ? 'Batal' : 'Cancel'}</button><button className="primary-button" disabled={renameSaving || !renameTitle.trim()}>{renameSaving ? (isId ? 'Menyimpan...' : 'Saving...') : (isId ? 'Simpan' : 'Save')}</button></div>
         </form>
       </div>}
       <DocumentAccessModal open={showDocumentAccess} onClose={() => setShowDocumentAccess(false)} />
