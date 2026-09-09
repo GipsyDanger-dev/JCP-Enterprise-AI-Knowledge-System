@@ -229,6 +229,8 @@ export function DocumentsPage() {
   const [renameTitle, setRenameTitle] = useState('')
   const [renameSaving, setRenameSaving] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
+  const [deleteDoc, setDeleteDoc] = useState<{ id: string; name: string } | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const canManage = role === 'admin' || isPersonal || user?.role === 'ADMIN_UNIT'
   const isId = language === 'id'
   const [searchParams, setSearchParams] = useSearchParams()
@@ -365,11 +367,16 @@ export function DocumentsPage() {
     setSearchParams(nextSearchParams)
   }
 
-  const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Hapus dokumen "${name}"?`)) {
-      await removeDocument(id)
-      if (selectedDoc?.id === id) setSelectedDoc(null)
-    }
+  const handleDelete = (id: string, name: string) => setDeleteDoc({ id, name })
+
+  const confirmDelete = async () => {
+    if (!deleteDoc || deleteBusy) return
+    setDeleteBusy(true)
+    try {
+      await removeDocument(deleteDoc.id)
+      if (selectedDoc?.id === deleteDoc.id) setSelectedDoc(null)
+      setDeleteDoc(null)
+    } finally { setDeleteBusy(false) }
   }
   const openAccessDialog = (document: DocumentItem) => {
     setAccessCategoryId(document.categoryId ?? '')
@@ -525,6 +532,15 @@ export function DocumentsPage() {
           </div>
           <div className="modal-actions"><button type="button" className="secondary-button" disabled={renameSaving} onClick={() => setRenameDoc(null)}>{isId ? 'Batal' : 'Cancel'}</button><button className="primary-button" disabled={renameSaving || !renameTitle.trim()}>{renameSaving ? (isId ? 'Menyimpan...' : 'Saving...') : (isId ? 'Simpan' : 'Save')}</button></div>
         </form>
+      </div>}
+      {deleteDoc && <div className="modal-overlay" onClick={() => !deleteBusy && setDeleteDoc(null)}>
+        <div className="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="delete-document-title" onClick={(event) => event.stopPropagation()}>
+          <div className="modal-header"><h2 id="delete-document-title">{isId ? 'Hapus dokumen' : 'Delete document'}</h2><button type="button" className="icon-button" aria-label={isId ? 'Tutup' : 'Close'} disabled={deleteBusy} onClick={() => setDeleteDoc(null)}><X size={18} /></button></div>
+          <div className="modal-body">
+            <p className="modal-copy">{isId ? <>Dokumen <strong>{deleteDoc.name}</strong> akan dihapus permanen beserta seluruh potongan teks yang sudah diindeks. Tindakan ini tidak bisa dibatalkan.</> : <>Document <strong>{deleteDoc.name}</strong> will be permanently deleted along with every indexed chunk. This action cannot be undone.</>}</p>
+          </div>
+          <div className="modal-actions"><button type="button" className="secondary-button" disabled={deleteBusy} onClick={() => setDeleteDoc(null)}>{isId ? 'Batal' : 'Cancel'}</button><button type="button" className="danger-button" disabled={deleteBusy} autoFocus onClick={confirmDelete}>{deleteBusy ? (isId ? 'Menghapus...' : 'Deleting...') : (isId ? 'Hapus dokumen' : 'Delete document')}</button></div>
+        </div>
       </div>}
       <DocumentAccessModal open={showDocumentAccess} onClose={() => setShowDocumentAccess(false)} />
 
