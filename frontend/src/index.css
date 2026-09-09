@@ -573,7 +573,7 @@ button { cursor: pointer; }
 .home-announcement:hover { border-color: var(--accent); background: var(--surface-hover); }
 .home-announcement > span { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 6px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .home-announcement > div { min-width: 0; }
-.home-announcement strong { display: block; color: var(--text-strong); font-size: var(--fs-sm); }
+.home-announcement strong { display: block; overflow: hidden; color: var(--text-strong); font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
 .home-announcement p { margin: 3px 0 0; overflow: hidden; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
 .home-announcement > svg { color: var(--text-muted); }
 .recent-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
@@ -1661,7 +1661,7 @@ button { cursor: pointer; }
 .announcement-meta { display: flex; flex-wrap: wrap; gap: 7px 12px; color: var(--text-muted); font-size: var(--fs-xs); }
 .announcement-meta b { color: var(--accent); font-weight: var(--fw-heavy); }
 .announcement-card.archived .announcement-meta b { color: var(--text-muted); }
-.announcement-content h2 { margin: 7px 0 6px; color: var(--text-strong); font-size: var(--fs-lg); line-height: 1.35; }
+.announcement-content h2 { margin: 7px 0 6px; color: var(--text-strong); font-size: var(--fs-lg); line-height: 1.35; overflow-wrap: anywhere; }
 .announcement-content p { margin: 0; color: var(--text-body); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .announcement-readers-toggle { display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; border: 1px solid var(--border-strong); border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--fs-xs); font-weight: var(--fw-heavy); padding: 6px 13px; cursor: pointer; }
 .announcement-readers-toggle:hover, .announcement-readers-toggle[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
