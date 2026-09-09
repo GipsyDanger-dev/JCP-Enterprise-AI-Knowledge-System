@@ -810,6 +810,8 @@ button { cursor: pointer; }
 .onboarding-choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 18px; }
 .onboarding-choice-grid button { min-width: 0; display: flex; align-items: center; gap: 9px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); color: var(--text-secondary); text-align: left; cursor: pointer; }
 .onboarding-choice-grid button:hover, .onboarding-choice-grid button.active { border-color: var(--brand-500); background: var(--brand-50); color: var(--brand-700); }
+.onboarding-choice-grid button:disabled, .onboarding-choice-grid button.disabled { border-color: var(--border); background: var(--bg-page); color: var(--text-muted); cursor: not-allowed; opacity: .62; }
+.onboarding-choice-grid button:disabled:hover, .onboarding-choice-grid button.disabled:hover { border-color: var(--border); background: var(--bg-page); color: var(--text-muted); }
 .onboarding-choice-grid button > span { min-width: 0; display: grid; gap: 2px; flex: 1; }
 .onboarding-choice-grid strong { font-size: 11px; color: inherit; }
 .onboarding-choice-grid small { color: var(--text-muted); font-size: 9px; line-height: 1.3; }

@@ -102,7 +102,7 @@ export function MessagingPage() {
     setError(null)
     try {
       const msg = await sendDirectMessage(conversationId, { content, attachments }, token)
-      setMessages((prev) => [...prev, msg])
+      setMessages((prev) => prev.some((existing) => existing.id === msg.id) ? prev : [...prev, msg])
     } catch (err) {
       setError(errorMessage(err))
     } finally {

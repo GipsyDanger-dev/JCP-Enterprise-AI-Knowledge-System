@@ -45,13 +45,18 @@ async function main() {
   console.log('PASS organization provisioning and direct-login workspace binding');
   const personal = [];
   for (const label of ['one', 'two']) {
-    const account = await call('/auth/register/personal', null, 'POST', { displayName: `Personal ${label}`, email: `personal_${label}_${suffix}@example.invalid`, password: credentials.password, confirmPassword: credentials.password }, 201);
+    const username = `personal_${label}_${suffix}`;
+    const email = `${username}@example.invalid`;
+    const account = await call('/auth/register/personal', null, 'POST', { displayName: `Personal ${label}`, username, email, password: credentials.password, confirmPassword: credentials.password }, 201);
     assert.equal(account.user.accountType, 'PERSONAL');
     assert.equal(account.user.isAdmin, false);
+    assert.equal(account.user.username, username);
+    const passwordLogin = await login(username);
+    assert.equal(passwordLogin.user.id, account.user.id);
     personal.push(account);
   }
   assert.notEqual(personal[0].user.workspaceId, personal[1].user.workspaceId);
-  await call('/auth/register/personal', null, 'POST', { displayName: 'Invalid admin', email: `bad_${suffix}@example.invalid`, password: credentials.password, confirmPassword: credentials.password, isAdmin: true, workspaceId: organizations[0].workspace.id }, 400);
+  await call('/auth/register/personal', null, 'POST', { displayName: 'Invalid admin', username: `bad_${suffix}`, email: `bad_${suffix}@example.invalid`, password: credentials.password, confirmPassword: credentials.password, isAdmin: true, workspaceId: organizations[0].workspace.id }, 400);
   for (const account of personal) {
     await call('/users', account.accessToken, 'GET', undefined, 403);
     await call('/workspaces', account.accessToken, 'GET', undefined, 403);

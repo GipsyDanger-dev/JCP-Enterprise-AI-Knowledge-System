@@ -13,7 +13,10 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const token = this.extractBearerToken(request.headers.authorization);
+    const requestMeta = request as AuthenticatedRequest & { url?: string; query?: { token?: unknown } };
+    const streamPath = requestMeta.url?.split('?')[0].endsWith('/messaging/stream');
+    const queryToken = streamPath && typeof requestMeta.query?.token === 'string' ? requestMeta.query.token : undefined;
+    const token = this.extractBearerToken(request.headers.authorization) ?? queryToken;
     if (!token) throw new UnauthorizedException('Authentication required');
 
     try {

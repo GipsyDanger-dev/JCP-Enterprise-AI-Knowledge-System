@@ -3,6 +3,7 @@ import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -16,6 +17,16 @@ export class RegisterPersonalDto {
   @MinLength(2)
   @MaxLength(100)
   displayName!: string;
+
+  @ApiProperty({ example: 'beny.pratama', minLength: 3, maxLength: 50 })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
+  @IsString()
+  @MinLength(3)
+  @MaxLength(50)
+  @Matches(/^[a-zA-Z0-9._-]+$/)
+  username!: string;
 
   @ApiProperty({ example: 'beny@gmail.com', maxLength: 254 })
   @Transform(({ value }: { value: unknown }) =>

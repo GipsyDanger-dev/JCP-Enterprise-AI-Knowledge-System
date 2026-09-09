@@ -61,12 +61,14 @@ export class AuthService {
 
     const email = input.email.trim().toLowerCase();
     const displayName = input.displayName.trim();
+    const username = input.username.trim().toLowerCase();
     const passwordHash = await hashPassword(input.password);
 
     try {
       const user = await this.prisma.user.create({
         data: {
           email,
+          username,
           displayName,
           passwordHash,
           accountType: AccountType.PERSONAL,
@@ -80,7 +82,7 @@ export class AuthService {
       return this.issueApplicationSession(user, 'PASSWORD', ipAddress, userAgent, true);
     } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Email is already registered');
+        throw new ConflictException('Username or email is already registered');
       }
       throw error;
     }

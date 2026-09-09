@@ -7,7 +7,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { MessagingService } from './messaging.service';
 import { MessagingStreamEvent } from './messaging-events.service';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { UserRole } from '@prisma/client';
 import { isAdminRole } from '../auth/role.utils';
 
@@ -80,8 +80,8 @@ export class MessagingController {
 
   /** Real-time event stream (messages, edits, deletes, typing). */
   @Sse('stream')
-  stream(@CurrentUser() actor: AuthenticatedUser): Observable<MessagingStreamEvent> {
-    return this.messagingService.stream(actor);
+  stream(@CurrentUser() actor: AuthenticatedUser): Observable<{ data: MessagingStreamEvent }> {
+    return this.messagingService.stream(actor).pipe(map((data) => ({ data })));
   }
 
   /** Broadcast typing state to the other side of a conversation. */

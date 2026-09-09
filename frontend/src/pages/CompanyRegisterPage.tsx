@@ -16,6 +16,7 @@ export function CompanyRegisterPage() {
   const { registerCompany } = useAuth()
   const { language } = useWorkspace()
   const isId = language === 'id'
+  const paymentEnabled = false
   const [organizationName, setOrganizationName] = useState('')
   const [adminName, setAdminName] = useState('')
   const [adminUsername, setAdminUsername] = useState('')
@@ -124,9 +125,8 @@ export function CompanyRegisterPage() {
                 <Clock3 size={18} /><span><strong>{isId ? 'Trial gratis' : 'Free trial'}</strong><small>{isId ? 'Akses langsung selama masa trial' : 'Immediate access during trial'}</small></span>
                 {onboardingMode === 'TRIAL' && <Check size={15} />}
               </button>
-              <button type="button" className={onboardingMode === 'SUBSCRIBE' ? 'active' : ''} onClick={() => setOnboardingMode('SUBSCRIBE')}>
-                <CreditCard size={18} /><span><strong>{isId ? 'Berlangganan' : 'Subscribe now'}</strong><small>{isId ? 'Siapkan checkout pembayaran' : 'Set up payment checkout'}</small></span>
-                {onboardingMode === 'SUBSCRIBE' && <Check size={15} />}
+              <button type="button" className="disabled" disabled={!paymentEnabled} aria-disabled={!paymentEnabled} title={isId ? 'Pembayaran belum tersedia' : 'Payment is not available yet'}>
+                <CreditCard size={18} /><span><strong>{isId ? 'Berlangganan' : 'Subscribe now'}</strong><small>{isId ? 'Pembayaran belum tersedia' : 'Payment is not available yet'}</small></span>
               </button>
             </div>
 

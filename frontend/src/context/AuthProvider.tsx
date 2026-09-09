@@ -80,11 +80,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerPersonal = useCallback(async (
     displayName: string,
+    username: string,
     email: string,
     password: string,
     confirmPassword: string,
   ) => {
-    const response = await apiRegisterPersonal({ displayName, email, password, confirmPassword })
+    const response = await apiRegisterPersonal({ displayName, username, email, password, confirmPassword })
     localStorage.setItem(TOKEN_KEY, response.accessToken)
     setToken(response.accessToken)
     setUser(response.user)

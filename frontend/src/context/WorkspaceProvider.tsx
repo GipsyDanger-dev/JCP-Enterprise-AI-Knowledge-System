@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { getConversation, listConversations as listChatConversations, queryChat } from '@/api/chat'
+import { getConversation, queryChat } from '@/api/chat'
 import { errorMessage } from '@/api/client'
 import { deleteDocument, getDocumentStatus, listDocuments, uploadDocument } from '@/api/documents'
 import { getAnnouncementUnreadCount, markAnnouncementsRead } from '@/api/announcements'
@@ -39,7 +39,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const prevUnreadRef = useRef(0)
   const prevUnreadAnnouncementsRef = useRef(0)
   const prevUserIdRef = useRef<string | null>(user?.id ?? null)
-  const skipAutoLoadRef = useRef(false)
   const uploadRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
@@ -84,25 +83,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       })
     return () => { cancelled = true }
   }, [location.search, token])
-
-  // Restore the latest room when entering Chat directly or after a refresh.
-  // An explicit "new chat" action sets skipAutoLoadRef so it stays empty.
-  useEffect(() => {
-    if (location.pathname !== '/chat' || location.search || !token || chatHistory.length > 0) return
-    if (skipAutoLoadRef.current) {
-      skipAutoLoadRef.current = false
-      return
-    }
-    let cancelled = false
-    listChatConversations(token)
-      .then((conversations) => {
-        if (cancelled) return
-        const latest = conversations.find((conversation) => conversation.messageCount > 0)
-        if (latest) navigate(`/chat?conversation=${latest.id}`, { replace: true })
-      })
-      .catch(() => { /* empty state is valid when no room exists yet */ })
-    return () => { cancelled = true }
-  }, [location.pathname, location.search, token])
 
   // Muat dokumen dari API saat login; fallback ke data lokal bila gagal
   useEffect(() => {
@@ -321,7 +301,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }
 
   const clearChat = useCallback(() => {
-    skipAutoLoadRef.current = true
     setChatHistory([])
     setConversationId(null)
     setQuestion('')

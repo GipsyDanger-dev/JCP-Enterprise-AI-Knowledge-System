@@ -17,8 +17,9 @@ export async function openBrowser() {
 }
 
 export async function login(page, { email, password }) {
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle0' })
+  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' })
   const usernameSelector = await page.$('#login-username') ? '#login-username' : '#login-email'
+  await page.waitForSelector(usernameSelector, { visible: true })
   await page.type(usernameSelector, email)
   await page.type('#login-password', password)
   await page.click('.login-submit')

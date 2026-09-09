@@ -1,7 +1,7 @@
 import { chromium } from 'playwright'
 
 const WEB_URL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5173'
-const API_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:8002'
+const API_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:8000'
 const chromePath = process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 
 function required(name) {
@@ -51,8 +51,9 @@ const browser = await chromium.launch({ executablePath: chromePath, headless: tr
 try {
   const context = await browser.newContext()
   const page = await context.newPage()
-  await page.goto(`${WEB_URL}/login`, { waitUntil: 'networkidle' })
-  await page.locator('#login-email').fill(employeeUsername)
+  await page.goto(`${WEB_URL}/login`, { waitUntil: 'domcontentloaded' })
+  const usernameSelector = await page.locator('#login-username').count() > 0 ? '#login-username' : '#login-email'
+  await page.locator(usernameSelector).fill(employeeUsername)
   await page.locator('#login-password').fill(employeePassword)
   await page.locator('.login-submit').click()
   await page.waitForURL((url) => !url.pathname.endsWith('/login'))

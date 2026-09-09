@@ -18,7 +18,7 @@ try {
     await page.goto('http://127.0.0.1:5273/login')
     if (label === 'personal') {
       await page.getByRole('tab', { name: /Personal/ }).click()
-      await page.locator('#personal-email').fill(account.user.email)
+      await page.locator('#personal-username').fill(account.user.username)
       await page.locator('#personal-password').fill(fixtures.password)
     } else {
       await page.locator('#login-username').fill(account.user.username)

@@ -8,7 +8,7 @@ export interface AuthContextValue {
   loading: boolean
   login: (username: string, password: string) => Promise<void>
   loginWithGoogle: (credential: string) => Promise<void>
-  registerPersonal: (displayName: string, email: string, password: string, confirmPassword: string) => Promise<void>
+  registerPersonal: (displayName: string, username: string, email: string, password: string, confirmPassword: string) => Promise<void>
   registerCompany: (input: {
     organizationName: string
     adminName: string

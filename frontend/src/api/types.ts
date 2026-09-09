@@ -58,6 +58,7 @@ export type ApiAccountType = 'COMPANY' | 'PERSONAL'
 export interface GoogleLoginRequest { credential: string }
 export interface PersonalRegisterRequest {
   displayName: string
+  username: string
   email: string
   password: string
   confirmPassword: string

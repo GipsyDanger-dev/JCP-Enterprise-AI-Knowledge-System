@@ -36,6 +36,7 @@ export function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [personalName, setPersonalName] = useState('')
+  const [personalUsername, setPersonalUsername] = useState('')
   const [personalEmail, setPersonalEmail] = useState('')
   const [personalPassword, setPersonalPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -117,11 +118,15 @@ export function LoginPage() {
     setError(null)
     setNotice(null)
 
-    if (!personalEmail.trim() || !personalPassword || (personalMode === 'register' && !personalName.trim())) {
+    if (!personalUsername.trim() || !personalPassword || (personalMode === 'register' && (!personalName.trim() || !personalEmail.trim()))) {
       setError(isId ? 'Lengkapi seluruh data yang wajib diisi.' : 'Complete all required fields.')
       return
     }
-    if (!EMAIL_PATTERN.test(personalEmail.trim())) {
+    if (!USERNAME_PATTERN.test(personalUsername.trim())) {
+      setError(isId ? 'Username harus 3–50 karakter: huruf, angka, titik, strip, atau garis bawah.' : 'Username must use 3–50 letters, numbers, periods, hyphens, or underscores.')
+      return
+    }
+    if (personalMode === 'register' && !EMAIL_PATTERN.test(personalEmail.trim())) {
       setError(isId ? 'Masukkan alamat email yang valid.' : 'Enter a valid email address.')
       return
     }
@@ -139,19 +144,20 @@ export function LoginPage() {
       if (personalMode === 'register') {
         await registerPersonal(
           personalName.trim(),
+          personalUsername.trim().toLowerCase(),
           personalEmail.trim().toLowerCase(),
           personalPassword,
           confirmPassword,
         )
       } else {
-        await login(personalEmail.trim().toLowerCase(), personalPassword)
+        await login(personalUsername.trim().toLowerCase(), personalPassword)
       }
       navigate('/', { replace: true })
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setError(isId ? 'Email ini sudah terdaftar. Silakan masuk atau gunakan email lain.' : 'This email is already registered. Sign in or use another email.')
+        setError(isId ? 'Username atau email ini sudah terdaftar. Silakan gunakan yang lain.' : 'This username or email is already registered. Use another one.')
       } else if (err instanceof ApiError && err.status === 401) {
-        setError(isId ? 'Email atau kata sandi salah.' : 'Invalid email or password.')
+        setError(isId ? 'Username atau kata sandi salah.' : 'Invalid username or password.')
       } else {
         setError(errorMessage(err))
       }
@@ -240,7 +246,9 @@ export function LoginPage() {
                   onCredential={handleGoogleCredential}
                   onError={(message) => { setNotice(null); setError(message) }}
                 />
-                <div className="login-divider"><span>{isId ? 'atau gunakan email' : 'or use email'}</span></div>
+                <div className="login-divider"><span>{personalMode === 'register'
+                  ? (isId ? 'atau daftar dengan email' : 'or register with email')
+                  : (isId ? 'atau gunakan username' : 'or use your username')}</span></div>
 
                 {personalMode === 'register' && (
                   <div className="login-field">
@@ -252,13 +260,32 @@ export function LoginPage() {
                   </div>
                 )}
 
-                <div className="login-field">
-                  <label htmlFor="personal-email">Email</label>
-                  <div className="login-input-wrap">
-                    <Mail size={16} className="login-input-icon" />
-                    <input id="personal-email" type="email" value={personalEmail} onChange={(event) => setPersonalEmail(event.target.value)} placeholder={isId ? 'nama@email.com' : 'name@email.com'} autoComplete="email" disabled={submitting} />
+                {personalMode === 'register' ? (
+                  <>
+                    <div className="login-field">
+                      <label htmlFor="personal-username">Username</label>
+                      <div className="login-input-wrap">
+                        <UserRound size={16} className="login-input-icon" />
+                        <input id="personal-username" type="text" value={personalUsername} onChange={(event) => setPersonalUsername(event.target.value)} placeholder={isId ? 'Buat username untuk login' : 'Create a username for sign in'} autoComplete="username" disabled={submitting} />
+                      </div>
+                    </div>
+                    <div className="login-field">
+                      <label htmlFor="personal-email">Email</label>
+                      <div className="login-input-wrap">
+                        <Mail size={16} className="login-input-icon" />
+                        <input id="personal-email" type="email" value={personalEmail} onChange={(event) => setPersonalEmail(event.target.value)} placeholder={isId ? 'nama@email.com' : 'name@email.com'} autoComplete="email" disabled={submitting} />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="login-field">
+                    <label htmlFor="personal-username">Username</label>
+                    <div className="login-input-wrap">
+                      <UserRound size={16} className="login-input-icon" />
+                      <input id="personal-username" type="text" value={personalUsername} onChange={(event) => setPersonalUsername(event.target.value)} placeholder={isId ? 'Masukkan username Anda' : 'Enter your username'} autoComplete="username" disabled={submitting} />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <PasswordField id="personal-password" label={isId ? 'Kata sandi' : 'Password'} value={personalPassword} onChange={setPersonalPassword} show={showPassword} onToggle={() => setShowPassword((value) => !value)} autoComplete={personalMode === 'register' ? 'new-password' : 'current-password'} disabled={submitting} isId={isId} />
 
