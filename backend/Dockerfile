@@ -2,6 +2,9 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
+# Prisma's native query engine requires OpenSSL at build and runtime.
+RUN apk add --no-cache openssl
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
@@ -16,6 +19,8 @@ FROM node:22-alpine AS production
 
 ENV NODE_ENV=production
 WORKDIR /app
+
+RUN apk add --no-cache openssl
 
 COPY package.json package-lock.json ./
 COPY prisma ./prisma

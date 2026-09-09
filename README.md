@@ -73,12 +73,13 @@ Perintah di atas memakai frontend development untuk pekerjaan lokal. Untuk VPS,
 set `VITE_API_BASE_URL` ke URL HTTPS Backend lalu gunakan override production:
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 ```
 
-Override tersebut membangun aset Vite dengan URL Backend yang diberikan lalu
-menyajikannya melalui Nginx. Karena nilainya masuk saat build, perubahan
-`VITE_API_BASE_URL` memerlukan rebuild image frontend.
+Gunakan file production secara langsung agar bind mount dan service PostgreSQL
+lokal dari Compose development tidak ikut terbawa ke VPS. Stack production
+membangun aset Vite lalu menyajikannya melalui Nginx. Karena nilai frontend
+masuk saat build, perubahan konfigurasi build memerlukan rebuild image.
 
 | Service | URL |
 | --- | --- |
