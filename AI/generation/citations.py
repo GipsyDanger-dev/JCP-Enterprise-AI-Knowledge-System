@@ -23,6 +23,11 @@ def citation_from_chunk(chunk: dict[str, Any]) -> dict[str, Any]:
         citation["excerpt"] = text[:2400]
     if "document_version_id" in chunk:
         citation["document_version_id"] = chunk["document_version_id"]
+    # Judul ikut supaya kartu bukti menyebut nama yang sama dengan daftar
+    # dokumen. `filename` tetap dikirim sebagai identitas teknisnya.
+    title = str(chunk.get("title") or "").strip()
+    if title:
+        citation["title"] = title
     return citation
 
 

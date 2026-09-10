@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from generation.naming import display_name
+
 SYSTEM_PROMPT = (
     "Kamu adalah asisten knowledge berbasis dokumen. Jawab HANYA berdasarkan "
     "konteks dokumen yang diberikan. Bidang dokumen dapat berupa apa saja, jadi "
@@ -61,6 +63,7 @@ _QUESTION_OPENERS = (
 #: 2021" saja sudah enam kata. Batas lama (lima) membuat justru judul dokumen,
 #: bentuk yang paling sering diketik pengguna, tidak pernah terdeteksi.
 _MAX_TOPIC_WORDS = 8
+
 
 #: Dicocokkan sebagai kata utuh: "apa" tidak boleh ikut tersulut oleh
 #: "siapa" atau "berapa" yang kebetulan memuatnya sebagai potongan huruf.
@@ -118,7 +121,7 @@ def format_inventory(documents: list[dict[str, Any]]) -> str:
         except AttributeError:
             diunggah_teks = "tanggal unggah tidak tercatat"
         baris.append(
-            f"- {document['filename']} — {halaman_teks}, "
+            f"- {display_name(document)} — {halaman_teks}, "
             f"{_format_size(document.get('file_size'))}, diunggah {diunggah_teks}"
         )
     return "\n".join(baris)
@@ -132,7 +135,7 @@ def build_messages(
     workspace_type: str = "COMPANY",
 ) -> list[dict[str, str]]:
     context = "\n\n".join(
-        f"[DOKUMEN: {chunk['filename']} | HALAMAN: {chunk.get('page_number') or '-'} | "
+        f"[DOKUMEN: {display_name(chunk)} | HALAMAN: {chunk.get('page_number') or '-'} | "
         f"SECTION: {chunk.get('section_title') or '-'}]\n{chunk['text']}"
         for _, chunk in matches
     )

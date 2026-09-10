@@ -37,6 +37,13 @@ function formatEvidencePreview(excerpt: string, question: string | null) {
   return (ranked.length > 0 ? ranked : [content.slice(0, 720)]).join('\n\n')
 }
 
+// Nama berkas hanya identitas teknis; yang dikenali pengguna adalah judul di
+// daftar dokumen. Menampilkan nama berkas membuat dokumen yang sudah diganti
+// nama tampil dengan nama lamanya di kartu bukti.
+function documentLabel(citation: { title?: string; filename: string }): string {
+  return citation.title?.trim() || citation.filename
+}
+
 function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: { msg: ChatMessage; isId: boolean; isPending: boolean; onOpenSource: (citation: Citation, question: string) => void; onSuggestion: (value: string) => void }) {
   return (
     <>
@@ -64,7 +71,7 @@ function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: {
               {msg.citations.map((c, i) => (
                 <SourceCard
                   key={`${c.documentId}-${c.chunkId}-${i}`}
-                  title={c.filename}
+                  title={documentLabel(c)}
                   detail={[c.sectionTitle, c.pageNumber ? `Page ${c.pageNumber}` : null, c.version].filter(Boolean).join(' · ')}
                   excerpt={c.excerpt}
                   trailing={<ArrowUpRight size={15} />}
@@ -234,7 +241,7 @@ export function ChatPage() {
               <span><FileText size={18} /> {isId ? 'Sumber jawaban' : 'Answer source'}</span>
               <button type="button" className="icon-button" title="Close" onClick={() => { setSelectedSourceQuestion(null); setSelectedSource(null) }}><X size={18} /></button>
             </header>
-            <strong>{selectedSource.filename}</strong>
+            <strong>{documentLabel(selectedSource)}</strong>
             <small>{[selectedSource.sectionTitle, selectedSource.pageNumber ? `Page ${selectedSource.pageNumber}` : null, selectedSource.version].filter(Boolean).join(' · ')}</small>
             {sourcePdfLoading && <div className="source-preview-loading">{isId ? 'Memuat PDF asli...' : 'Loading original PDF...'}</div>}
             {sourcePdfUrl ? (
@@ -243,7 +250,7 @@ export function ChatPage() {
                   <span>{isId ? 'Bukti yang digunakan untuk jawaban' : 'Evidence used for this answer'}</span>
                   <mark>{evidencePreview || (isId ? 'Cuplikan citation tidak tersedia.' : 'Citation excerpt is unavailable.')}</mark>
                 </div>
-                <iframe title={`${selectedSource.filename} page ${selectedSource.pageNumber ?? 1}`} src={sourcePdfUrl} />
+                <iframe title={`${documentLabel(selectedSource)} page ${selectedSource.pageNumber ?? 1}`} src={sourcePdfUrl} />
               </div>
             ) : (
               <blockquote>{sourcePreviewLoading ? (isId ? 'Memuat cuplikan...' : 'Loading excerpt...') : evidencePreview || (isId ? 'Cuplikan tidak tersedia untuk sumber ini.' : 'No excerpt is available for this source.')}</blockquote>

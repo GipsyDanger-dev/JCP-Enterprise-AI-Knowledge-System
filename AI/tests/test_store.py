@@ -110,7 +110,7 @@ class PgVectorStoreTests(unittest.TestCase):
     def test_search_returns_scored_chunks(self):
         row = (
             "chunk-1", "doc-1", "version-1", "sop.txt", 1,
-            1, "SOP", "Biaya hotel.", 0.71,
+            1, "SOP", "Biaya hotel.", 0.71, "SOP Perjalanan Dinas",
         )
         with patch_deps(cursor=FakeCursor(rows=[row])):
             db = PgVectorStore("postgresql://u:p@h/db")
@@ -122,6 +122,9 @@ class PgVectorStoreTests(unittest.TestCase):
         self.assertEqual(chunk["document_id"], "doc-1")
         self.assertEqual(chunk["document_version_id"], "version-1")
         self.assertEqual(chunk["filename"], "sop.txt")
+        # Judul ikut terbawa: nama berkas adalah identitas teknis, judul yang
+        # dilihat pengguna, dan keduanya berpisah setelah dokumen diganti nama.
+        self.assertEqual(chunk["title"], "SOP Perjalanan Dinas")
         self.assertEqual(chunk["section_title"], "SOP")
 
     # ---------- batas akses ----------

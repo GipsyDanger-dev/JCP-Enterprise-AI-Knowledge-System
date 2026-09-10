@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+
 MAX_SUGGESTIONS = 4
 
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
@@ -64,7 +65,17 @@ def questions_from_topics(
         if filename in used_documents:
             continue
         section = clean_section(str(topic.get("section_title") or ""))
-        document = clean_document_name(filename)
+        # Nama berkas tetap jadi identitas untuk menghindari duplikat di atas,
+        # tapi labelnya memakai judul yang dilihat pengguna — saran yang
+        # menyebut nama berkas lama tidak akan mereka kenali.
+        #
+        # Judul dipakai apa adanya, tidak lewat `clean_document_name`. Fungsi
+        # itu merapikan nama berkas buatan mesin dengan menyisipkan spasi di
+        # batas huruf-angka, dan itu justru merusak judul yang diketik orang:
+        # "tessss1" berubah jadi "tessss 1", lalu tidak cocok lagi dengan yang
+        # tertulis di daftar dokumen.
+        title = str(topic.get("title") or "").strip()
+        document = _shorten(title) if title else clean_document_name(filename)
         if section:
             template = _SECTION_TEMPLATES[len(questions) % len(_SECTION_TEMPLATES)]
             label = section

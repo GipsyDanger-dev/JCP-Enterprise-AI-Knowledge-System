@@ -210,7 +210,7 @@ class PgVectorStore:
         access_conditions, access_params = scope.conditions()
         sql = f"""
             SELECT dv.original_filename, dv.page_count, dv.file_size,
-                   dv.created_at, COUNT(c.chunk_id)::int
+                   dv.created_at, COUNT(c.chunk_id)::int, d.title
             FROM document_versions AS dv
             JOIN documents AS d ON d.id = dv.document_id
             LEFT JOIN chunks AS c ON c.document_version_id = dv.id
@@ -219,7 +219,7 @@ class PgVectorStore:
                   SELECT MAX(v.version_number) FROM document_versions AS v
                   WHERE v.document_id = d.id
               )
-            GROUP BY dv.original_filename, dv.page_count, dv.file_size, dv.created_at
+            GROUP BY dv.original_filename, dv.page_count, dv.file_size, dv.created_at, d.title
             ORDER BY dv.original_filename
         """
         with _connect(self.dsn) as conn:
@@ -227,6 +227,7 @@ class PgVectorStore:
         return [
             {
                 "filename": row[0],
+                "title": row[5],
                 "page_count": row[1],
                 "file_size": row[2],
                 "created_at": row[3],
@@ -241,7 +242,7 @@ class PgVectorStore:
         """Return section/file labels from the same access-filtered corpus."""
         access_conditions, access_params = scope.conditions()
         sql = f"""
-            SELECT c.section_title, dv.original_filename
+            SELECT c.section_title, dv.original_filename, d.title
             FROM chunks AS c
             JOIN document_versions AS dv ON dv.id = c.document_version_id
             JOIN documents AS d ON d.id = dv.document_id
@@ -250,7 +251,7 @@ class PgVectorStore:
                   SELECT MAX(v.version_number) FROM document_versions AS v
                   WHERE v.document_id = d.id
               )
-            GROUP BY c.section_title, dv.original_filename
+            GROUP BY c.section_title, dv.original_filename, d.title
             ORDER BY random()
             LIMIT %s
         """
@@ -260,7 +261,10 @@ class PgVectorStore:
         except Exception as exc:
             print(f"[AI] Suggestion topics failed: {exc}")
             return []
-        return [{"section_title": row[0] or "", "filename": row[1]} for row in rows]
+        return [
+            {"section_title": row[0] or "", "filename": row[1], "title": row[2]}
+            for row in rows
+        ]
 
     def suggested_questions(self, *, scope: AccessScope) -> list[str]:
         return questions_from_topics(self.suggestion_topics(scope=scope))
@@ -383,7 +387,7 @@ class PgVectorStore:
         sql = f"""
             SELECT c.chunk_id, d.id, dv.id, dv.original_filename,
                    dv.version_number, c.page_number, c.section_title, c.text,
-                   1 - (c.embedding <=> %s::vector) AS score
+                   1 - (c.embedding <=> %s::vector) AS score, d.title
             FROM chunks AS c
             JOIN document_versions AS dv ON dv.id = c.document_version_id
             JOIN documents AS d ON d.id = dv.document_id
@@ -409,6 +413,8 @@ class PgVectorStore:
                 "document_id": str(row[1]),
                 "document_version_id": str(row[2]),
                 "filename": row[3],
+                # row[8] adalah skor kemiripan; title menyusul sesudahnya.
+                "title": row[9],
                 "version": row[4],
                 "page_number": row[5],
                 "section_title": row[6] or "",
@@ -429,7 +435,7 @@ class PgVectorStore:
         access_conditions, access_params = scope.conditions()
         sql = f"""
             SELECT c.chunk_id, d.id, dv.id, dv.original_filename,
-                   dv.version_number, c.page_number, c.section_title, c.text
+                   dv.version_number, c.page_number, c.section_title, c.text, d.title
             FROM chunks AS c
             JOIN document_versions AS dv ON dv.id = c.document_version_id
             JOIN documents AS d ON d.id = dv.document_id
@@ -444,6 +450,7 @@ class PgVectorStore:
                 "document_id": str(row[1]),
                 "document_version_id": str(row[2]),
                 "filename": row[3],
+                "title": row[8],
                 "version": row[4],
                 "page_number": row[5],
                 "section_title": row[6] or "",
@@ -526,7 +533,7 @@ class PgVectorStore:
                     access_conditions, access_params = scope.conditions()
                     cur.execute(
                         "SELECT c.chunk_id, c.document_version_id, d.id, dv.original_filename, "
-                        "dv.version_number, c.page_number, c.section_title, c.text "
+                        "dv.version_number, c.page_number, c.section_title, c.text, d.title "
                         "FROM chunks c "
                         "JOIN document_versions dv ON dv.id = c.document_version_id "
                         "JOIN documents d ON d.id = dv.document_id "
@@ -541,7 +548,7 @@ class PgVectorStore:
                 chunks.append({
                     "chunk_id": row[0], "document_version_id": str(row[1]),
                     "document_id": str(row[2]),
-                    "filename": row[3], "version": row[4],
+                    "filename": row[3], "title": row[8], "version": row[4],
                     "page_number": row[5], "section_title": row[6] or "",
                     "text": row[7],
                 })

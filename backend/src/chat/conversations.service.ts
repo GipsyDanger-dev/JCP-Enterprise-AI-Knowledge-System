@@ -114,6 +114,9 @@ export class ConversationsService {
           documentId: documentVersion.document.id,
           documentVersionId: documentVersion.id,
           filename: documentVersion.originalFilename,
+          // Riwayat lama pun ikut memakai judul terkini, jadi dokumen yang
+          // sudah diganti nama tidak muncul dengan nama lamanya.
+          title: documentVersion.document.title,
           version: documentVersion.versionNumber,
         })),
       })),

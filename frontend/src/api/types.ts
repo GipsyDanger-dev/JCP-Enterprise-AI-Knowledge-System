@@ -219,7 +219,12 @@ export interface DeleteDocumentResponse {
 export interface Citation {
   documentId: string
   documentVersionId: string
+  /** Identitas teknis berkas. Dipakai untuk hal seperti menentukan penampil
+   *  PDF, bukan untuk ditampilkan sebagai nama dokumen. */
   filename: string
+  /** Nama yang dilihat pengguna di daftar dokumen. Berbeda dari `filename`
+   *  begitu dokumennya diganti nama. */
+  title?: string
   version?: number
   pageNumber: number | null
   sectionTitle: string | null

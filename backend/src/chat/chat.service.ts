@@ -8,6 +8,7 @@ import { allowedCategoryFilter, documentVisibilityWhere } from '../documents/doc
 interface AiCitation {
   document_id: string;
   filename: string;
+  title?: string;
   version?: number | string;
   page_number?: number | null;
   section_title?: string | null;
@@ -51,6 +52,9 @@ export interface ChatCitation {
   documentId: string;
   documentVersionId: string;
   filename: string;
+  /** Nama yang dilihat pengguna di daftar dokumen; berbeda dari `filename`
+   *  begitu dokumennya diganti nama. */
+  title?: string;
   version?: number;
   pageNumber: number | null;
   sectionTitle: string | null;
@@ -254,6 +258,7 @@ export class ChatService {
       documentId: citation.document_id,
       documentVersionId: citation.document_version_id ?? '',
       filename: citation.filename,
+      title: citation.title,
       version: typeof citation.version === 'number' ? citation.version : undefined,
       pageNumber: citation.page_number ?? null,
       sectionTitle: citation.section_title ?? null,
