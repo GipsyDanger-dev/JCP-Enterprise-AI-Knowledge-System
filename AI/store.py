@@ -32,6 +32,7 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from config import EMBEDDING_MODEL, EMBEDDINGS_ENABLED
 from generation.citations import citations_from_matches, supporting_matches
+from generation.naming import find_named_document
 from generation.guardrails import (
     clarify_response,
     is_no_answer,
@@ -531,16 +532,26 @@ class PgVectorStore:
                     # Jalur cadangan ini memuat seluruh chunk sekaligus, jadi
                     # justru di sini penyaring akses paling wajib ada.
                     access_conditions, access_params = scope.conditions()
+                    # Penyaring dokumen ikut ditegakkan di sini, bukan hanya di
+                    # jalur vektor: kalau tidak, pertanyaan yang menyebut nama
+                    # dokumen akan dijawab dari dokumen mana saja begitu jalur
+                    # cadangan ini yang berjalan.
+                    filename = (filters or {}).get("filename")
+                    document_conditions = list(access_conditions)
+                    document_params = list(access_params)
+                    if filename:
+                        document_conditions.append("dv.original_filename ILIKE %s")
+                        document_params.append(f"%{filename}%")
                     cur.execute(
                         "SELECT c.chunk_id, c.document_version_id, d.id, dv.original_filename, "
                         "dv.version_number, c.page_number, c.section_title, c.text, d.title "
                         "FROM chunks c "
                         "JOIN document_versions dv ON dv.id = c.document_version_id "
                         "JOIN documents d ON d.id = dv.document_id "
-                        "WHERE " + " AND ".join(access_conditions) + " "
+                        "WHERE " + " AND ".join(document_conditions) + " "
                         "AND dv.version_number = (SELECT MAX(v.version_number) FROM document_versions v WHERE v.document_id = d.id) "
                         "ORDER BY c.created_at",
-                        access_params,
+                        document_params,
                     )
                     rows = cur.fetchall()
             chunks = []
@@ -594,6 +605,28 @@ class PgVectorStore:
         workspace_type: str = "COMPANY",
         lexical_query: str | None = None,
     ) -> dict[str, Any]:
+        # Penanya yang menyebut nama dokumen sudah menentukan sumbernya sendiri.
+        # Tanpa ini, "apa isi dokumen X" ditangani sebagai pencarian potongan
+        # biasa dan yang menang justru judul bab tanpa isi, sementara isi
+        # sungguhannya tersaring keluar oleh ambang kemiripan.
+        #
+        # Hanya berlaku bila pemanggil tidak menyaring sendiri: penyaring yang
+        # datang dari permintaan adalah keputusan yang lebih tahu konteks.
+        if filters is None:
+            # Pertanyaan mentah diperiksa lebih dulu; label topik percakapan
+            # baru dipakai bila pertanyaannya sendiri tidak menyebut nama apa
+            # pun — sebutan eksplisit harus selalu mengalahkan sisa konteks.
+            inventory = self.document_metadata(scope=scope)
+            target = find_named_document(lexical_query or query, inventory)
+            if target is None and lexical_query:
+                target = find_named_document(query, inventory)
+            if target is not None:
+                filters = {"filename": target["filename"]}
+                # Dokumennya sudah pasti, jadi kemiripan tidak lagi layak
+                # menjadi penyaring — yang tersisa hanya soal urutan.
+                minimum_score = 0.0
+                print(f"[AI] Pertanyaan menyebut dokumen: {target['filename']}")
+
         if not EMBEDDINGS_ENABLED:
             return self._tfidf_fallback(
                 query, top_k, use_llm=use_llm, model=model, api_key=api_key,
