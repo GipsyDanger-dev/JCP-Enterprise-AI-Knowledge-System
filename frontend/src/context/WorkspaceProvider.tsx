@@ -27,6 +27,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [question, setQuestion] = useState('')
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [conversationId, setConversationId] = useState<string | null>(null)
+  // Percakapan yang baru saja dibuat di tab ini. Sengaja ref, bukan state:
+  // react-router v7 membungkus pembaruan lokasi dalam `startTransition`,
+  // sehingga URL dan state React berada di lane prioritas berbeda dan tidak
+  // dijamin tiba pada render yang sama. Membandingkan dua sumber yang bisa
+  // tidak sinkron membuat penjaganya sesekali lolos; ref sudah bernilai benar
+  // begitu diisi, apa pun urutan render yang dipilih React.
+  const ownConversationRef = useRef<string | null>(null)
   const [isLoadingAnswer, setIsLoadingAnswer] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -53,6 +60,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       prevUserIdRef.current = user?.id ?? null
       setChatHistory([])
       setConversationId(null)
+      // Ikut dilepas: percakapan milik akun sebelumnya tidak boleh dianggap
+      // "milik tab ini" oleh akun yang baru masuk.
+      ownConversationRef.current = null
       setQuestion('')
       setUploadError(null)
       setIsLoadingAnswer(false)
@@ -74,7 +84,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // yang menaruh id percakapan baru ke URL langsung memicu pemuatan ulang,
     // dan jawaban PERTAMA di setiap percakapan kehilangan chip pilihannya
     // sekaligus kuncinya — persis saat pertanyaan balik paling membutuhkannya.
-    if (requestedConversationId === conversationId) return
+    if (
+      requestedConversationId === conversationId ||
+      requestedConversationId === ownConversationRef.current
+    ) return
 
     let cancelled = false
     getConversation(requestedConversationId, token)
@@ -274,6 +287,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setIsLoadingAnswer(true)
     try {
       const res = await queryChat({ question: q, conversationId: conversationId ?? undefined, fromSuggestion }, token ?? undefined)
+      // Ditandai sebelum `navigate()` di bawah, supaya effect pemuat sudah
+      // melihat nilainya pada render mana pun yang menerima URL barunya.
+      ownConversationRef.current = res.conversationId
       setConversationId(res.conversationId)
       // Persist the active room in the URL so a refresh/restart can reload the
       // complete conversation instead of showing only the in-memory message.
@@ -311,6 +327,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const clearChat = useCallback(() => {
     setChatHistory([])
     setConversationId(null)
+    ownConversationRef.current = null
     setQuestion('')
     setIsLoadingAnswer(false)
     if (location.pathname === '/chat' && location.search) {
