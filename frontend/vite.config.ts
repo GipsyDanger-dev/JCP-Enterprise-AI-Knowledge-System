@@ -18,6 +18,15 @@ export default defineConfig(({ mode }) => {
   const frontendViteEnv = loadEnv(mode, process.cwd(), 'VITE_')
   const googleClientId = frontendViteEnv.VITE_GOOGLE_CLIENT_ID || sharedViteEnv.VITE_GOOGLE_CLIENT_ID
   const port = Number(process.env.FRONTEND_PORT ?? fileEnv.FRONTEND_PORT) || DEFAULT_PORT
+  // Bind mount dari host Windows tidak meneruskan event inotify ke dalam
+  // container, sehingga Vite tidak pernah tahu berkasnya berubah dan terus
+  // menyajikan modul lama — perubahan kode seolah tidak berpengaruh sama
+  // sekali padahal berkasnya sudah baru. Polling menutupnya, dan sengaja
+  // opt-in lewat env supaya pengembang di host asli tidak ikut menanggung
+  // biayanya.
+  const usePolling = ['1', 'true', 'yes'].includes(
+    (process.env.CHOKIDAR_USEPOLLING ?? '').trim().toLowerCase(),
+  )
 
   return {
     // Root .env is shared by all services. Vite will only expose variables
@@ -36,6 +45,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       port,
+      watch: usePolling ? { usePolling: true, interval: 300 } : undefined,
       proxy: {
         '/api': {
           target: process.env.BACKEND_PROXY_URL || `http://127.0.0.1:${process.env.BACKEND_PORT || 8000}`,

@@ -108,6 +108,9 @@ services:
       BACKEND_PROXY_URL: http://backend:8000
       # Opsional: kosong berarti tombol Google tidak dirender di frontend.
       VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+      # Wajib untuk bind mount dari Windows/macOS: tanpa polling, Vite tidak
+      # menerima event perubahan berkas dan terus menyajikan modul lama.
+      CHOKIDAR_USEPOLLING: ${CHOKIDAR_USEPOLLING:-true}
     ports:
       - "5173:5173"
     volumes:
