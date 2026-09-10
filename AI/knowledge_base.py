@@ -21,6 +21,7 @@ from typing import Any
 from ingestion.chunking import chunk_pages
 from ingestion.parsers import read_document
 from ingestion.sections import extract_sections
+from provider_errors import ProviderError
 from retrieval.search import build_retriever
 from generation.citations import citations_from_matches
 from generation.guardrails import is_no_answer, no_answer_response
@@ -178,7 +179,14 @@ def ingest(input_dir: Path | str, output: Path | str, embed: bool = False,
     if not kb.chunks:
         raise RuntimeError("No supported documents found in the input directory.")
     if embed and kb.chunks:
-        count = kb.embed_all(embed_model, api_key=api_key)
-        print(f"embedded  : {count} chunk(s) with {embed_model}")
+        # Sama seperti jalur pgvector: indeks teksnya tetap disimpan meskipun
+        # provider menolak request embedding. Indeks tanpa vektor masih bisa
+        # dicari lewat TF-IDF; indeks yang tidak pernah tersimpan tidak bisa
+        # dipakai sama sekali.
+        try:
+            count = kb.embed_all(embed_model, api_key=api_key)
+            print(f"embedded  : {count} chunk(s) with {embed_model}")
+        except ProviderError as error:
+            print(f"[AI] Embedding gagal, indeks disimpan tanpa vektor: {error}")
     kb.save(output_path)
     print(f"saved     : {len(kb.chunks)} chunk(s) from {len(kb.documents)} document(s) -> {output_path}")

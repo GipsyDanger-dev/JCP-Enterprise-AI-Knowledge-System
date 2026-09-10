@@ -43,6 +43,7 @@ from generation.suggestions import MAX_SUGGESTIONS, questions_from_topics
 from ingestion.chunking import chunk_pages
 from ingestion.parsers import read_document
 from ingestion.sections import extract_sections
+from provider_errors import ProviderError
 from retrieval.embeddings import embed_texts
 
 VECTOR_MINIMUM_SCORE = 0.45
@@ -380,6 +381,12 @@ class PgVectorStore:
             JOIN document_versions AS dv ON dv.id = c.document_version_id
             JOIN documents AS d ON d.id = dv.document_id
             WHERE {where}
+              -- Chunk tanpa vektor tidak punya jarak yang bisa dihitung:
+              -- skornya keluar NULL dan `float(None)` melempar TypeError, yang
+              -- lalu tertangkap sebagai "vector search failed" dan mematikan
+              -- pencarian semantik untuk SELURUH pertanyaan itu. Dokumen
+              -- seperti ini muncul ketika embedding gagal saat ingest.
+              AND c.embedding IS NOT NULL
             ORDER BY c.embedding <=> %s::vector
             LIMIT %s
         """
@@ -690,13 +697,25 @@ def ingest_to_pg(
         chunk["document_version_id"] = metadata["document_version_id"]
 
     store.replace_document_version(document_version_id, chunks)
+    # Kegagalan embedding sengaja TIDAK menggagalkan ingest. Chunk-nya sudah
+    # tersimpan di atas, jadi dokumennya tetap bisa dicari lewat TF-IDF —
+    # kehilangan pencarian semantik jauh lebih ringan daripada kehilangan
+    # seluruh dokumennya karena provider sedang menolak request.
+    status = "indexed"
     if embed and chunks:
-        vectors = embed_texts(
-            [chunk["text"] for chunk in chunks],
-            model=store.model,
-            api_key=api_key,
-        )
-        store.store_embeddings(vectors, [chunk["chunk_id"] for chunk in chunks])
+        try:
+            vectors = embed_texts(
+                [chunk["text"] for chunk in chunks],
+                model=store.model,
+                api_key=api_key,
+            )
+            store.store_embeddings(vectors, [chunk["chunk_id"] for chunk in chunks])
+        except ProviderError as error:
+            status = "indexed_without_vectors"
+            print(
+                f"[AI] Embedding gagal untuk {metadata['filename']} "
+                f"({len(chunks)} chunk tetap terindeks): {error}"
+            )
 
     return [{
         "filename": metadata["filename"],
@@ -707,5 +726,5 @@ def ingest_to_pg(
         # Dihitung dari parser, bukan dari chunk: halaman kosong tetap ikut
         # terhitung meskipun chunk_pages melewatinya.
         "page_count": len(pages),
-        "status": "indexed",
+        "status": status,
     }]
