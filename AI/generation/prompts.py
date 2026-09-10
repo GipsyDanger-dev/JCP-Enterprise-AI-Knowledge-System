@@ -7,6 +7,7 @@ when evidence is insufficient. Citations are returned as separate metadata.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 SYSTEM_PROMPT = (
@@ -56,13 +57,39 @@ _QUESTION_OPENERS = (
 )
 
 
+#: Judul produk hukum panjang secara wajar — "Perbup Sleman Nomor 55.19 Tahun
+#: 2021" saja sudah enam kata. Batas lama (lima) membuat justru judul dokumen,
+#: bentuk yang paling sering diketik pengguna, tidak pernah terdeteksi.
+_MAX_TOPIC_WORDS = 8
+
+#: Dicocokkan sebagai kata utuh: "apa" tidak boleh ikut tersulut oleh
+#: "siapa" atau "berapa" yang kebetulan memuatnya sebagai potongan huruf.
+_WORDS = re.compile(r"[a-z]+")
+_QUESTION_WORDS = frozenset(
+    word for opener in _QUESTION_OPENERS for word in opener.split()
+)
+
+
 def looks_like_topic_phrase(query: str) -> bool:
-    """Detect a short topic label that has no explicit question yet."""
-    text = query.strip().lower()
+    """Detect a short topic label that has no explicit question yet.
+
+    Tanda tanya di ujung sengaja tidak dianggap sebagai bukti pertanyaan:
+    "Perbup Sleman Nomor 55.19 Tahun 2021?" tetap sebuah judul, dan tanpa
+    pengecualian ini satu karakter saja sudah cukup untuk melewati
+    pemeriksaannya. Tanda tanya di TENGAH tetap menggugurkan, karena itu
+    menandakan kalimat tanya yang sungguhan.
+    """
+    text = query.strip().lower().rstrip("?").strip()
     if not text or "?" in text:
         return False
     words = text.split()
-    if len(words) > 5:
+    if len(words) > _MAX_TOPIC_WORDS:
+        return False
+    # Kata tanya dicari di SELURUH kalimat, bukan hanya di awal. Bahasa
+    # Indonesia lazim menaruhnya di belakang — "gaji manager berapa",
+    # "peraturan ini berlaku kapan" — dan memeriksa awalan saja membuat
+    # kalimat tanya yang jelas disangka label topik lalu dibalas pertanyaan.
+    if _WORDS.findall(text) and set(_WORDS.findall(text)) & _QUESTION_WORDS:
         return False
     return not any(text.startswith(opener) for opener in _QUESTION_OPENERS)
 

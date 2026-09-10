@@ -5,7 +5,7 @@ from unittest import mock
 from pathlib import Path
 
 from ai_engine import KnowledgeBase, chunk_pages, generate_answer
-from generation.prompts import build_messages
+from generation.prompts import build_messages, looks_like_topic_phrase
 
 
 class RetrievalContractTests(unittest.TestCase):
@@ -96,6 +96,71 @@ class LlmModeTests(unittest.TestCase):
         self.assertIn("personal milik pengguna", messages[1]["content"])
         self.assertIn("Bidang dokumen dapat berupa apa saja", messages[0]["content"])
         self.assertIn("TI-RADS", messages[1]["content"])
+
+
+class TopicPhraseTests(unittest.TestCase):
+    """Judul dokumen yang diketik tanpa pertanyaan harus memicu clarify.
+
+    Sebelumnya tidak: batas lima kata membuat judul produk hukum — bentuk yang
+    paling sering diketik pengguna — lolos sebagai "pertanyaan", lalu dijawab
+    "Informasi tidak ditemukan" padahal isinya ada di dokumen.
+    """
+
+    JUDUL = "Perbup Sleman Nomor 55.19 Tahun 2021"
+
+    def test_document_title_is_a_topic_phrase(self):
+        self.assertTrue(looks_like_topic_phrase(self.JUDUL))
+
+    def test_trailing_question_mark_does_not_make_a_title_a_question(self):
+        self.assertTrue(looks_like_topic_phrase(self.JUDUL + "?"))
+
+    def test_real_questions_are_left_alone(self):
+        for query in (
+            f"Apa yang diatur dalam {self.JUDUL}?",
+            f"Ringkas isi {self.JUDUL}",
+            "Berapa lama cuti tahunan?",
+            "Kapan peraturan itu mulai berlaku?",
+        ):
+            with self.subTest(query=query):
+                self.assertFalse(looks_like_topic_phrase(query))
+
+    def test_question_word_at_the_end_still_counts_as_a_question(self):
+        """Bahasa Indonesia lazim menaruh kata tanya di belakang.
+
+        Memeriksa awalan kalimat saja membuat "gaji manager berapa?" disangka
+        label topik, lalu dibalas pertanyaan padahal sudah jelas maksudnya.
+        """
+        for query in (
+            "gaji manager berapa?",
+            "cuti tahunan berapa hari?",
+            "peraturan ini berlaku kapan?",
+            "yang menandatangani siapa",
+        ):
+            with self.subTest(query=query):
+                self.assertFalse(looks_like_topic_phrase(query))
+
+    def test_mid_sentence_question_mark_still_disqualifies(self):
+        self.assertFalse(looks_like_topic_phrase("benarkah? tolong cek"))
+
+    def test_long_sentence_is_not_a_topic_phrase(self):
+        self.assertFalse(
+            looks_like_topic_phrase(
+                "peraturan bupati sleman tentang tata cara pemilihan lurah antar waktu di kabupaten"
+            )
+        )
+
+    def test_clarify_note_reaches_the_prompt_for_a_bare_title(self):
+        matches = [(0.6, {
+            "filename": "perbup.pdf", "page_number": 17, "section_title": "",
+            "text": "Peraturan Bupati ini mulai berlaku pada tanggal diundangkan.",
+        })]
+        with_note = build_messages(self.JUDUL, matches, allow_clarify=True)[1]["content"]
+        self.assertIn("hanya menyebut topik", with_note)
+
+        # Tanpa allow_clarify tidak ada pintu clarify, jadi catatannya pun tidak
+        # boleh ikut — kalau ikut, model diminta melakukan yang tak bisa dibalas.
+        without = build_messages(self.JUDUL, matches, allow_clarify=False)[1]["content"]
+        self.assertNotIn("hanya menyebut topik", without)
 
 
 if __name__ == "__main__":
