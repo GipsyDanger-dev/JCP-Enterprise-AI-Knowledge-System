@@ -23,7 +23,7 @@ from ingestion.parsers import read_document
 from ingestion.sections import extract_sections
 from provider_errors import ProviderError
 from retrieval.search import build_retriever
-from generation.citations import citations_from_matches
+from generation.citations import citations_from_matches, supporting_matches
 from generation.guardrails import is_no_answer, no_answer_response
 from generation.suggestions import questions_from_topics
 from generation.llm import DEFAULT_MODEL, generate_answer
@@ -131,7 +131,6 @@ class KnowledgeBase:
         matches = [(score, chunk) for score, chunk in engine.search(query, top_k, filters=filters) if score >= threshold]
         if not matches:
             return no_answer_response(self.suggested_questions())
-        citations = citations_from_matches(matches)
         if use_llm:
             answer = generate_answer(
                 query, matches, model=model, api_key=api_key,
@@ -141,11 +140,13 @@ class KnowledgeBase:
             answer = matches[0][1]["text"]
         if is_no_answer(answer):
             return no_answer_response(self.suggested_questions())
+        # Sama seperti jalur pgvector: sitasi dipangkas setelah jawaban ada.
+        supported = supporting_matches(answer, matches)
         return {
             "answer": answer,
-            "citations": citations,
+            "citations": citations_from_matches(supported),
             "grounded": True,
-            "retrieval": [{"chunk_id": chunk["chunk_id"], "score": round(score, 4)} for score, chunk in matches],
+            "retrieval": [{"chunk_id": chunk["chunk_id"], "score": round(score, 4)} for score, chunk in supported],
         }
 
 

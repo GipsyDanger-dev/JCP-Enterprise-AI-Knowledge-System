@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover - optional dependency
     register_vector = None
 
 from config import EMBEDDING_MODEL, EMBEDDINGS_ENABLED
-from generation.citations import citations_from_matches
+from generation.citations import citations_from_matches, supporting_matches
 from generation.guardrails import (
     clarify_response,
     is_no_answer,
@@ -466,7 +466,6 @@ class PgVectorStore:
         is not in the documents". It must reach http_api so the user is told the
         AI service is unavailable instead of being wrongly told nothing matched.
         """
-        citations = citations_from_matches(matches)
         answer = (
             generate_answer(
                 query, matches, model=model, api_key=api_key,
@@ -484,13 +483,22 @@ class PgVectorStore:
             return clarify_response(clarify, query)
         if is_no_answer(answer):
             return no_answer_response(self.suggested_questions(scope=scope))
+        # Sitasi dipangkas SETELAH jawaban tersusun, bukan sebelumnya. Semua
+        # chunk tetap ikut ke prompt — memangkasnya lebih awal justru membuang
+        # bahan yang mungkin dipakai menjawab. Yang dibuang di sini hanya yang
+        # terbukti tidak menopang jawabannya.
+        #
+        # Ini juga memutus penumpukan: `context_chunk_ids` giliran berikutnya
+        # diambil dari sitasi yang tersimpan, jadi dokumen keliru tidak lagi
+        # terbawa ke pertanyaan lanjutan dengan skor penuh.
+        supported = supporting_matches(answer, matches)
         return {
             "answer": answer,
-            "citations": citations,
+            "citations": citations_from_matches(supported),
             "grounded": True,
             "retrieval": [
                 {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
-                for score, chunk in matches
+                for score, chunk in supported
             ],
         }
 
