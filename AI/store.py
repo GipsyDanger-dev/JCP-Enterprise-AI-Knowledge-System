@@ -494,8 +494,16 @@ class PgVectorStore:
             ],
         }
 
-    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False, filters: dict[str, Any] | None = None, context_chunk_ids: list[str] | None = None, workspace_type: str = "COMPANY", *, scope: AccessScope) -> dict[str, Any]:
-        """TF-IDF fallback when vector search fails or finds nothing."""
+    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False, filters: dict[str, Any] | None = None, context_chunk_ids: list[str] | None = None, workspace_type: str = "COMPANY", *, scope: AccessScope, lexical_query: str | None = None) -> dict[str, Any]:
+        """TF-IDF fallback when vector search fails or finds nothing.
+
+        ``lexical_query`` adalah pertanyaan pengguna tanpa label topik
+        percakapan. TF-IDF mencocokkan kata, bukan makna, sehingga awalan
+        "Topik percakapan sebelumnya: ..." menarik peringkat ke dokumen topik
+        LAMA dan menenggelamkan dokumen yang benar-benar ditanyakan. Label itu
+        tetap dipakai untuk pencarian vektor dan untuk prompt LLM, yang memang
+        diuntungkan olehnya.
+        """
         try:
             from retrieval.tfidf import TfidfRetriever
             dsn = default_dsn()
@@ -530,8 +538,9 @@ class PgVectorStore:
                     "text": row[7],
                 })
             tfidf = TfidfRetriever(chunks)
+            search_query = lexical_query or query
             retrieved_matches = [
-                match for match in tfidf.search(query, top_k=top_k)
+                match for match in tfidf.search(search_query, top_k=top_k)
                 if match[0] > 0.0
             ]
             context_matches = self.context_chunks(context_chunk_ids or [], scope=scope)[:max(1, top_k // 2)]
@@ -541,7 +550,7 @@ class PgVectorStore:
                 if match[1]["chunk_id"] not in seen
             ]
             matches = matches[:top_k]
-            print(f"[AI] TF-IDF: {len(chunks)} chunks, {len(matches)} matches for '{query[:30]}'")
+            print(f"[AI] TF-IDF: {len(chunks)} chunks, {len(matches)} matches for '{search_query[:30]}'")
         except Exception as exc:
             print(f"[AI] TF-IDF retrieval failed: {exc}")
             return no_answer_response(self.suggested_questions(scope=scope))
@@ -568,6 +577,7 @@ class PgVectorStore:
         *,
         scope: AccessScope,
         workspace_type: str = "COMPANY",
+        lexical_query: str | None = None,
     ) -> dict[str, Any]:
         if not EMBEDDINGS_ENABLED:
             return self._tfidf_fallback(
@@ -575,6 +585,7 @@ class PgVectorStore:
                 allow_clarify=allow_clarify, filters=filters,
                 context_chunk_ids=context_chunk_ids,
                 workspace_type=workspace_type, scope=scope,
+                lexical_query=lexical_query,
             )
         try:
             # Reserve part of top_k for the new query so old citations cannot
@@ -603,11 +614,11 @@ class PgVectorStore:
             # Only retrieval is guarded here. TF-IDF needs no embeddings, so it is
             # a genuine fallback when the vector path fails.
             print(f"[AI] Vector search failed ({exc}), falling back to TF-IDF")
-            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters, context_chunk_ids=context_chunk_ids, workspace_type=workspace_type, scope=scope)
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters, context_chunk_ids=context_chunk_ids, workspace_type=workspace_type, scope=scope, lexical_query=lexical_query)
         if not matches:
             # Vector search found nothing above threshold, try TF-IDF fallback
             print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
-            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters, context_chunk_ids=context_chunk_ids, workspace_type=workspace_type, scope=scope)
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters, context_chunk_ids=context_chunk_ids, workspace_type=workspace_type, scope=scope, lexical_query=lexical_query)
         return self._answer_from_matches(
             query, matches, use_llm=use_llm, model=model,
             api_key=api_key, allow_clarify=allow_clarify, filters=filters,

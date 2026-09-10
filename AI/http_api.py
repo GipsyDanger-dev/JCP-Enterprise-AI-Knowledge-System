@@ -248,6 +248,9 @@ def ask(request: AskRequest) -> dict[str, Any]:
                 context_chunk_ids=request.context_chunk_ids,
                 allow_clarify=request.allow_clarify, scope=scope,
                 workspace_type=request.workspace_type,
+                # Pertanyaan mentahnya ikut dikirim: TF-IDF harus mencocokkan
+                # pertanyaan ini, bukan label topik percakapan sebelumnya.
+                lexical_query=request.query,
             )
         if request.access is not None:
             raise HTTPException(status_code=503, detail="Workspace retrieval requires PostgreSQL storage")
