@@ -26,6 +26,11 @@ class HttpApiTests(unittest.TestCase):
             "DATABASE_URL": "",
             "SUMOPOD_API_KEY": "",
             "LLM_API_KEY": "",
+            # Nama yang sebenarnya dibaca `_api_key()`. Tanpa ini, test di mesin
+            # yang punya key provider akan benar-benar memanggil API-nya:
+            # hasilnya bergantung jaringan, ikut memakai kuota, dan suite-nya
+            # melambat ~20x (0,15s -> 3s) tanpa alasan yang kelihatan.
+            "AI_PROVIDER_API_KEY": "",
         })
         environment.start()
         cls.addClassCleanup(environment.stop)
