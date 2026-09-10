@@ -192,16 +192,40 @@ export class AnnouncementsService {
     };
   }
 
-  async update(id: string, input: UpdateAnnouncementDto, actor: AuthenticatedUser) {
+  /**
+   * Pengumuman yang boleh diubah aktor ini, atau lemparkan penolakannya.
+   *
+   * Pimpinan hanya berwenang atas pengumumannya sendiri — menyunting, mengarsipkan,
+   * atau menghapus pengumuman unit lain bukan bagian dari wewenangnya; admin bebas.
+   */
+  private async assertCanEdit(id: string, actor: AuthenticatedUser) {
     this.assertCanPublish(actor);
     const announcement = await this.prisma.announcement.findUnique({ where: { id, workspaceId: actor.workspaceId }, select: { id: true, createdById: true } });
     if (!announcement) throw new NotFoundException('Announcement not found');
-    // Pimpinan hanya boleh menyunting dan mengarsipkan pengumumannya sendiri;
-    // menyapu pengumuman unit lain bukan bagian dari wewenangnya.
     if (!actor.isAdmin && announcement.createdById !== actor.sub) {
       throw new ForbiddenException('Hanya penerbitnya atau admin yang dapat mengubah pengumuman ini');
     }
+    return announcement;
+  }
+
+  async update(id: string, input: UpdateAnnouncementDto, actor: AuthenticatedUser) {
+    await this.assertCanEdit(id, actor);
     const updated = await this.prisma.announcement.update({ where: { id }, data: input, select: ANNOUNCEMENT_SELECT });
     return this.toResponse(updated, true);
+  }
+
+  /**
+   * Hapus permanen — berbeda dari mengarsipkan.
+   *
+   * Arsip hanya menyembunyikan pengumuman dari pegawai dan masih bisa
+   * diaktifkan lagi; penghapusan ikut membuang bukti bacanya (cascade), jadi
+   * laporan siapa saja yang sudah membaca tidak bisa dipulihkan. Notifikasi
+   * yang sudah telanjur terkirim tidak menunjuk pengumuman tertentu, jadi
+   * tidak ada tautan yang menggantung setelah barisnya hilang.
+   */
+  async remove(id: string, actor: AuthenticatedUser) {
+    await this.assertCanEdit(id, actor);
+    await this.prisma.announcement.delete({ where: { id } });
+    return { id, deleted: true };
   }
 }

@@ -121,6 +121,12 @@ async function main() {
   assert((await call('/announcements', a.employeeLogin.accessToken)).some((item) => item.id === announcement.id));
   assert(!(await call('/announcements', b.admin.accessToken)).some((item) => item.id === announcement.id));
   await call(`/announcements/${announcement.id}`, b.admin.accessToken, 'PATCH', { title: 'Intruder' }, 404);
+  await call(`/announcements/${announcement.id}`, b.admin.accessToken, 'DELETE', undefined, 404);
+  const edited = await call(`/announcements/${announcement.id}`, a.admin.accessToken, 'PATCH', { title: 'Alpha announcement (revisi)' }, 200);
+  assert.equal(edited.title, 'Alpha announcement (revisi)');
+  const disposable = await call('/announcements', a.admin.accessToken, 'POST', { title: 'Salah kirim', body: 'Segera dihapus.' }, 201);
+  await call(`/announcements/${disposable.id}`, a.admin.accessToken, 'DELETE', undefined, 200);
+  assert(!(await call('/announcements', a.admin.accessToken)).some((item) => item.id === disposable.id));
   const conversation = await call(`/messaging/employee/${a.employee.id}`, a.employeeLogin.accessToken);
   await call(`/messaging/${conversation.id}/messages`, b.admin.accessToken, 'GET', undefined, 404);
   await call(`/messaging/employee/${a.employee.id}`, b.admin.accessToken, 'GET', undefined, 404);

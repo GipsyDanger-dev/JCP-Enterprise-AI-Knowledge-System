@@ -921,6 +921,8 @@ button { cursor: pointer; }
 .modal-card form { min-height: 0; display: flex; flex: 1; flex-direction: column; }
 .modal-body { min-height: 0; padding: 20px 28px; overflow-y: auto; }
 .modal-copy { margin: 0 0 14px; color: var(--text-secondary); font-size: var(--fs-sm); }
+/* Nama yang dikutip di dialog bisa sepanjang batas kolomnya, jadi jangan sampai mendorong kartunya melebar. */
+.modal-copy strong { overflow-wrap: anywhere; }
 .assignment-list { display: grid; gap: 8px; }
 .assignment-person { display: flex; align-items: center; gap: 11px; padding: 11px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; }
 .assignment-person:hover { background: var(--bg-hover); }
@@ -1652,6 +1654,12 @@ button { cursor: pointer; }
 .announcement-composer input, .announcement-composer textarea { width: 100%; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-card); color: var(--text-strong); font: inherit; padding: 11px 12px; resize: vertical; }
 .announcement-composer input:focus, .announcement-composer textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
 .announcement-composer-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
+/* Form sunting menumpang di dalam kartu, jadi bingkai dan jaraknya sendiri dilepas. */
+.announcement-composer.inline { grid-column: 2 / -1; margin: 0; border: 0; padding: 0; background: transparent; }
+.announcement-composer.inline .announcement-composer-head { margin-bottom: 10px; }
+.announcement-actions { display: flex; align-items: center; gap: 2px; }
+.announcement-actions .icon-button:disabled { opacity: .5; cursor: default; }
+.announcement-actions .icon-button.danger:hover:not(:disabled) { background: color-mix(in srgb, #e53e3e 13%, transparent); color: #e53e3e; }
 .announcement-empty { min-height: 180px; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--text-muted); text-align: center; }
 .announcement-list { display: grid; gap: 10px; }
 .announcement-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: flex-start; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 18px; }
@@ -1686,6 +1694,7 @@ button { cursor: pointer; }
   .announcement-card { gap: 10px; }
   .announcement-meta { gap: 5px 9px; }
   .announcement-composer-actions { flex-direction: column-reverse; }
+  .announcement-composer.inline { padding: 0; }
   .announcement-composer-actions button { width: 100%; }
   .announcement-readers-columns { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 }

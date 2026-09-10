@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -51,5 +51,12 @@ export class AnnouncementsController {
   @ApiForbiddenResponse({ description: 'Bukan penerbitnya sendiri maupun admin' })
   update(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @Body() input: UpdateAnnouncementDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.announcements.update(id, input, actor);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Hapus pengumuman beserta bukti bacanya — berbeda dari mengarsipkan' })
+  @ApiForbiddenResponse({ description: 'Bukan penerbitnya sendiri maupun admin' })
+  remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @CurrentUser() actor: AuthenticatedUser) {
+    return this.announcements.remove(id, actor);
   }
 }
