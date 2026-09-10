@@ -64,12 +64,12 @@ export function AgentPanel() {
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           placeholder={awaitingChoice
-            ? (isId ? 'Pilih salah satu pertanyaan di atas untuk melanjutkan' : 'Pick one of the questions above to continue')
+            ? (isId ? 'Pilih pertanyaan di atas, atau tulis pertanyaan Anda sendiri' : 'Pick a question above, or write your own')
             : (isId ? 'Tanyakan apa saja tentang ruang kerja Anda' : 'Ask anything about your workspace')}
           aria-label={isId ? 'Tanyakan ke agen pengetahuan' : 'Ask the knowledge agent'}
-          disabled={isLoadingAnswer || awaitingChoice}
+          disabled={isLoadingAnswer}
         />
-        <button title={isId ? 'Kirim pertanyaan' : 'Send question'} disabled={isLoadingAnswer || awaitingChoice || !question.trim()}>
+        <button title={isId ? 'Kirim pertanyaan' : 'Send question'} disabled={isLoadingAnswer || !question.trim()}>
           {isLoadingAnswer ? <Loader2 size={17} className="spin" /> : <Send size={17} />}
         </button>
       </form>

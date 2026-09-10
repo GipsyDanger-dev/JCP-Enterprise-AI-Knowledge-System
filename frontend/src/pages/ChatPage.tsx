@@ -226,11 +226,11 @@ export function ChatPage() {
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           placeholder={awaitingChoice
-            ? (isId ? 'Pilih salah satu pertanyaan di atas untuk melanjutkan' : 'Pick one of the questions above to continue')
+            ? (isId ? 'Pilih pertanyaan di atas, atau tulis pertanyaan Anda sendiri' : 'Pick a question above, or write your own')
             : (isId ? 'Ajukan pertanyaan tentang pengetahuan perusahaan Anda' : 'Ask a question about your company knowledge')}
-          disabled={isLoadingAnswer || awaitingChoice}
+          disabled={isLoadingAnswer}
         />
-        <button title={isId ? 'Kirim pertanyaan' : 'Send question'} disabled={isLoadingAnswer || awaitingChoice || !question.trim()}>
+        <button title={isId ? 'Kirim pertanyaan' : 'Send question'} disabled={isLoadingAnswer || !question.trim()}>
           {isLoadingAnswer ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
         </button>
       </form>
