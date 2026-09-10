@@ -5,6 +5,8 @@ from unittest import mock
 from pathlib import Path
 
 from ai_engine import KnowledgeBase, chunk_pages, generate_answer
+from generation.guardrails import clarify_has_footing
+from store import clarify_quota_met
 from generation.prompts import build_messages, looks_like_topic_phrase
 
 
@@ -165,3 +167,72 @@ class TopicPhraseTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClarifyFootingTests(unittest.TestCase):
+    """Pertanyaan balik hanya boleh muncul kalau dokumennya memang menyinggung.
+
+    Sitasi jawaban sebelumnya ikut dibawa sebagai konteks lanjutan, jadi
+    potongan topik LAMA selalu hadir di prompt. Tanpa penjaga ini model
+    menjembatani topik baru yang sama sekali asing ke topik lama, lalu
+    menawarkan pilihan yang isinya tidak ada di dokumen mana pun.
+    """
+
+    KONTEKS = [(
+        1.0,
+        {
+            "text": (
+                "Pengembangan ekonomi kreatif di Kabupaten Sleman meliputi subsektor "
+                "kuliner dan kriya. Harga jual produk ditetapkan pelaku usaha setiap hari."
+            ),
+            "title": "SlemanNomor8Tahun2025ttgPengembanganEkonomiKreatif",
+            "filename": "sleman8.pdf",
+        },
+    )]
+
+    def test_topik_asing_tidak_berpijak(self):
+        for query in ("resep rendang padang", "jadwal liga champions", "cuaca jogja besok"):
+            with self.subTest(query=query):
+                self.assertFalse(clarify_has_footing(query, self.KONTEKS))
+
+    def test_topik_dokumen_tetap_berpijak(self):
+        for query in ("ekonomi kreatif", "subsektor kuliner", "apa itu kriya"):
+            with self.subTest(query=query):
+                self.assertTrue(clarify_has_footing(query, self.KONTEKS))
+
+    def test_kata_umum_saja_belum_cukup_jadi_pijakan(self):
+        """"harga" dan "hari" ada di dokumen, tapi "bitcoin" tidak di mana pun.
+
+        Syarat "salah satu kata cocok" meloloskan pertanyaan ini justru lewat
+        kata umumnya, jadi seluruh kata isinya yang harus ada.
+        """
+        self.assertFalse(clarify_has_footing("harga bitcoin hari ini", self.KONTEKS))
+        self.assertTrue(clarify_has_footing("harga produk kuliner", self.KONTEKS))
+
+    def test_pertanyaan_lanjutan_tidak_ikut_terblokir(self):
+        """Lanjutan menunjuk jawaban sebelumnya, jadi wajar tanpa kata isi sendiri."""
+        for query in ("jelaskan lebih detail", "yang kedua bagaimana", "ringkas lagi dong"):
+            with self.subTest(query=query):
+                self.assertTrue(clarify_has_footing(query, self.KONTEKS))
+
+
+class ClarifyQuotaTests(unittest.TestCase):
+    """Bertanya balik hanya layak kalau bahannya memang banyak.
+
+    Penjaga sebelumnya memakai JALUR pencarian sebagai penanda, dan itu
+    terbalik: skor kemiripan turun justru ketika pertanyaannya pendek, jadi
+    "ekonomi" (0,414, jatuh ke TF-IDF) kehilangan pertanyaan baliknya
+    sementara "ekonomi kreatif" (0,673) yang lebih sempit tetap dapat.
+    """
+
+    TOP_K = 5
+
+    def test_kuota_penuh_boleh_bertanya_balik(self):
+        self.assertTrue(clarify_quota_met([object()] * self.TOP_K, self.TOP_K))
+
+    def test_bahan_tipis_tidak_boleh(self):
+        """Sekelas "difabel": dua serpihan tidak cukup untuk tiga tawaran."""
+        self.assertFalse(clarify_quota_met([object(), object()], self.TOP_K))
+
+    def test_tanpa_bahan_tidak_boleh(self):
+        self.assertFalse(clarify_quota_met([], self.TOP_K))

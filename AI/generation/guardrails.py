@@ -11,6 +11,8 @@ import re
 from typing import Any
 
 from config import NO_ANSWER
+from generation.citations import content_tokens
+from generation.prompts import QUESTION_WORDS
 
 OUT_OF_SCOPE = (
     "Saya hanya dapat membantu menjawab pertanyaan yang jawabannya ada pada "
@@ -79,8 +81,31 @@ def is_out_of_scope(query: str, workspace_type: str = "COMPANY") -> bool:
     return any(phrase in normalized for phrase in _PROMPT_INJECTION_PHRASES)
 
 
+#: Inti kalimat baku, tanpa subjek di depannya. Model kerap menyisipkan
+#: pokok pertanyaan ke tengah ("Informasi MENGENAI HARGA BITCOIN tidak
+#: ditemukan pada dokumen yang tersedia"), jadi pembandingan kata per kata
+#: dengan NO_ANSWER meleset justru pada kalimat yang maksudnya sama persis.
+_NO_ANSWER_CORE = "tidak ditemukan pada dokumen"
+
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s")
+
+
 def is_no_answer(answer: str) -> bool:
-    return answer == NO_ANSWER
+    """Apakah ini pernyataan tidak-ditemukan, termasuk yang diparafrase model?
+
+    Tanpa pengenalan parafrase, jawaban yang isinya "tidak ditemukan" lolos ke
+    jalur jawaban biasa: ia diberi sitasi, memakai lencana "Evidence verified"
+    di antarmuka, dan kehilangan usulan pertanyaan lanjutannya.
+
+    Hanya kalimat PERTAMA yang diperiksa. Jawaban yang menjawab sebagian lalu
+    menyebut ada bagian yang tidak ditemukan tetap jawaban sungguhan, dan
+    sitasinya memang layak dipertahankan.
+    """
+    text = answer.strip()
+    if text == NO_ANSWER:
+        return True
+    first = _SENTENCE_END.split(text, maxsplit=1)[0]
+    return _NO_ANSWER_CORE in first.lower()
 
 
 # Penanda satu baris, bukan JSON penuh: jawaban biasa tetap teks polos sehingga
@@ -103,6 +128,51 @@ def parse_clarify(answer: str) -> dict[str, Any] | None:
     if not question:
         return None
     return {"question": question, "options": [option for option in options if option][:3]}
+
+
+#: Kata penunjuk lanjutan dan partikel obrolan: pembawa maksud "seperti
+#: jawaban tadi, tapi ...".
+#: Kata-kata ini tidak memperkenalkan pokok baru, jadi kehadirannya tidak boleh
+#: dihitung sebagai tuntutan agar dokumen memuatnya. Tanpa daftar ini
+#: "jelaskan lebih detail" dinilai tak berpijak hanya karena kata "lebih" dan
+#: "detail" memang tidak ada di dalam teks dokumen mana pun.
+_FOLLOW_UP_WORDS = frozenset("""
+lebih detail detil rinci terperinci lanjut lanjutkan lagi ringkas ringkasan
+singkat contoh contohnya maksud maksudnya arti artinya tadi sebelumnya
+pertama kedua ketiga keempat kelima terakhir poin bagian atas bawah
+more detail details further again summarize summary briefly example meaning
+dong sih nih deh kok tuh aja saja lah pun kah kan
+coba mohon bisa boleh silakan please
+""".split())
+
+
+def clarify_has_footing(query: str, matches: list[tuple[float, dict[str, Any]]]) -> bool:
+    """Apakah pertanyaannya punya pijakan kata di potongan yang terambil?
+
+    Sitasi jawaban sebelumnya ikut dibawa sebagai konteks lanjutan, jadi
+    potongan topik LAMA selalu ada di prompt meski pertanyaan barunya tidak
+    berkaitan sama sekali. Dalam keadaan itu model cenderung menjembatani
+    keduanya dan menawarkan pilihan yang isinya tidak ada di dokumen mana pun.
+    Bertanya balik hanya layak bila kata yang ditanyakan memang muncul di
+    bahan yang terambil; kalau tidak, berhenti lebih jujur daripada menebak.
+
+    Pertanyaan lanjutan yang menunjuk jawaban sebelumnya ("jelaskan lebih
+    detail", "yang kedua bagaimana") sengaja tetap lolos: ia memang tidak
+    membawa kata isi sendiri, dan itu bukan tanda tak berdasar.
+    """
+    asked = content_tokens(query) - QUESTION_WORDS - _FOLLOW_UP_WORDS
+    if not asked:
+        return True
+    tersedia: set[str] = set()
+    for _, chunk in matches:
+        tersedia |= content_tokens(chunk.get("text", ""))
+        tersedia |= content_tokens(chunk.get("title") or "")
+        tersedia |= content_tokens(chunk.get("filename") or "")
+    # SEMUA kata isinya harus ada, bukan sekadar salah satu. "harga bitcoin
+    # hari ini" memuat "harga" dan "hari" yang lazim ada di dokumen apa pun,
+    # sehingga syarat "salah satu cocok" meloloskannya justru karena kata
+    # umumnya — sementara kata pembedanya, "bitcoin", tidak ada di mana pun.
+    return asked <= tersedia
 
 
 def clarify_response(clarify: dict[str, Any], query: str) -> dict[str, Any]:

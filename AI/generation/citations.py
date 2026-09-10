@@ -65,7 +65,8 @@ SUPPORT_KEEP_RATIO = 0.34
 SUPPORT_MINIMUM = 1.0
 
 
-def _tokens(text: str) -> set[str]:
+def content_tokens(text: str) -> set[str]:
+    """Kata isi teks: angka dan kata >=3 huruf, tanpa kata fungsi."""
     return {
         token for token in _TOKEN.findall(str(text).lower())
         if token not in _STOPWORDS
@@ -90,11 +91,11 @@ def supporting_matches(
     """
     if len(matches) < 2:
         return matches
-    answer_tokens = _tokens(answer)
+    answer_tokens = content_tokens(answer)
     if not answer_tokens:
         return matches
 
-    candidates = [_tokens(chunk.get("text", "")) for _, chunk in matches]
+    candidates = [content_tokens(chunk.get("text", "")) for _, chunk in matches]
     total = len(candidates)
     frequency: dict[str, int] = {}
     for tokens in candidates:

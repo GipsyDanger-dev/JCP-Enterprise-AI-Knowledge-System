@@ -34,6 +34,7 @@ from config import EMBEDDING_MODEL, EMBEDDINGS_ENABLED
 from generation.citations import citations_from_matches, supporting_matches
 from generation.naming import find_named_document
 from generation.guardrails import (
+    clarify_has_footing,
     clarify_response,
     is_no_answer,
     no_answer_response,
@@ -48,6 +49,29 @@ from provider_errors import ProviderError
 from retrieval.embeddings import embed_texts
 
 VECTOR_MINIMUM_SCORE = 0.45
+
+
+def clarify_quota_met(retrieved: list[Any], top_k: int) -> bool:
+    """Apakah pencarian berhasil mengisi kuotanya untuk pertanyaan ini?
+
+    Bertanya balik berarti berkata "topikmu terlalu luas, aspek mana yang kamu
+    mau" — dan itu hanya jujur kalau bahannya memang banyak. Kalau kuota
+    pencarian saja tidak terisi, topiknya tipis, dan tiga pilihan yang
+    ditawarkan di atasnya akan berujung "informasi tidak ditemukan" satu per
+    satu.
+
+    Versi sebelumnya menutup pertanyaan balik berdasarkan JALUR mana yang
+    dipakai (vektor atau TF-IDF). Itu keliru: jalur ditentukan oleh skor
+    kemiripan, dan skor bergerak berlawanan dengan keluasan topik — kata
+    tunggal "ekonomi" hanya mencapai 0,414 justru karena pendek, sedangkan
+    "ekonomi kreatif" yang lebih sempit mencapai 0,673. Akibatnya topik
+    terluaslah yang paling gampang kehilangan pertanyaan baliknya.
+
+    Yang dihitung hanya hasil pencarian untuk pertanyaan ini, bukan sitasi
+    giliran sebelumnya yang ikut terbawa: konteks lama akan memenuhi kuota
+    tanpa membuktikan apa pun tentang topik yang baru ditanyakan.
+    """
+    return len(retrieved) >= top_k
 
 #: Menyematkan satu pertanyaan pendek tidak pernah butuh lama; batas ingest yang
 #: 120 detik terlalu longgar di sini karena ada pengguna yang menunggu. Anggaran
@@ -466,7 +490,8 @@ class PgVectorStore:
                              api_key: str | None = None, allow_clarify: bool = False,
                              filters: dict[str, Any] | None = None,
                              *, scope: AccessScope,
-                             workspace_type: str = "COMPANY") -> dict[str, Any]:
+                             workspace_type: str = "COMPANY",
+                             lexical_query: str | None = None) -> dict[str, Any]:
         """Turn retrieved chunks into the answer payload.
 
         Deliberately left outside the retrieval ``try`` blocks: a ProviderError
@@ -488,7 +513,20 @@ class PgVectorStore:
         )
         clarify = parse_clarify(answer)
         if clarify:
-            return clarify_response(clarify, query)
+            # Pertanyaan mentahnya, bukan `query` yang sudah dibubuhi label
+            # topik percakapan: label itu selalu cocok dengan konteks lama,
+            # jadi memakainya membuat penjaga di bawah tidak pernah menolak.
+            # Ia juga yang tampil di pilihan "Jelaskan ringkasan lengkap
+            # tentang ...", sehingga label internal tidak bocor ke layar.
+            asked = lexical_query or query
+            if not clarify_has_footing(asked, matches):
+                print("[AI] Clarify ditolak: pertanyaan tidak berpijak pada dokumen")
+                # Usulannya diambil dari korpus, bukan dari model. Pilihan
+                # karangan model akan menyeret pengguna kembali ke topik
+                # sebelumnya, sedangkan judul dokumen yang benar-benar ada
+                # memberinya jalan keluar yang bisa dijawab.
+                return no_answer_response(self.suggested_questions(scope=scope))
+            return clarify_response(clarify, asked)
         if is_no_answer(answer):
             return no_answer_response(self.suggested_questions(scope=scope))
         # Sitasi dipangkas SETELAH jawaban tersusun, bukan sebelumnya. Semua
@@ -583,9 +621,10 @@ class PgVectorStore:
         if not matches:
             return no_answer_response(self.suggested_questions(scope=scope))
         return self._answer_from_matches(
-            query, matches, use_llm=use_llm, model=model,
-            api_key=api_key, allow_clarify=allow_clarify, scope=scope,
-            filters=filters, workspace_type=workspace_type,
+            query, matches, use_llm=use_llm, model=model, api_key=api_key,
+            allow_clarify=allow_clarify and clarify_quota_met(retrieved_matches, top_k),
+            scope=scope, filters=filters, workspace_type=workspace_type,
+            lexical_query=lexical_query,
         )
 
 
@@ -666,11 +705,15 @@ class PgVectorStore:
         if not matches:
             # Vector search found nothing above threshold, try TF-IDF fallback
             print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
+            # Kelayakan bertanya balik tidak lagi ditentukan di sini. TF-IDF
+            # menilainya sendiri lewat `clarify_quota_met`, memakai ukuran yang
+            # sama dengan jalur vektor.
             return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters, context_chunk_ids=context_chunk_ids, workspace_type=workspace_type, scope=scope, lexical_query=lexical_query)
         return self._answer_from_matches(
-            query, matches, use_llm=use_llm, model=model,
-            api_key=api_key, allow_clarify=allow_clarify, filters=filters,
-            workspace_type=workspace_type, scope=scope,
+            query, matches, use_llm=use_llm, model=model, api_key=api_key,
+            allow_clarify=allow_clarify and clarify_quota_met(retrieved_matches, top_k),
+            filters=filters, workspace_type=workspace_type, scope=scope,
+            lexical_query=lexical_query,
         )
 
 

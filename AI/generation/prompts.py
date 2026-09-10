@@ -68,7 +68,7 @@ _MAX_TOPIC_WORDS = 8
 #: Dicocokkan sebagai kata utuh: "apa" tidak boleh ikut tersulut oleh
 #: "siapa" atau "berapa" yang kebetulan memuatnya sebagai potongan huruf.
 _WORDS = re.compile(r"[a-z]+")
-_QUESTION_WORDS = frozenset(
+QUESTION_WORDS = frozenset(
     word for opener in _QUESTION_OPENERS for word in opener.split()
 )
 
@@ -92,7 +92,7 @@ def looks_like_topic_phrase(query: str) -> bool:
     # Indonesia lazim menaruhnya di belakang — "gaji manager berapa",
     # "peraturan ini berlaku kapan" — dan memeriksa awalan saja membuat
     # kalimat tanya yang jelas disangka label topik lalu dibalas pertanyaan.
-    if _WORDS.findall(text) and set(_WORDS.findall(text)) & _QUESTION_WORDS:
+    if _WORDS.findall(text) and set(_WORDS.findall(text)) & QUESTION_WORDS:
         return False
     return not any(text.startswith(opener) for opener in _QUESTION_OPENERS)
 
