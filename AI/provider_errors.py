@@ -20,6 +20,12 @@ class ProviderHttpError(ProviderError):
     def __init__(self, operation: str, status: int):
         super().__init__(f"AI provider {operation} request failed (HTTP {status})")
         self.status = status
+        # Status upstream-nya ikut ke pesan publik: tanpa ini, 401 (key salah),
+        # 429 (rate limit) dan 402 (kuota habis) semuanya terbaca sebagai satu
+        # kalimat generik, padahal penanganannya berbeda total. Hanya angkanya
+        # yang ikut — `operation` sengaja tidak, karena bisa memuat detail
+        # request, sedangkan int tidak bisa membawa kredensial.
+        self.public_detail = f"AI provider request failed (upstream HTTP {status})"
 
 
 class ProviderUnavailableError(ProviderError):

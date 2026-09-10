@@ -9,20 +9,23 @@ from __future__ import annotations
 import json
 import os
 import re
-import urllib.error
 import urllib.request
 from typing import Any
 
 from config import AI_PROVIDER_API_KEY_ENV, AI_PROVIDER_BASE_URL, DEFAULT_MODEL
 from generation.guardrails import CLARIFY_MARKER
 from generation.prompts import build_messages
-from provider_errors import (
-    ProviderConfigurationError,
-    ProviderHttpError,
-    ProviderResponseError,
-    ProviderUnavailableError,
-)
+from provider_errors import ProviderConfigurationError, ProviderResponseError
+from provider_retry import read_with_retry
 
+
+CHAT_MAX_ATTEMPTS = 2
+#: Total waktu yang boleh dihabiskan untuk mencoba ulang jawaban chat. Dipilih
+#: di bawah 2x CHAT_TIMEOUT supaya provider yang menggantung tidak pernah
+#: melipatgandakan waktu tunggu pengguna: 429/503 yang kembali seketika tetap
+#: diulang, timeout penuh tidak.
+CHAT_TIMEOUT = 60
+CHAT_RETRY_BUDGET = 75
 
 _INTERNAL_CHUNK_REFERENCE = re.compile(
     r"\s*\[[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}-\d+(?:\s*-\s*[^\]]*)?\]",
@@ -101,19 +104,14 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
         method="POST",
     )
-    failure = None
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            body = response.read()
-    except urllib.error.HTTPError as exc:
-        status = exc.code
-        if exc.fp is not None:
-            exc.close()
-        failure = ProviderHttpError("chat", status)
-    except (urllib.error.URLError, TimeoutError, OSError):
-        failure = ProviderUnavailableError("chat")
-    if failure is not None:
-        raise failure
+    # Percobaan ulangnya sedikit: ada pengguna yang menunggu jawaban di layar.
+    # Tanpa ini sama sekali, satu 429/503 sesaat dari provider langsung menjadi
+    # kegagalan yang dilihat pengguna, padahal panggilan berikutnya biasanya
+    # berhasil.
+    body = read_with_retry(
+        request, operation="chat", timeout=CHAT_TIMEOUT,
+        max_attempts=CHAT_MAX_ATTEMPTS, retry_budget=CHAT_RETRY_BUDGET,
+    )
 
     failure = None
     content = ""

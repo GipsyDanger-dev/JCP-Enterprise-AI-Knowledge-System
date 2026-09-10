@@ -11,18 +11,18 @@ from __future__ import annotations
 import json
 import math
 import os
-import urllib.error
 import urllib.request
 from typing import Any
 
 from config import AI_PROVIDER_API_KEY_ENV, AI_PROVIDER_BASE_URL, EMBEDDING_MODEL
-from provider_errors import (
-    ProviderConfigurationError,
-    ProviderHttpError,
-    ProviderResponseError,
-    ProviderUnavailableError,
-)
+from provider_errors import ProviderConfigurationError, ProviderResponseError
+from provider_retry import read_with_retry
 from retrieval.filters import match_metadata
+
+
+EMBEDDING_MAX_ATTEMPTS = 3
+#: Batas wajar untuk satu batch saat ingest, yang berjalan di latar belakang.
+EMBEDDING_TIMEOUT = 120
 
 
 def _api_key(api_key: str | None) -> str:
@@ -44,6 +44,9 @@ def embed_texts(
     model: str = EMBEDDING_MODEL,
     api_key: str | None = None,
     batch_size: int = 64,
+    max_attempts: int = EMBEDDING_MAX_ATTEMPTS,
+    timeout: float = EMBEDDING_TIMEOUT,
+    retry_budget: float | None = None,
 ) -> list[list[float]]:
     """Embed a list of texts via an OpenAI-compatible /v1/embeddings API."""
     if not texts:
@@ -64,19 +67,13 @@ def embed_texts(
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             method="POST",
         )
-        failure = None
-        try:
-            with urllib.request.urlopen(request, timeout=120) as response:
-                body = response.read()
-        except urllib.error.HTTPError as exc:
-            status = exc.code
-            if exc.fp is not None:
-                exc.close()
-            failure = ProviderHttpError("embeddings", status)
-        except (urllib.error.URLError, TimeoutError, OSError):
-            failure = ProviderUnavailableError("embeddings")
-        if failure is not None:
-            raise failure
+        # Gangguan sesaat dicoba ulang di dalam helper: pemanggil jalur
+        # pencarian menurunkan diri ke TF-IDF begitu ini gagal, jadi satu
+        # blip 502 cukup untuk membuat jawaban kehilangan pencarian semantik.
+        body = read_with_retry(
+            request, operation="embeddings", timeout=timeout,
+            max_attempts=max_attempts, retry_budget=retry_budget,
+        )
 
         failure = None
         try:

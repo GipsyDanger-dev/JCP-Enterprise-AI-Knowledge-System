@@ -47,6 +47,13 @@ from provider_errors import ProviderError
 from retrieval.embeddings import embed_texts
 
 VECTOR_MINIMUM_SCORE = 0.45
+
+#: Menyematkan satu pertanyaan pendek tidak pernah butuh lama; batas ingest yang
+#: 120 detik terlalu longgar di sini karena ada pengguna yang menunggu. Anggaran
+#: di bawah 2x timeout membuat kegagalan cepat tetap diulang, sedangkan provider
+#: yang menggantung langsung dilepas ke TF-IDF alih-alih menggandakan waktu tunggu.
+QUERY_EMBED_TIMEOUT = 20
+QUERY_EMBED_RETRY_BUDGET = 30
 DATABASE_URL_ENV = "DATABASE_URL"
 
 
@@ -573,7 +580,15 @@ class PgVectorStore:
             # Reserve part of top_k for the new query so old citations cannot
             # crowd out retrieval for a follow-up question.
             context_matches = self.context_chunks(context_chunk_ids or [], scope=scope)[:max(1, top_k // 2)]
-            query_vector = embed_texts([query], model=self.model, api_key=api_key)[0]
+            # Percobaan ulangnya sengaja lebih sedikit daripada saat ingest:
+            # ada pengguna yang sedang menunggu jawaban, jadi satu ulangan cepat
+            # sudah cukup untuk menyelamatkan blip sesaat tanpa membuatnya
+            # menatap layar kosong.
+            query_vector = embed_texts(
+                [query], model=self.model, api_key=api_key,
+                max_attempts=2, timeout=QUERY_EMBED_TIMEOUT,
+                retry_budget=QUERY_EMBED_RETRY_BUDGET,
+            )[0]
             retrieved_matches = [
                 (score, chunk)
                 for score, chunk in self.search(query_vector, top_k, filters=filters, scope=scope)

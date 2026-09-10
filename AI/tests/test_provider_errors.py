@@ -51,7 +51,7 @@ class ProviderRedactionTests(unittest.TestCase):
 
     def test_embedding_http_error_discards_echoed_authorization(self):
         with mock.patch(
-            "retrieval.embeddings.urllib.request.urlopen",
+            "provider_retry.urllib.request.urlopen",
             side_effect=echoed_http_error("embeddings"),
         ):
             with self.assertRaises(ProviderHttpError) as caught:
@@ -62,7 +62,7 @@ class ProviderRedactionTests(unittest.TestCase):
 
     def test_chat_http_error_discards_echoed_authorization(self):
         with mock.patch(
-            "generation.llm.urllib.request.urlopen",
+            "provider_retry.urllib.request.urlopen",
             side_effect=echoed_http_error("chat/completions"),
         ):
             with self.assertRaises(ProviderHttpError) as caught:
@@ -74,7 +74,7 @@ class ProviderRedactionTests(unittest.TestCase):
     def test_invalid_provider_body_is_not_copied_to_exception(self):
         response = FakeResponse(f'{{"secret":"{SECRET}"'.encode())
         with mock.patch(
-            "retrieval.embeddings.urllib.request.urlopen",
+            "provider_retry.urllib.request.urlopen",
             return_value=response,
         ):
             with self.assertRaises(ProviderResponseError) as caught:
@@ -86,10 +86,12 @@ class ProviderRedactionTests(unittest.TestCase):
         provider_error = urllib.error.URLError(
             f"connection failed with Authorization: Bearer {SECRET}"
         )
+        # Gangguan jaringan memang dicoba ulang; backoff-nya dibekukan supaya
+        # test ini menguji redaksi pesannya, bukan menunggu jedanya.
         with mock.patch(
-            "generation.llm.urllib.request.urlopen",
+            "provider_retry.urllib.request.urlopen",
             side_effect=provider_error,
-        ):
+        ), mock.patch("provider_retry.time.sleep"):
             with self.assertRaises(ProviderUnavailableError) as caught:
                 generate_answer("question", [], api_key=SECRET)
 
@@ -100,7 +102,10 @@ class ProviderRedactionTests(unittest.TestCase):
         config_error = ProviderConfigurationError("AI_PROVIDER_API_KEY")
 
         self.assertEqual(http_error.http_status, 502)
-        self.assertEqual(http_error.public_detail, "AI provider request failed")
+        self.assertEqual(
+            http_error.public_detail,
+            "AI provider request failed (upstream HTTP 401)",
+        )
         self.assertEqual(config_error.http_status, 503)
         self.assertEqual(config_error.public_detail, "AI provider is not configured")
 

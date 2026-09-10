@@ -200,7 +200,10 @@ class HttpApiTests(unittest.TestCase):
             response = self.client.post("/ask", json={"query": "policy"})
 
         self.assertEqual(response.status_code, 502)
-        self.assertEqual(response.json(), {"detail": "AI provider request failed"})
+        self.assertEqual(
+            response.json(),
+            {"detail": "AI provider request failed (upstream HTTP 401)"},
+        )
         self.assertNotIn(secret, response.text)
         self.assertNotIn("Authorization", response.text)
 
