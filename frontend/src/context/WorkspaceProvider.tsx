@@ -67,6 +67,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const requestedConversationId = new URLSearchParams(location.search).get('conversation')
     if (!requestedConversationId || !token) return
+    // Percakapan yang sudah ada di memori tidak dibangun ulang dari server.
+    //
+    // Riwayat di server hanya menyimpan jawaban dan sitasi — `suggestions` dan
+    // `awaitingChoice` tidak ikut tersimpan. Tanpa penjaga ini, `navigate()`
+    // yang menaruh id percakapan baru ke URL langsung memicu pemuatan ulang,
+    // dan jawaban PERTAMA di setiap percakapan kehilangan chip pilihannya
+    // sekaligus kuncinya — persis saat pertanyaan balik paling membutuhkannya.
+    if (requestedConversationId === conversationId) return
 
     let cancelled = false
     getConversation(requestedConversationId, token)
@@ -82,7 +90,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         }
       })
     return () => { cancelled = true }
-  }, [location.search, token])
+  }, [location.search, token, conversationId])
 
   // Muat dokumen dari API saat login; fallback ke data lokal bila gagal
   useEffect(() => {
