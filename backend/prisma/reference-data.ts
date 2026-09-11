@@ -120,34 +120,52 @@ export const KATEGORI_DOKUMEN: KategoriSeed[] = [
   { name: 'Pelayanan Publik & Informasi', units: [] },
 ];
 
+export interface JabatanSeed {
+  name: string;
+  /** Boleh menerbitkan, menyunting, mengarsipkan, dan menghapus pengumuman. */
+  canManageAnnouncements?: boolean;
+  /** Boleh melihat siapa saja yang sudah dan belum membaca pengumuman. */
+  canViewAnnouncementReaders?: boolean;
+  /** Boleh menugaskan bacaan wajib dan membaca laporan kepatuhannya. */
+  canAssignRequiredReadings?: boolean;
+}
+
 /**
- * Nomenklatur jabatan. Hanya keterangan — tidak memengaruhi hak akses dokumen
- * sama sekali. Yang menentukan akses adalah unit kerja.
+ * Nomenklatur jabatan bawaan — hanya dipakai untuk MENGISI tabel `jabatan`
+ * pertama kali (seed dan pembuatan workspace baru), bukan sebagai sumber
+ * kebenaran saat aplikasi berjalan.
+ *
+ * Setelah tersimpan, daftarnya diurus super admin dari halaman Orang & akses;
+ * mengubah file ini tidak akan menyentuh workspace yang sudah ada, karena seed
+ * sengaja tidak menimpa baris yang namanya sudah ada. Itu disengaja: kalau ada
+ * yang mencabut centang wewenang lewat antarmuka, deploy berikutnya tidak boleh
+ * diam-diam mengembalikannya.
+ *
+ * Jabatan tidak menentukan dokumen apa yang terlihat — itu urusan unit kerja.
+ * Yang ditentukan di sini hanya wewenang pada pengumuman dan bacaan wajib.
  */
-export const JABATAN: string[] = [
-  'Kepala Perangkat Daerah',
-  'Sekretaris',
-  'Kepala Bidang',
-  'Kepala Subbagian',
-  'Kepala Seksi',
-  'Kepala Subbidang',
-  'Jabatan Fungsional',
-  'Staf / Pelaksana',
+export const JABATAN: JabatanSeed[] = [
+  { name: 'Kepala Perangkat Daerah', canManageAnnouncements: true, canViewAnnouncementReaders: true },
+  { name: 'Sekretaris', canManageAnnouncements: true, canViewAnnouncementReaders: true },
+  { name: 'Kepala Bidang' },
+  { name: 'Kepala Subbagian' },
+  { name: 'Kepala Seksi' },
+  { name: 'Kepala Subbidang' },
+  { name: 'Jabatan Fungsional' },
+  { name: 'Staf / Pelaksana' },
 ];
 
 /**
- * Jabatan yang boleh menerbitkan pengumuman dan melihat siapa saja yang sudah
- * membacanya, di luar admin.
+ * Nama tampilan bawaan untuk ketiga role yang dipakai.
  *
- * Ditaruh berdampingan dengan JABATAN supaya isinya tidak bisa lepas dari
- * nomenklatur yang dipakai form pengguna: jabatan yang salah tulis di sini
- * tidak akan pernah cocok dengan jabatan siapa pun, dan wewenangnya hilang
- * diam-diam. Perbandingannya sendiri mengabaikan besar-kecil huruf dan spasi
- * di tepi, karena jabatan pengguna lama masih berupa teks bebas.
+ * Hanya labelnya yang bisa diubah instansi, bukan perilakunya: wewenang tiap
+ * role tertanam di kode, jadi menambah role baru tidak akan menambah aturan
+ * apa pun di baliknya. Lihat model RoleLabel di schema.prisma.
  */
-export const JABATAN_PENERBIT_PENGUMUMAN: string[] = [
-  'Kepala Perangkat Daerah',
-  'Sekretaris',
+export const ROLE_LABEL_BAWAAN: { role: 'SUPER_ADMIN' | 'ADMIN_UNIT' | 'PEGAWAI'; label: string; description: string }[] = [
+  { role: 'SUPER_ADMIN', label: 'Admin', description: 'Mengelola seluruh dokumen, pengguna, dan pengaturan workspace.' },
+  { role: 'ADMIN_UNIT', label: 'Admin Unit', description: 'Mengelola dokumen milik unit kerjanya sendiri.' },
+  { role: 'PEGAWAI', label: 'Pegawai', description: 'Membaca dokumen yang terbuka untuk unit kerjanya.' },
 ];
 
 /** Kategori demo bawaan template lama; dihapus saat seed bila belum dipakai dokumen. */

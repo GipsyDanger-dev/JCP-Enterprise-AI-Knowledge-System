@@ -1,6 +1,7 @@
 import { PrismaClient, UserRole } from '@prisma/client';
 import { hashPassword } from '../src/auth/password.util';
 import { KATEGORI_DEMO_LAMA, KATEGORI_DOKUMEN, PEMETAAN_UNIT_LAMA, UNIT_KERJA } from './reference-data';
+import { seedJabatanDanRoleLabel } from './organization-defaults';
 
 const prisma = new PrismaClient();
 const workspaceId = process.env.SEED_WORKSPACE_ID?.trim() || '00000000-0000-4000-8000-000000000001';
@@ -26,6 +27,12 @@ async function upsertUser(
     ? await prisma.unitKerja.findUnique({ where: { workspaceId_code: { workspaceId, code: unitKerjaCode } }, select: { id: true } })
     : null;
   const unitKerjaId = unitKerja?.id ?? null;
+  // jobTitle tetap diisi teksnya, tapi yang menentukan wewenang adalah barisnya.
+  const jabatan = await prisma.jabatan.findUnique({
+    where: { workspaceId_name: { workspaceId, name: jobTitle } },
+    select: { id: true },
+  });
+  if (!jabatan) throw new Error(`Jabatan "${jobTitle}" belum ada di workspace ini`);
   const email = requiredEnvironment(emailName).toLowerCase();
   const username = email.split('@', 1)[0];
   const password = requiredEnvironment(passwordName);
@@ -41,7 +48,7 @@ async function upsertUser(
   await prisma.user.upsert({
     where: { email },
     update: {},
-    create: { workspaceId, displayName, username, employeeNumber, division, jobTitle, email, isActive: true, passwordHash, role, isAdmin, unitKerjaId },
+    create: { workspaceId, displayName, username, employeeNumber, division, jobTitle, jabatanId: jabatan.id, email, isActive: true, passwordHash, role, isAdmin, unitKerjaId },
   });
   console.log(`Seeded ${isAdmin ? 'SUPER_ADMIN' : role}: ${username}${unitKerjaCode ? ` @ ${unitKerjaCode}` : ''}`);
 }
@@ -167,6 +174,7 @@ async function main(): Promise<void> {
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
   if (!workspace || workspace.type !== 'COMPANY') throw new Error('Seed requires an existing company workspace');
   await seedUnitKerjaDanKategori();
+  await seedJabatanDanRoleLabel(prisma, workspaceId);
   await seedBillingPlans();
   await pindahkanUnitLama();
 
