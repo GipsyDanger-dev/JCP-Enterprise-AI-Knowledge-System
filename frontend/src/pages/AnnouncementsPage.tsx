@@ -306,7 +306,7 @@ export function AnnouncementsPage() {
         {announcements.map((announcement) => {
           const editing = canManage && editingId === announcement.id
           const busy = busyId === announcement.id
-          return <article key={announcement.id} className={`announcement-card${!announcement.isActive && !editing ? ' archived' : ''}`}>
+          return <article key={announcement.id} className={`announcement-card${!announcement.isActive && !editing ? ' archived' : ''}${announcement.imageDataUrl && !editing ? ' with-image' : ''}`}>
             <span className="announcement-icon">{editing ? <Pencil size={19} /> : <Megaphone size={19} />}</span>
             {editing ? <AnnouncementForm
               inline
@@ -320,12 +320,12 @@ export function AnnouncementsPage() {
               onCancel={() => setEditingId(null)}
             /> : <>
               <div className="announcement-content"><div className="announcement-meta"><span>{formatPublishedAt(announcement.publishedAt, isId)}</span><span>{isId ? `Oleh ${announcement.createdBy.displayName}` : `By ${announcement.createdBy.displayName}`}</span>{canManage && <b>{announcement.isActive ? (isId ? 'Aktif' : 'Active') : (isId ? 'Diarsipkan' : 'Archived')}</b>}</div><h2>{announcement.title}</h2><p>{announcement.body}</p>
-                {announcement.imageDataUrl && <figure className="announcement-image"><img src={announcement.imageDataUrl} alt={isId ? `Gambar untuk pengumuman ${announcement.title}` : `Image for announcement ${announcement.title}`} /></figure>}
                 {canManage && <button type="button" className="announcement-readers-toggle" aria-expanded={openReport === announcement.id} onClick={() => toggleReport(announcement)}>
                   <Users size={15} />
                   {isId ? `${announcement.readCount ?? 0} orang sudah membaca` : `Read by ${announcement.readCount ?? 0}`}
                 </button>}
               </div>
+              {announcement.imageDataUrl && <figure className="announcement-image"><img src={announcement.imageDataUrl} alt={isId ? `Gambar untuk pengumuman ${announcement.title}` : `Image for announcement ${announcement.title}`} /></figure>}
               {canManage && <div className="announcement-actions">
                 <button className="icon-button" disabled={busy} title={isId ? 'Sunting pengumuman' : 'Edit announcement'} onClick={() => setEditingId(announcement.id)}><Pencil size={17} /></button>
                 <button className="icon-button" disabled={busy} title={announcement.isActive ? (isId ? 'Arsipkan pengumuman' : 'Archive announcement') : (isId ? 'Aktifkan pengumuman' : 'Restore announcement')} onClick={() => toggleActive(announcement)}>{announcement.isActive ? <Archive size={17} /> : <RotateCcw size={17} />}</button>
