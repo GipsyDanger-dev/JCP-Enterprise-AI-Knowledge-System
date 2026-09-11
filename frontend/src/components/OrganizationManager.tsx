@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Check, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { errorMessage } from '@/api/client'
+import { useConfirm } from './ConfirmDialog'
 import {
   createJabatan,
   createUnitKerja,
@@ -94,6 +95,7 @@ interface SectionProps {
 // ------------------------------------------------------------------ unit kerja
 
 function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionProps & { units: OrgUnitKerja[] }) {
+  const { tanya, dialog: dialogKonfirmasi } = useConfirm()
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [saving, setSaving] = useState(false)
@@ -140,10 +142,16 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
   }
 
   const hapus = async (unit: OrgUnitKerja) => {
-    const pesan = isId
-      ? `Hapus unit kerja "${unit.name}"?\n\nHanya bisa dihapus kalau belum dipakai pengguna maupun dokumen.`
-      : `Delete work unit "${unit.name}"?\n\nOnly possible when no user or document still refers to it.`
-    if (!confirm(pesan)) return
+    const setuju = await tanya({
+      title: isId ? 'Hapus unit kerja' : 'Delete work unit',
+      body: isId
+        ? <><strong>{unit.name}</strong> hanya bisa dihapus kalau belum dipakai pengguna maupun dokumen.</>
+        : <><strong>{unit.name}</strong> can only be deleted while no user or document still refers to it.</>,
+      confirmLabel: isId ? 'Hapus' : 'Delete',
+      cancelLabel: isId ? 'Batal' : 'Cancel',
+      tone: 'danger',
+    })
+    if (!setuju) return
     onError(null)
     try {
       await deleteUnitKerja(unit.id, token ?? undefined)
@@ -251,6 +259,7 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
           </tbody>
         </table>
       </div>
+      {dialogKonfirmasi}
     </>
   )
 }
@@ -258,6 +267,7 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
 // --------------------------------------------------------------------- jabatan
 
 function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps & { items: OrgJabatan[] }) {
+  const { tanya, dialog: dialogKonfirmasi } = useConfirm()
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -302,10 +312,16 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
   }
 
   const hapus = async (jabatan: OrgJabatan) => {
-    const pesan = isId
-      ? `Hapus jabatan "${jabatan.name}"?\n\nHanya bisa dihapus kalau belum dipegang siapa pun.`
-      : `Delete job title "${jabatan.name}"?\n\nOnly possible when nobody holds it.`
-    if (!confirm(pesan)) return
+    const setuju = await tanya({
+      title: isId ? 'Hapus jabatan' : 'Delete job title',
+      body: isId
+        ? <><strong>{jabatan.name}</strong> hanya bisa dihapus kalau belum dipegang siapa pun.</>
+        : <><strong>{jabatan.name}</strong> can only be deleted while nobody holds it.</>,
+      confirmLabel: isId ? 'Hapus' : 'Delete',
+      cancelLabel: isId ? 'Batal' : 'Cancel',
+      tone: 'danger',
+    })
+    if (!setuju) return
     onError(null)
     try {
       await deleteJabatan(jabatan.id, token ?? undefined)
@@ -414,6 +430,7 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
           </tbody>
         </table>
       </div>
+      {dialogKonfirmasi}
     </>
   )
 }
