@@ -3,6 +3,7 @@ import { AccountType, AuditAction, AuditActorType, Prisma } from '@prisma/client
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { hashPassword } from '../auth/password.util';
+import { isAdminRole } from '../auth/role.utils';
 import { PrismaService } from '../database/prisma.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -11,6 +12,8 @@ import { OrganizationService } from '../organization/organization.service';
 
 const SAFE_USER_SELECT = {
   id: true,
+  // Dipakai daftar pengguna untuk mengunci tombol pada akun pertama perusahaan.
+  isPlatformOwner: true,
   username: true,
   employeeNumber: true,
   division: true,
@@ -158,6 +161,12 @@ export class UsersService {
     const user = await this.prisma.user.findFirst({ where: { id, workspaceId: actor.workspaceId, accountType: AccountType.COMPANY }, select: { id: true, isPlatformOwner: true } });
     if (!user) throw new NotFoundException('User not found');
     if (user.isPlatformOwner && !actor.isPlatformOwner) throw new ForbiddenException('Cannot modify platform owner');
+    // Sekali wewenangnya sendiri dicabut, pelakunya langsung kehilangan halaman
+    // ini dan tidak punya jalan untuk membatalkannya. Berlaku untuk siapa pun
+    // yang boleh mengubah role, bukan hanya pemilik akun pertama.
+    if (id === actor.sub && ((input.role !== undefined && !isAdminRole(input.role)) || input.isAdmin === false)) {
+      throw new ConflictException('Cannot revoke your own admin access');
+    }
 
     const data: Prisma.UserUpdateInput = {};
     if (input.displayName !== undefined) data.displayName = input.displayName.trim();
