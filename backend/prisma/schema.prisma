@@ -353,6 +353,11 @@ model UnitKerja {
   categories  DocumentCategory[] @relation("CategoryAccess")
 
   @@unique([workspaceId, code])
+  // Nama ikut dikunci, bukan hanya kode. Yang dilihat dan dipilih orang di
+  // dropdown adalah namanya; dua baris bernama sama — pernah terjadi, dengan
+  // kode berbeda — tampil sebagai dua pilihan yang tak bisa dibedakan, dan
+  // memilih yang salah berarti pegawainya tidak melihat dokumen unitnya.
+  @@unique([workspaceId, name])
   @@index([name])
   @@map("unit_kerja")
 }
