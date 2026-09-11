@@ -16,7 +16,7 @@ import type { ApiUnitKerja, ApiUser } from '@/api/types'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `${pdfWorker}?v=2`
 
 function PdfReader({ source, title, onError }: { source: string; title: string; onError: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null)
