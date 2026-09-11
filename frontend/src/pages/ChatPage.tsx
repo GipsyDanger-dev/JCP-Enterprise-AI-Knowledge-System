@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ArrowUpRight, FileText, Loader2, MessageSquareText, Plus, Send, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, ArrowUpRight, FileText, Loader2, Maximize2, MessageSquareText, Minimize2, Plus, Send, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { SourceCard } from '@/components/SourceCard'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
@@ -128,6 +128,7 @@ export function ChatPage() {
   const [sourcePreviewLoading, setSourcePreviewLoading] = useState(false)
   const [sourcePdfUrl, setSourcePdfUrl] = useState<string | null>(null)
   const [sourcePdfLoading, setSourcePdfLoading] = useState(false)
+  const [sourceExpanded, setSourceExpanded] = useState(false)
 
   useEffect(() => {
     if (!selectedSource) {
@@ -148,7 +149,7 @@ export function ChatPage() {
       getDocumentBlob(selectedSource.documentId, token ?? undefined)
         .then((blob) => {
           objectUrl = URL.createObjectURL(blob)
-          if (!cancelled) setSourcePdfUrl(`${objectUrl}#page=${selectedSource.pageNumber ?? 1}`)
+          if (!cancelled) setSourcePdfUrl(objectUrl)
         })
         .catch(() => { if (!cancelled) setSourcePdfUrl(null) })
         .finally(() => { if (!cancelled) setSourcePdfLoading(false) })
@@ -176,6 +177,10 @@ export function ChatPage() {
   }, [selectedSource, token])
 
   const evidencePreview = sourcePreviewText ? formatEvidencePreview(sourcePreviewText, selectedSourceQuestion) : null
+
+  const sourcePdfSrc = sourcePdfUrl
+    ? `${sourcePdfUrl}#page=${selectedSource?.pageNumber ?? 1}&view=FitH`
+    : null
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -238,22 +243,32 @@ export function ChatPage() {
         </button>
       </form>
       {selectedSource && (
-        <div className="source-preview-backdrop" role="presentation" onClick={() => setSelectedSource(null)}>
-          <section className="source-preview" role="dialog" aria-modal="true" aria-label="Source preview" onClick={(event) => event.stopPropagation()}>
+        <div className={`source-preview-backdrop ${sourceExpanded ? 'is-expanded' : ''}`} role="presentation" onClick={() => { setSourceExpanded(false); setSelectedSource(null) }}>
+          <section className={`source-preview ${sourceExpanded ? 'is-expanded' : ''}`} role="dialog" aria-modal="true" aria-label="Source preview" onClick={(event) => event.stopPropagation()}>
             <header>
-              <span><FileText size={18} /> {isId ? 'Sumber jawaban' : 'Answer source'}</span>
-              <button type="button" className="icon-button" title="Close" onClick={() => { setSelectedSourceQuestion(null); setSelectedSource(null) }}><X size={18} /></button>
+              <span><FileText size={18} /> {sourceExpanded ? documentLabel(selectedSource) : (isId ? 'Sumber jawaban' : 'Answer source')}</span>
+              <div className="source-preview-actions">
+                <button
+                  type="button"
+                  className="icon-button"
+                  title={sourceExpanded ? (isId ? 'Perkecil jendela' : 'Shrink window') : (isId ? 'Perbesar jendela' : 'Enlarge window')}
+                  onClick={() => setSourceExpanded((value) => !value)}
+                >
+                  {sourceExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </button>
+                <button type="button" className="icon-button" title="Close" onClick={() => { setSourceExpanded(false); setSelectedSourceQuestion(null); setSelectedSource(null) }}><X size={18} /></button>
+              </div>
             </header>
             <strong>{documentLabel(selectedSource)}</strong>
             <small>{[selectedSource.sectionTitle, selectedSource.pageNumber ? `Page ${selectedSource.pageNumber}` : null, selectedSource.version].filter(Boolean).join(' · ')}</small>
             {sourcePdfLoading && <div className="source-preview-loading">{isId ? 'Memuat PDF asli...' : 'Loading original PDF...'}</div>}
-            {sourcePdfUrl ? (
+            {sourcePdfSrc ? (
               <div className="source-preview-pdf">
-                <div className="source-preview-evidence">
-                  <span>{isId ? 'Bukti yang digunakan untuk jawaban' : 'Evidence used for this answer'}</span>
-                  <mark>{evidencePreview || (isId ? 'Cuplikan citation tidak tersedia.' : 'Citation excerpt is unavailable.')}</mark>
-                </div>
-                <iframe title={`${documentLabel(selectedSource)} page ${selectedSource.pageNumber ?? 1}`} src={sourcePdfUrl} />
+                <iframe
+                  key={String(sourceExpanded)}
+                  title={`${documentLabel(selectedSource)} page ${selectedSource.pageNumber ?? 1}`}
+                  src={sourcePdfSrc}
+                />
               </div>
             ) : (
               <blockquote>{sourcePreviewLoading ? (isId ? 'Memuat cuplikan...' : 'Loading excerpt...') : evidencePreview || (isId ? 'Cuplikan tidak tersedia untuk sumber ini.' : 'No excerpt is available for this source.')}</blockquote>
