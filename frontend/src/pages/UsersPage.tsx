@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Camera, Check, ChevronDown, Loader2, Pencil, Plus, UserX, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
+import { useConfirm } from '@/components/ConfirmDialog'
 import { errorMessage } from '@/api/client'
 import { changePassword, createUser, deleteUser, getUserReferenceData, listUsers, updateUser } from '@/api/users'
 import { userInitials, userRoleLabel } from '@/utils/users'
@@ -58,6 +59,7 @@ function kodeDariNama(nama: string, sudahDipakai: string[]): string {
 
 export function UsersPage() {
   const { token, user: currentUser } = useAuth()
+  const { tanya, dialog: dialogKonfirmasi } = useConfirm()
   const { language } = useWorkspace()
   const isId = language === 'id'
   const [users, setUsers] = useState<ApiUser[]>([])
@@ -193,10 +195,16 @@ export function UsersPage() {
   }
 
   const handleDelete = async (user: ApiUser) => {
-    const msg = isId
-      ? `Nonaktifkan ${user.displayName}?\n\nPengguna ini tidak akan bisa login lagi.`
-      : `Deactivate ${user.displayName}?\n\nThis user will no longer be able to log in.`
-    if (!confirm(msg)) return
+    const setuju = await tanya({
+      title: isId ? 'Nonaktifkan pengguna' : 'Deactivate user',
+      body: isId
+        ? <><strong>{user.displayName}</strong> tidak akan bisa login lagi. Dokumen, pengumuman, dan jejak aktivitasnya tetap tersimpan.</>
+        : <><strong>{user.displayName}</strong> will no longer be able to log in. Their documents, announcements, and activity trail stay intact.</>,
+      confirmLabel: isId ? 'Nonaktifkan' : 'Deactivate',
+      cancelLabel: isId ? 'Batal' : 'Cancel',
+      tone: 'danger',
+    })
+    if (!setuju) return
     try {
       await deleteUser(user.id, token ?? undefined)
       setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, isActive: false } : u))
@@ -634,6 +642,7 @@ export function UsersPage() {
           </div>
         </div>
       )}
+      {dialogKonfirmasi}
     </div>
   )
 }
