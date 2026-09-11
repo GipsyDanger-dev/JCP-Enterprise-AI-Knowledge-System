@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Camera, Check, ChevronDown, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Camera, Check, ChevronDown, Loader2, Pencil, Plus, UserX, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { errorMessage } from '@/api/client'
 import { changePassword, createUser, deleteUser, getUserReferenceData, listUsers, updateUser } from '@/api/users'
@@ -354,8 +354,8 @@ export function UsersPage() {
                       <button className="icon-button" title={isId ? `Edit ${user.displayName}` : `Edit ${user.displayName}`} onClick={() => openEdit(user)}>
                         <Pencil size={15} />
                       </button>
-                      <button className="icon-button" title={isId ? `Hapus ${user.displayName}` : `Delete ${user.displayName}`} onClick={() => handleDelete(user)}>
-                        <Trash2 size={15} />
+                      <button className="icon-button" title={isId ? `Nonaktifkan ${user.displayName}` : `Deactivate ${user.displayName}`} onClick={() => handleDelete(user)}>
+                        <UserX size={15} />
                       </button>
                     </div>
                   </td>
