@@ -57,7 +57,7 @@ function kodeDariNama(nama: string, sudahDipakai: string[]): string {
 }
 
 export function UsersPage() {
-  const { token } = useAuth()
+  const { token, user: currentUser } = useAuth()
   const { language } = useWorkspace()
   const isId = language === 'id'
   const [users, setUsers] = useState<ApiUser[]>([])
@@ -326,7 +326,19 @@ export function UsersPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr><td colSpan={5} className="empty-row">Tidak ada pengguna ditemukan.</td></tr>
-              ) : filtered.map((user) => (
+              ) : filtered.map((user) => {
+                // Menonaktifkan diri sendiri langsung mengunci pelakunya keluar, dan
+                // akun pemilik platform (maintainer sistem, bukan admin perusahaan)
+                // dilindungi backend. Keduanya sudah ditolak di sana; di sini tombolnya
+                // dimatikan supaya alasannya terbaca sebelum diklik.
+                const diriSendiri = currentUser?.id === user.id
+                const pemilikPlatform = user.isPlatformOwner === true
+                const alasanTerkunci = diriSendiri
+                  ? (isId ? 'Tidak bisa menonaktifkan akun sendiri' : 'You cannot deactivate your own account')
+                  : pemilikPlatform
+                    ? (isId ? 'Akun pemilik platform tidak bisa dinonaktifkan' : 'The platform owner account cannot be deactivated')
+                    : null
+                return (
                 <tr key={user.id}>
                   <td>
                     <div className="person-cell">
@@ -354,13 +366,14 @@ export function UsersPage() {
                       <button className="icon-button" title={isId ? `Edit ${user.displayName}` : `Edit ${user.displayName}`} onClick={() => openEdit(user)}>
                         <Pencil size={15} />
                       </button>
-                      <button className="icon-button" title={isId ? `Nonaktifkan ${user.displayName}` : `Deactivate ${user.displayName}`} onClick={() => handleDelete(user)}>
+                      <button className="icon-button" disabled={alasanTerkunci !== null} title={alasanTerkunci ?? (isId ? `Nonaktifkan ${user.displayName}` : `Deactivate ${user.displayName}`)} onClick={() => handleDelete(user)}>
                         <UserX size={15} />
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -455,7 +468,7 @@ export function UsersPage() {
                 <div className="auth-field">
                   <label>{isId ? 'Role' : 'Role'}</label>
                   <div className="select-wrapper">
-                    <select value={editRole} onChange={(e) => setEditRole(e.target.value as ApiRole)}>
+                    <select value={editRole} onChange={(e) => setEditRole(e.target.value as ApiRole)} disabled={currentUser?.id === editingUser.id}>
                       {roleLabels.map((item) => (
                         <option key={item.role} value={item.role}>{item.label}</option>
                       ))}
@@ -468,6 +481,15 @@ export function UsersPage() {
                     </select>
                     <ChevronDown size={15} className="select-icon" />
                   </div>
+                  {/* Menurunkan role sendiri mencabut akses ke halaman ini tanpa jalan
+                      kembali, jadi pilihannya dikunci — bukan dibiarkan lalu ditolak. */}
+                  {currentUser?.id === editingUser.id && (
+                    <p className="field-hint">
+                      {isId
+                        ? 'Role akun sendiri tidak bisa diubah. Minta admin lain kalau perlu diturunkan.'
+                        : 'You cannot change your own role. Ask another admin if it needs lowering.'}
+                    </p>
+                  )}
                 </div>
 
                 <div className="auth-field">
