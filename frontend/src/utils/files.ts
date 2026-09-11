@@ -3,9 +3,11 @@ import type { AttachmentType, MessageAttachment } from '@/api/types'
 export const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 let attachSeq = 1000
 
+const RENDERABLE_IMAGE_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp'])
+
 /** Check if a file is an image by MIME type */
 export function isImageFile(file: File): boolean {
-  return file.type.startsWith('image/')
+  return RENDERABLE_IMAGE_TYPES.has(file.type)
 }
 
 /** Get attachment type from file */

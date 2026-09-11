@@ -10,7 +10,7 @@ import { isNotificationsEnabled, setNotificationsEnabled, isBrowserNotifications
 
 const THEME_KEY = 'jcp-theme'
 const FONT_SIZE_KEY = 'jcp-font-size'
-type FontSize = 'small' | 'medium' | 'large'
+type FontSize = 'small' | 'medium' | 'large' | 'super-large'
 
 function getStoredTheme(): 'light' | 'dark' {
   const v = localStorage.getItem(THEME_KEY)
@@ -20,7 +20,9 @@ function getStoredTheme(): 'light' | 'dark' {
 
 function getStoredFontSize(): FontSize {
   const value = localStorage.getItem(FONT_SIZE_KEY)
-  return value === 'medium' || value === 'large' ? value : 'small'
+  return value === 'small' || value === 'medium' || value === 'large' || value === 'super-large'
+    ? value
+    : 'medium'
 }
 
 export function SettingsPage() {
@@ -276,6 +278,7 @@ export function SettingsPage() {
                   ['small', isId ? 'Kecil' : 'Small', 'A'],
                   ['medium', isId ? 'Sedang' : 'Medium', 'A'],
                   ['large', isId ? 'Besar' : 'Large', 'A'],
+                  ['super-large', isId ? 'Sangat besar' : 'Super large', 'A'],
                 ] as const).map(([value, label, sample]) => (
                   <button
                     key={value}

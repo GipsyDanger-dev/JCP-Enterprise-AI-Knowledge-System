@@ -4,6 +4,7 @@ export interface Announcement {
   id: string
   title: string
   body: string
+  imageDataUrl: string | null
   isActive: boolean
   publishedAt: string
   createdAt: string
@@ -36,8 +37,8 @@ export interface AnnouncementReadReport {
 }
 
 export const listAnnouncements = (token?: string) => request<Announcement[]>('/announcements', { headers: authHeaders(token) })
-export const createAnnouncement = (input: Pick<Announcement, 'title' | 'body'>, token?: string) => request<Announcement>('/announcements', { method: 'POST', body: input, headers: authHeaders(token) })
-export const updateAnnouncement = (id: string, input: Partial<Pick<Announcement, 'title' | 'body' | 'isActive'>>, token?: string) => request<Announcement>(`/announcements/${id}`, { method: 'PATCH', body: input, headers: authHeaders(token) })
+export const createAnnouncement = (input: Pick<Announcement, 'title' | 'body' | 'imageDataUrl'>, token?: string) => request<Announcement>('/announcements', { method: 'POST', body: input, headers: authHeaders(token) })
+export const updateAnnouncement = (id: string, input: Partial<Pick<Announcement, 'title' | 'body' | 'imageDataUrl' | 'isActive'>>, token?: string) => request<Announcement>(`/announcements/${id}`, { method: 'PATCH', body: input, headers: authHeaders(token) })
 /** Hapus permanen; bukti bacanya ikut terhapus. Untuk sekadar menyembunyikan, pakai updateAnnouncement({ isActive: false }). */
 export const deleteAnnouncement = (id: string, token?: string) => request<{ id: string; deleted: boolean }>(`/announcements/${id}`, { method: 'DELETE', headers: authHeaders(token) })
 export const getAnnouncementUnreadCount = (token?: string) => request<{ count: number; latestTitle: string | null }>('/announcements/unread', { headers: authHeaders(token) })

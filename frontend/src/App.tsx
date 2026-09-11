@@ -29,7 +29,10 @@ function ThemeInitializer() {
       document.documentElement.setAttribute('data-theme', stored)
     }
     const fontSize = localStorage.getItem('jcp-font-size')
-    document.documentElement.setAttribute('data-font-size', fontSize === 'medium' || fontSize === 'large' ? fontSize : 'small')
+    const resolvedFontSize = fontSize === 'small' || fontSize === 'medium' || fontSize === 'large' || fontSize === 'super-large'
+      ? fontSize
+      : 'medium'
+    document.documentElement.setAttribute('data-font-size', resolvedFontSize)
   }, [])
   return null
 }

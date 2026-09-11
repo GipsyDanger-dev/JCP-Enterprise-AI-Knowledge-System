@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { Archive, Check, CheckCheck, Loader2, Megaphone, Pencil, Plus, RotateCcw, Send, Trash2, Users, X } from 'lucide-react'
+import { Archive, Check, CheckCheck, ImagePlus, Loader2, Megaphone, Pencil, Plus, RotateCcw, Send, Trash2, Users, X } from 'lucide-react'
 import {
   createAnnouncement,
   deleteAnnouncement,
@@ -16,6 +16,7 @@ import { errorMessage } from '@/api/client'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
+import { fileToAttachment, isImageFile } from '@/utils/files'
 
 const formatPublishedAt = (value: string, isId: boolean) => new Date(value).toLocaleDateString(isId ? 'id-ID' : 'en-US', {
   day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -48,20 +49,42 @@ function AnnouncementForm({ heading, submitLabel, submitIcon, initial, saving, i
   heading: string
   submitLabel: string
   submitIcon: ReactNode
-  initial?: { title: string; body: string }
+  initial?: { title: string; body: string; imageDataUrl: string | null }
   saving: boolean
   isId: boolean
   inline?: boolean
-  onSubmit: (values: { title: string; body: string }) => void
+  onSubmit: (values: { title: string; body: string; imageDataUrl: string | null }) => void
   onCancel: () => void
 }) {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [body, setBody] = useState(initial?.body ?? '')
+  const [imageDataUrl, setImageDataUrl] = useState(initial?.imageDataUrl ?? null)
+  const [imageName, setImageName] = useState('')
+  const [imageError, setImageError] = useState<string | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  const selectImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!isImageFile(file)) {
+      setImageError(isId ? 'Gunakan gambar PNG, JPG, WebP, GIF, atau AVIF.' : 'Use a PNG, JPG, WebP, GIF, or AVIF image.')
+      return
+    }
+    try {
+      const attachment = await fileToAttachment(file)
+      setImageDataUrl(attachment.dataUrl)
+      setImageName(file.name)
+      setImageError(null)
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : (isId ? 'Gambar tidak dapat diproses.' : 'The image could not be processed.'))
+    }
+  }
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (!title.trim() || !body.trim()) return
-    onSubmit({ title: title.trim(), body: body.trim() })
+    onSubmit({ title: title.trim(), body: body.trim(), imageDataUrl })
   }
 
   return (
@@ -69,6 +92,16 @@ function AnnouncementForm({ heading, submitLabel, submitIcon, initial, saving, i
       <div className="announcement-composer-head"><Megaphone size={19} /><strong>{heading}</strong></div>
       <label>{isId ? 'Judul' : 'Title'}<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={180} autoFocus /></label>
       <label>{isId ? 'Isi pengumuman' : 'Message'}<textarea value={body} onChange={(event) => setBody(event.target.value)} maxLength={4000} rows={5} /></label>
+      <div className="announcement-image-field">
+        <span>{isId ? 'Gambar (opsional)' : 'Image (optional)'}</span>
+        <input ref={imageInputRef} type="file" accept="image/avif,image/gif,image/jpeg,image/png,image/webp" onChange={selectImage} hidden />
+        {imageDataUrl ? <div className="announcement-image-picker-preview">
+          <img src={imageDataUrl} alt="" />
+          <span>{imageName || (isId ? 'Gambar pengumuman' : 'Announcement image')}</span>
+          <button type="button" className="icon-button" title={isId ? 'Hapus gambar' : 'Remove image'} aria-label={isId ? 'Hapus gambar' : 'Remove image'} onClick={() => { setImageDataUrl(null); setImageName(''); setImageError(null) }}><X size={16} /></button>
+        </div> : <button type="button" className="announcement-image-picker" onClick={() => imageInputRef.current?.click()}><ImagePlus size={17} />{isId ? 'Tambahkan gambar' : 'Add image'}</button>}
+        {imageError && <small className="announcement-image-error" role="alert">{imageError}</small>}
+      </div>
       <div className="announcement-composer-actions">
         <button type="button" className="secondary-button" onClick={onCancel} disabled={saving}>{isId ? 'Batal' : 'Cancel'}</button>
         <button className="primary-button" disabled={saving || !title.trim() || !body.trim()}>{saving ? <Loader2 size={17} className="spin" /> : submitIcon}{submitLabel}</button>
@@ -147,7 +180,7 @@ export function AnnouncementsPage() {
   // dan bukti bacanya tercatat per pengumuman di server.
   useEffect(() => { markAnnouncementsSeen() }, [markAnnouncementsSeen])
 
-  const publish = async (values: { title: string; body: string }) => {
+  const publish = async (values: { title: string; body: string; imageDataUrl: string | null }) => {
     if (!token) return
     setSaving(true)
     setError(null)
@@ -164,7 +197,7 @@ export function AnnouncementsPage() {
 
   const replaceInList = (updated: Announcement) => setAnnouncements((items) => items.map((item) => item.id === updated.id ? updated : item))
 
-  const saveEdit = async (announcement: Announcement, values: { title: string; body: string }) => {
+  const saveEdit = async (announcement: Announcement, values: { title: string; body: string; imageDataUrl: string | null }) => {
     if (!token) return
     setBusyId(announcement.id)
     setError(null)
@@ -284,14 +317,14 @@ export function AnnouncementsPage() {
         {announcements.map((announcement) => {
           const editing = canManage && editingId === announcement.id
           const busy = busyId === announcement.id
-          return <article key={announcement.id} className={`announcement-card${!announcement.isActive && !editing ? ' archived' : ''}`}>
+          return <article key={announcement.id} className={`announcement-card${!announcement.isActive && !editing ? ' archived' : ''}${announcement.imageDataUrl && !editing ? ' with-image' : ''}`}>
             <span className="announcement-icon">{editing ? <Pencil size={19} /> : <Megaphone size={19} />}</span>
             {editing ? <AnnouncementForm
               inline
               heading={isId ? 'Sunting pengumuman' : 'Edit announcement'}
               submitLabel={isId ? 'Simpan perubahan' : 'Save changes'}
               submitIcon={<Check size={17} />}
-              initial={{ title: announcement.title, body: announcement.body }}
+              initial={{ title: announcement.title, body: announcement.body, imageDataUrl: announcement.imageDataUrl }}
               saving={busy}
               isId={isId}
               onSubmit={(values) => saveEdit(announcement, values)}
@@ -303,6 +336,7 @@ export function AnnouncementsPage() {
                   {isId ? `${announcement.readCount ?? 0} orang sudah membaca` : `Read by ${announcement.readCount ?? 0}`}
                 </button>}
               </div>
+              {announcement.imageDataUrl && <figure className="announcement-image"><img src={announcement.imageDataUrl} alt={isId ? `Gambar untuk pengumuman ${announcement.title}` : `Image for announcement ${announcement.title}`} /></figure>}
               {canManage && <div className="announcement-actions">
                 <button className="icon-button" disabled={busy} title={isId ? 'Sunting pengumuman' : 'Edit announcement'} onClick={() => setEditingId(announcement.id)}><Pencil size={17} /></button>
                 <button className="icon-button" disabled={busy} title={announcement.isActive ? (isId ? 'Arsipkan pengumuman' : 'Archive announcement') : (isId ? 'Aktifkan pengumuman' : 'Restore announcement')} onClick={() => toggleActive(announcement)}>{announcement.isActive ? <Archive size={17} /> : <RotateCcw size={17} />}</button>
