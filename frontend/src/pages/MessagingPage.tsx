@@ -105,6 +105,7 @@ export function MessagingPage() {
       setMessages((prev) => prev.some((existing) => existing.id === msg.id) ? prev : [...prev, msg])
     } catch (err) {
       setError(errorMessage(err))
+      throw err
     } finally {
       setSending(false)
     }

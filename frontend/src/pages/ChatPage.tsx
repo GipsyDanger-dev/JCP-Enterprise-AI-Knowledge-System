@@ -12,6 +12,7 @@ import type { ChatMessage } from '@/context/workspaceContextValue'
 type Citation = ChatMessage['citations'][number]
 
 const COMMON_QUERY_WORDS = new Set(['yang', 'dengan', 'untuk', 'dalam', 'tentang', 'pada', 'dari', 'atau', 'dan', 'saya', 'kami', 'bisa', 'bagaimana', 'berapa', 'apakah', 'tolong', 'dokumen', 'perusahaan'])
+const NO_ANSWER_TEXT = 'Informasi tidak ditemukan pada dokumen yang tersedia.'
 
 function formatEvidencePreview(excerpt: string, question: string | null) {
   const normalized = excerpt
@@ -90,6 +91,8 @@ function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: {
 }
 
 function renderAnswer(answer: string) {
+  if (answer.trim() === NO_ANSWER_TEXT) return <strong>{answer}</strong>
+
   return answer.split(/\r?\n/).map((line, lineIndex) => {
     const parts = line.split(/(\*\*[^*]+\*\*)/g)
     return (

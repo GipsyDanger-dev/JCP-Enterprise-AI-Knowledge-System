@@ -903,8 +903,9 @@ button { cursor: pointer; }
 .doc-viewer { width: min(960px, 100%); height: min(90vh, 100%); background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,.25); animation: slideUp .2s ease; }
 .doc-viewer-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 28px; border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 16px; }
 .doc-viewer-title { display: flex; align-items: flex-start; gap: 14px; flex: 1; min-width: 0; }
+.doc-viewer-title > div { flex: 1 1 auto; min-width: 0; }
 .doc-viewer-title svg { color: var(--brand-600); margin-top: 2px; flex-shrink: 0; }
-.doc-viewer-title h2 { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-bold); color: var(--text-card); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-viewer-title h2 { min-width: 0; max-width: 100%; margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-bold); color: var(--text-card); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-viewer-meta { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: var(--fs-xs); color: var(--text-muted); flex-wrap: wrap; }
 .doc-viewer-meta .status-badge { font-size: 9px; padding: 2px 8px; }
 .doc-viewer-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
@@ -1444,6 +1445,13 @@ button { cursor: pointer; }
 
 /* ============ Responsive: mobile (≤760px) ============ */
 @media (max-width: 760px) {
+  .doc-viewer-overlay { padding: 10px; }
+  .doc-viewer { width: 100%; height: calc(100dvh - 20px); border-radius: 12px; }
+  .doc-viewer-header { align-items: flex-start; padding: 16px; gap: 12px; }
+  .doc-viewer-title { gap: 10px; }
+  .doc-viewer-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .doc-viewer-content { padding: 16px; }
+
   /* Login */
   .login-centered { display: block; height: 100dvh; min-height: 100dvh; overflow: hidden; }
   .login-workspace { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 100dvh; overflow: hidden; isolation: isolate; background: #ddd9d2; }
@@ -1669,6 +1677,13 @@ button { cursor: pointer; }
 .announcement-composer label { display: grid; gap: 7px; margin-top: 13px; color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--fw-heavy); }
 .announcement-composer input, .announcement-composer textarea { width: 100%; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-card); color: var(--text-strong); font: inherit; padding: 11px 12px; resize: vertical; }
 .announcement-composer input:focus, .announcement-composer textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.announcement-image-field { display: grid; gap: 8px; margin-top: 13px; color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--fw-heavy); }
+.announcement-image-picker { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: fit-content; min-height: 38px; border: 1px dashed var(--border-strong); border-radius: 6px; background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-heavy); padding: 8px 12px; cursor: pointer; }
+.announcement-image-picker:hover { border-color: var(--accent); color: var(--accent); }
+.announcement-image-picker-preview { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; align-items: center; gap: 11px; min-height: 76px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); padding: 8px; }
+.announcement-image-picker-preview img { display: block; width: 96px; height: 60px; border-radius: 4px; object-fit: cover; }
+.announcement-image-picker-preview span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-body); font-weight: var(--fw-normal); }
+.announcement-image-error { color: var(--danger); font-size: var(--fs-xs); font-weight: var(--fw-normal); }
 .announcement-composer-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
 /* Form sunting menumpang di dalam kartu, jadi bingkai dan jaraknya sendiri dilepas. */
 .announcement-composer.inline { grid-column: 2 / -1; margin: 0; border: 0; padding: 0; background: transparent; }
@@ -1687,6 +1702,8 @@ button { cursor: pointer; }
 .announcement-card.archived .announcement-meta b { color: var(--text-muted); }
 .announcement-content h2 { margin: 7px 0 6px; color: var(--text-strong); font-size: var(--fs-lg); line-height: 1.35; overflow-wrap: anywhere; }
 .announcement-content p { margin: 0; color: var(--text-body); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.announcement-image { display: grid; place-items: center; margin: 16px 0 0; overflow: hidden; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); }
+.announcement-image img { display: block; width: 100%; max-height: 520px; object-fit: contain; }
 .announcement-readers-toggle { display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; border: 1px solid var(--border-strong); border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--fs-xs); font-weight: var(--fw-heavy); padding: 6px 13px; cursor: pointer; }
 .announcement-readers-toggle:hover, .announcement-readers-toggle[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
 /* Panel laporan adalah anak keempat kartu; dibentangkan supaya tidak terjepit
@@ -1707,11 +1724,15 @@ button { cursor: pointer; }
 
 @media (max-width: 600px) {
   .announcement-composer, .announcement-card { padding: 14px; }
-  .announcement-card { gap: 10px; }
+  .announcement-card { grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+  .announcement-actions { grid-column: 2; justify-self: end; }
   .announcement-meta { gap: 5px 9px; }
   .announcement-composer-actions { flex-direction: column-reverse; }
   .announcement-composer.inline { padding: 0; }
   .announcement-composer-actions button { width: 100%; }
+  .announcement-image-picker-preview { grid-template-columns: 76px minmax(0, 1fr) auto; }
+  .announcement-image-picker-preview img { width: 76px; height: 54px; }
+  .announcement-image img { max-height: 360px; }
   .announcement-readers-columns { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 }
 

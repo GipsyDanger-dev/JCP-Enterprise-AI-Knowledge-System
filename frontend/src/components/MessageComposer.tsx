@@ -4,7 +4,7 @@ import { fileToAttachment, formatFileSize, getFileIcon } from '@/utils/files'
 import type { MessageAttachment } from '@/api/types'
 
 interface MessageComposerProps {
-  onSend: (content: string, attachments: MessageAttachment[]) => void
+  onSend: (content: string, attachments: MessageAttachment[]) => Promise<void>
   onTyping?: () => void
   disabled?: boolean
   placeholder?: string
@@ -47,12 +47,16 @@ export function MessageComposer({ onSend, onTyping, disabled, placeholder, isId 
     setAttachments((prev) => prev.filter((a) => a.id !== id))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if ((!input.trim() && attachments.length === 0) || disabled) return
-    onSend(input.trim(), [...attachments])
-    setInput('')
-    setAttachments([])
+    try {
+      await onSend(input.trim(), [...attachments])
+      setInput('')
+      setAttachments([])
+    } catch {
+      // The page displays the server error. Keep the draft and attachments so it can be retried.
+    }
   }
 
   const canSend = (input.trim() || attachments.length > 0) && !disabled && !uploading
@@ -88,7 +92,7 @@ export function MessageComposer({ onSend, onTyping, disabled, placeholder, isId 
           ref={fileInputRef}
           onChange={handleFileSelect}
           multiple
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+          accept="image/avif,image/gif,image/jpeg,image/png,image/webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
           style={{ display: 'none' }}
         />
         <button

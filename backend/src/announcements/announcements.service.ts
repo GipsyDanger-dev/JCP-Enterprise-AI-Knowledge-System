@@ -11,6 +11,7 @@ const ANNOUNCEMENT_SELECT = {
   id: true,
   title: true,
   body: true,
+  imageDataUrl: true,
   isActive: true,
   publishedAt: true,
   createdAt: true,
@@ -87,7 +88,13 @@ export class AnnouncementsService {
   async create(input: CreateAnnouncementDto, actor: AuthenticatedUser) {
     this.assertCanPublish(actor);
     const announcement = await this.prisma.announcement.create({
-      data: { title: input.title, body: input.body, createdById: actor.sub, workspaceId: actor.workspaceId },
+      data: {
+        title: input.title,
+        body: input.body,
+        imageDataUrl: input.imageDataUrl ?? null,
+        createdById: actor.sub,
+        workspaceId: actor.workspaceId,
+      },
       select: ANNOUNCEMENT_SELECT,
     });
     await this.notifyEveryone(announcement, actor.sub, actor.workspaceId);

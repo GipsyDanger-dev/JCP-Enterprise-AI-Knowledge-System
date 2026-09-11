@@ -1,6 +1,8 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+
+const ANNOUNCEMENT_IMAGE_PATTERN = /^data:image\/(?:avif|gif|jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
 export class CreateAnnouncementDto {
   @ApiProperty({ example: 'Perubahan jadwal operasional', maxLength: 180 })
@@ -16,4 +18,14 @@ export class CreateAnnouncementDto {
   @MinLength(3)
   @MaxLength(4000)
   body!: string;
+
+  @ApiPropertyOptional({
+    description: 'Gambar pengumuman dalam format data URL PNG, JPG, WebP, GIF, atau AVIF.',
+    maxLength: 14_000_000,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(14_000_000)
+  @Matches(ANNOUNCEMENT_IMAGE_PATTERN, { message: 'Gambar pengumuman harus berupa data gambar yang didukung' })
+  imageDataUrl?: string | null;
 }

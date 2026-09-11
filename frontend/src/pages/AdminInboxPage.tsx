@@ -38,6 +38,7 @@ export function AdminInboxPage() {
       setConversations(data)
     } catch (err) {
       setError(errorMessage(err))
+      throw err
     } finally {
       setLoading(false)
     }
