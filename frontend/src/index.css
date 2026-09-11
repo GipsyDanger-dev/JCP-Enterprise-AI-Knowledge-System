@@ -1694,18 +1694,22 @@ button { cursor: pointer; }
 .announcement-empty { min-height: 180px; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--text-muted); text-align: center; }
 .announcement-list { display: grid; gap: 10px; }
 .announcement-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: flex-start; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 18px; }
-.announcement-card.with-image { grid-template-columns: auto minmax(0, 1fr) minmax(220px, 32%) auto; }
+.announcement-card.with-image { grid-template-columns: auto minmax(0, 1fr) minmax(220px, 32%) auto; align-items: stretch; }
 .announcement-card.archived { opacity: .62; }
 .announcement-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .announcement-content { min-width: 0; }
+.announcement-card.with-image .announcement-content { display: flex; flex-direction: column; padding: 4px 2px 4px 0; }
 .announcement-meta { display: flex; flex-wrap: wrap; gap: 7px 12px; color: var(--text-muted); font-size: var(--fs-xs); }
 .announcement-meta b { color: var(--accent); font-weight: var(--fw-heavy); }
 .announcement-card.archived .announcement-meta b { color: var(--text-muted); }
 .announcement-content h2 { margin: 7px 0 6px; color: var(--text-strong); font-size: var(--fs-lg); line-height: 1.35; overflow-wrap: anywhere; }
 .announcement-content p { margin: 0; color: var(--text-body); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.announcement-image { align-self: stretch; min-height: 176px; margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); }
-.announcement-image img { display: block; width: 100%; height: 100%; min-height: 176px; object-fit: cover; }
+.announcement-card.with-image .announcement-content h2 { margin-top: 18px; font-size: var(--fs-xl); }
+.announcement-card.with-image .announcement-content p { max-width: 62ch; margin-top: 8px; }
+.announcement-image { align-self: stretch; min-height: 0; max-height: 320px; aspect-ratio: 4 / 3; margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); }
+.announcement-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .announcement-readers-toggle { display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; border: 1px solid var(--border-strong); border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--fs-xs); font-weight: var(--fw-heavy); padding: 6px 13px; cursor: pointer; }
+.announcement-card.with-image .announcement-readers-toggle { margin-top: auto; align-self: flex-start; }
 .announcement-readers-toggle:hover, .announcement-readers-toggle[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
 /* Panel laporan adalah anak keempat kartu; dibentangkan supaya tidak terjepit
    di kolom ikon saat grid membuat baris baru. */
@@ -1726,7 +1730,7 @@ button { cursor: pointer; }
 @media (max-width: 600px) {
   .announcement-composer, .announcement-card { padding: 14px; }
   .announcement-card { grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
-  .announcement-card.with-image .announcement-image { grid-column: 1 / -1; min-height: 200px; }
+  .announcement-card.with-image .announcement-image { grid-column: 1 / -1; min-height: 200px; max-height: none; }
   .announcement-actions { grid-column: 2; justify-self: end; }
   .announcement-meta { gap: 5px 9px; }
   .announcement-composer-actions { flex-direction: column-reverse; }
@@ -1734,6 +1738,8 @@ button { cursor: pointer; }
   .announcement-composer-actions button { width: 100%; }
   .announcement-image-picker-preview { grid-template-columns: 76px minmax(0, 1fr) auto; }
   .announcement-image-picker-preview img { width: 76px; height: 54px; }
+  .announcement-card.with-image .announcement-content { padding: 0; }
+  .announcement-card.with-image .announcement-content h2 { margin-top: 12px; font-size: var(--fs-lg); }
   .announcement-image img { min-height: 200px; }
   .announcement-readers-columns { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 }
