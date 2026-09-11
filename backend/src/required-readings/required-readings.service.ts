@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AccountType, DocumentStatus, NotificationType } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -20,7 +20,21 @@ function resolveDueAt(value?: string): Date {
 export class RequiredReadingsService {
   constructor(private readonly prisma: PrismaService, private readonly notifications: NotificationsService) {}
 
+  /**
+   * Boleh menugaskan bacaan wajib dan membaca laporan kepatuhannya.
+   *
+   * Sebelumnya murni milik admin. Sekarang jabatan tertentu bisa diberi centang
+   * yang sama dari halaman Orang & akses — pengawas internal perlu menugaskan
+   * bacaan tanpa harus diberi wewenang mengelola seluruh dokumen dan pengguna.
+   */
+  private assertCanAssign(actor: AuthenticatedUser) {
+    if (actor.accountType !== AccountType.COMPANY) throw new ForbiddenException('Company account required');
+    if (actor.isAdmin || actor.jabatan?.canAssignRequiredReadings) return;
+    throw new ForbiddenException('Jabatan Anda tidak diberi wewenang menugaskan bacaan wajib');
+  }
+
   async assign(documentId: string, userIds: string[], actor: AuthenticatedUser, dueAtInput?: string) {
+    this.assertCanAssign(actor);
     if (!Array.isArray(userIds) || userIds.some((id) => typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id))) throw new BadRequestException('Invalid employee IDs');
     const uniqueUserIds = [...new Set(userIds)];
     if (uniqueUserIds.length === 0) throw new BadRequestException('Select at least one active employee');
@@ -68,6 +82,7 @@ export class RequiredReadingsService {
   }
 
   async report(actor: AuthenticatedUser) {
+    this.assertCanAssign(actor);
     const now = new Date();
     const items = await this.prisma.requiredReading.findMany({ where: { document: { workspaceId: actor.workspaceId }, user: { workspaceId: actor.workspaceId } }, select: { userId: true, progress: true, dueAt: true, completedAt: true, user: { select: { displayName: true, employeeNumber: true, division: true, jobTitle: true } }, document: { select: { id: true, title: true } } } });
     const map = new Map<string, { documentId: string; title: string; total: number; completed: number; overdue: number; readers: Array<Record<string, unknown>> }>();

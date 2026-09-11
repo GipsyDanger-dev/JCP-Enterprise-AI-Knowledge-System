@@ -35,16 +35,16 @@ export class AnnouncementsController {
   @Get(':id/readers')
   @ApiOperation({ summary: 'Daftar pegawai yang sudah dan belum membaca pengumuman' })
   @ApiOkResponse({ description: 'Pembaca beserta waktu bacanya, dan yang belum membaca' })
-  @ApiForbiddenResponse({ description: 'Bukan admin maupun jabatan yang berhak menerbitkan pengumuman' })
+  @ApiForbiddenResponse({ description: 'Jabatannya tidak diberi wewenang atas pengumuman' })
   readers(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string, @CurrentUser() actor: AuthenticatedUser) {
     return this.announcements.readers(id, actor);
   }
 
-  // Tanpa @AdminOnly: jabatan pimpinan (lihat JABATAN_PENERBIT_PENGUMUMAN) juga
-  // boleh menerbitkan. Batasnya ditegakkan di service karena bergantung pada
-  // jabatan pengguna, bukan sekadar flag admin yang dikenali RolesGuard.
+  // Tanpa @AdminOnly: jabatan yang dicentang "boleh kelola pengumuman" juga
+  // berhak. Batasnya ditegakkan di service karena bergantung pada baris jabatan
+  // pengguna, bukan sekadar flag admin yang dikenali RolesGuard.
   @Post()
-  @ApiForbiddenResponse({ description: 'Bukan admin maupun jabatan yang berhak menerbitkan pengumuman' })
+  @ApiForbiddenResponse({ description: 'Jabatannya tidak diberi wewenang atas pengumuman' })
   create(@Body() input: CreateAnnouncementDto, @CurrentUser() actor: AuthenticatedUser) { return this.announcements.create(input, actor); }
 
   @Patch(':id')

@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
-import { AdminOnly } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { RequiredReadingsService } from './required-readings.service';
@@ -11,8 +10,10 @@ import { RequiredReadingsService } from './required-readings.service';
 export class RequiredReadingsController {
   constructor(private readonly service: RequiredReadingsService) {}
 
+  // Tanpa @AdminOnly: jabatan yang dicentang "boleh tugaskan bacaan wajib" juga
+  // berhak. Batasnya ditegakkan di service karena bergantung pada baris jabatan
+  // pengguna, bukan sekadar flag admin yang dikenali RolesGuard.
   @Post('documents/:documentId/assign')
-  @AdminOnly()
   assign(@Param('documentId', new ParseUUIDPipe({ version: '4' })) id: string, @Body() body: { userIds?: string[]; dueAt?: string }, @CurrentUser() actor: AuthenticatedUser) {
     return this.service.assign(id, body.userIds ?? [], actor, body.dueAt);
   }
@@ -31,6 +32,5 @@ export class RequiredReadingsController {
   }
 
   @Get('report')
-  @AdminOnly()
   report(@CurrentUser() actor: AuthenticatedUser) { return this.service.report(actor); }
 }
