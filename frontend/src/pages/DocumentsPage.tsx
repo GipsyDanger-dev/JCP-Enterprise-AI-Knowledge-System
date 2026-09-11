@@ -8,6 +8,7 @@ import { DocumentAccessModal } from '@/components/DocumentAccessModal'
 import { downloadDocument, getDocumentBlob, getDocumentChunks, listDocumentCategories, updateDocument, updateDocumentAccess, type DocumentChunk } from '@/api/documents'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
+import { useScrollToError } from '@/hooks/useScrollToError'
 import type { DocumentItem } from '@/types/domain'
 import type { ApiDocumentCategory } from '@/api/types'
 import { assignRequiredReading, completeRequiredReading, listMyRequiredReadings, requiredReadingReport, updateRequiredReadingProgress, type RequiredReadingReport } from '@/api/requiredReadings'
@@ -230,6 +231,7 @@ export function DocumentsPage() {
   const [renameTitle, setRenameTitle] = useState('')
   const [renameSaving, setRenameSaving] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
+  const renameErrorRef = useScrollToError<HTMLDivElement>(renameError)
   const [deleteDoc, setDeleteDoc] = useState<{ id: string; name: string } | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const canManage = role === 'admin' || isPersonal || user?.role === 'ADMIN_UNIT'
@@ -277,6 +279,7 @@ export function DocumentsPage() {
   const [accessUnitId, setAccessUnitId] = useState('')
   const [accessSaving, setAccessSaving] = useState(false)
   const [accessError, setAccessError] = useState<string | null>(null)
+  const accessErrorRef = useScrollToError<HTMLDivElement>(accessError)
   const [unitKerjaList, setUnitKerjaList] = useState<ApiUnitKerja[]>([])
 
   useEffect(() => {
@@ -532,7 +535,7 @@ export function DocumentsPage() {
         }}>
           <div className="modal-header"><h2>{isId ? 'Ubah nama dokumen' : 'Rename document'}</h2><button type="button" className="icon-button" aria-label={isId ? 'Tutup' : 'Close'} disabled={renameSaving} onClick={() => setRenameDoc(null)}><X size={18} /></button></div>
           <div className="modal-body">
-            {renameError && <div className="upload-error-msg" role="alert">{renameError}</div>}
+            {renameError && <div className="upload-error-msg" role="alert" ref={renameErrorRef}>{renameError}</div>}
             <div className="upload-field">
               <label htmlFor="rename-document-title">{isId ? 'Nama dokumen' : 'Document title'}</label>
               <input id="rename-document-title" required maxLength={255} value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} autoFocus />
@@ -614,7 +617,7 @@ export function DocumentsPage() {
                     : 'Locked means only that unit can open the document and get answers from it in the AI assistant. Uncheck to reopen it to every employee.'}
                 </p>
               </div>
-              {accessError && <div className="upload-error-msg" role="alert">{accessError}</div>}
+              {accessError && <div className="upload-error-msg" role="alert" ref={accessErrorRef}>{accessError}</div>}
             </div>
             <div className="modal-actions">
               <button className="secondary-button" onClick={() => setAccessDoc(null)} disabled={accessSaving}>{isId ? 'Batal' : 'Cancel'}</button>

@@ -13,6 +13,7 @@ import type { OrganizationSection } from '@/components/OrganizationManager'
 import type { ApiUser, ApiRole, ApiRoleLabel, ApiJabatan, ApiUnitKerja } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
+import { useScrollToError } from '@/hooks/useScrollToError'
 
 // 'employee' sengaja bukan nilai role: yang dimaksud tombolnya adalah "semua
 // yang bukan admin", termasuk akun lama dengan role warisan.
@@ -80,6 +81,7 @@ export function UsersPage() {
   const [formPassword, setFormPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const formErrorRef = useScrollToError<HTMLDivElement>(formError)
 
   const [editingUser, setEditingUser] = useState<ApiUser | null>(null)
   const [editName, setEditName] = useState('')
@@ -92,6 +94,7 @@ export function UsersPage() {
   const [editPassword, setEditPassword] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const editErrorRef = useScrollToError<HTMLDivElement>(editError)
   const editPhotoRef = useRef<HTMLInputElement>(null)
 
   const loadUsers = useCallback(async () => {
@@ -373,7 +376,7 @@ export function UsersPage() {
             </div>
             <form onSubmit={handleEdit}>
               <div className="modal-body">
-                {editError && <div className="auth-error">{editError}</div>}
+                {editError && <div className="auth-error" role="alert" ref={editErrorRef}>{editError}</div>}
 
                 <div className="auth-field">
                   <label>{isId ? 'Nama' : 'Name'}</label>
@@ -516,7 +519,7 @@ export function UsersPage() {
             </div>
             <form onSubmit={handleCreate}>
               <div className="modal-body">
-                {formError && <div className="auth-error">{formError}</div>}
+                {formError && <div className="auth-error" role="alert" ref={formErrorRef}>{formError}</div>}
 
                 <div className="auth-field">
                   <label htmlFor="user-name">Nama</label>

@@ -6,6 +6,7 @@ import { errorMessage } from '@/api/client'
 import type { ApiDocument, ApiDocumentCategory, ApiUnitKerja } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
+import { useScrollToError } from '@/hooks/useScrollToError'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -39,6 +40,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const [unitKerjaId, setUnitKerjaId] = useState('')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const errorRef = useScrollToError<HTMLDivElement>(error)
 
   const isSuperAdmin = user?.isAdmin ?? false
   const ownUnit = user?.unitKerja ?? null
@@ -247,7 +249,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
         </div>
 
         }
-        {error && <div className="upload-error-msg">{error}</div>}
+        {error && <div className="upload-error-msg" role="alert" ref={errorRef}>{error}</div>}
         </div>
 
         <div className="modal-actions">
