@@ -7,7 +7,7 @@ import { PrismaService } from '../database/prisma.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { JABATAN } from '../../prisma/reference-data';
+import { OrganizationService } from '../organization/organization.service';
 
 const SAFE_USER_SELECT = {
   id: true,
@@ -15,6 +15,18 @@ const SAFE_USER_SELECT = {
   employeeNumber: true,
   division: true,
   jobTitle: true,
+  jabatanId: true,
+  // Centang wewenangnya ikut dikirim: daftar pengguna dan profil sesi memakai
+  // bentuk yang sama, jadi frontend tidak perlu dua tipe untuk hal yang sama.
+  jabatan: {
+    select: {
+      id: true,
+      name: true,
+      canManageAnnouncements: true,
+      canViewAnnouncementReaders: true,
+      canAssignRequiredReadings: true,
+    },
+  },
   displayName: true,
   role: true,
   unitKerjaId: true,
@@ -36,6 +48,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogs: AuditLogsService,
+    private readonly organization: OrganizationService,
   ) {}
 
   findAll(actor: AuthenticatedUser) {
@@ -47,19 +60,52 @@ export class UsersService {
   }
 
   /**
-   * Daftar acuan untuk dropdown di form pengguna.
+   * Daftar acuan untuk dropdown di form pembuatan akun.
    *
-   * Unit kerja dibaca dari database (bisa berubah tanpa deploy), sedangkan
-   * jabatan berasal dari konstanta karena murni keterangan dan tidak
-   * memengaruhi hak akses apa pun.
+   * Ketiganya kini baris database, bukan konstanta: unit kerja menentukan
+   * dokumen apa yang terlihat, jabatan membawa wewenang pengumuman dan bacaan
+   * wajib, dan nama role hanya istilah yang dipilih instansi. Yang dikembalikan
+   * hanya yang masih aktif — dropdown adalah tempat memilih untuk ke depan,
+   * sedangkan yang sudah telanjur terpasang di seseorang tetap ditampilkan oleh
+   * frontend dari data penggunanya sendiri.
    */
   async referenceData(actor: AuthenticatedUser) {
-    const unitKerja = await this.prisma.unitKerja.findMany({
-      where: { isActive: true, workspaceId: actor.workspaceId },
-      select: { id: true, code: true, name: true },
-      orderBy: { name: 'asc' },
+    const [unitKerja, jabatan, roleLabels] = await Promise.all([
+      this.prisma.unitKerja.findMany({
+        where: { isActive: true, workspaceId: actor.workspaceId },
+        select: { id: true, code: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.jabatan.findMany({
+        where: { isActive: true, workspaceId: actor.workspaceId },
+        select: {
+          id: true,
+          name: true,
+          canManageAnnouncements: true,
+          canViewAnnouncementReaders: true,
+          canAssignRequiredReadings: true,
+        },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      }),
+      this.organization.roleLabels(actor.workspaceId),
+    ]);
+    return { unitKerja, jabatan, roleLabels };
+  }
+
+  /**
+   * Jabatan pilihan admin, dipastikan milik workspace ini.
+   *
+   * Mengembalikan namanya sekalian karena users.job_title adalah salinan teks
+   * yang dipakai daftar dan laporan; menyimpan id tanpa menyalin namanya membuat
+   * kedua tempat itu menampilkan jabatan yang sudah basi.
+   */
+  private async jabatanTerpilih(actor: AuthenticatedUser, jabatanId: string) {
+    const jabatan = await this.prisma.jabatan.findFirst({
+      where: { id: jabatanId, workspaceId: actor.workspaceId },
+      select: { id: true, name: true },
     });
-    return { unitKerja, jabatan: JABATAN };
+    if (!jabatan) throw new ForbiddenException('Jabatan does not belong to this workspace');
+    return jabatan;
   }
 
   async create(input: CreateUserDto, actor: AuthenticatedUser) {
@@ -67,6 +113,7 @@ export class UsersService {
     const username = input.username.trim().toLowerCase();
     const displayName = input.displayName.trim();
     const passwordHash = await hashPassword(input.password);
+    const jabatan = input.jabatanId ? await this.jabatanTerpilih(actor, input.jabatanId) : null;
 
     try {
       return await this.prisma.$transaction(async (transaction) => {
@@ -77,7 +124,8 @@ export class UsersService {
             isAdmin: input.role === 'SUPER_ADMIN' || input.role === 'ADMIN',
             employeeNumber: input.employeeNumber.trim().toUpperCase(),
             division: input.division.trim(),
-            jobTitle: input.jobTitle.trim(),
+            jobTitle: jabatan?.name ?? input.jobTitle?.trim() ?? '',
+            jabatanId: jabatan?.id ?? null,
             displayName,
             passwordHash,
             role: input.role ?? 'PEGAWAI',
@@ -117,6 +165,18 @@ export class UsersService {
     if (input.employeeNumber !== undefined) data.employeeNumber = input.employeeNumber.trim().toUpperCase();
     if (input.division !== undefined) data.division = input.division.trim();
     if (input.jobTitle !== undefined) data.jobTitle = input.jobTitle.trim();
+    // jabatanId menang atas jobTitle: kalau keduanya dikirim, nama dari barisnya
+    // yang dipakai, supaya teks dan wewenang tidak pernah menunjuk jabatan yang
+    // berbeda.
+    if (input.jabatanId !== undefined) {
+      if (input.jabatanId) {
+        const jabatan = await this.jabatanTerpilih(actor, input.jabatanId);
+        data.jabatan = { connect: { id: jabatan.id } };
+        data.jobTitle = jabatan.name;
+      } else {
+        data.jabatan = { disconnect: true };
+      }
+    }
     if (input.role !== undefined) {
       data.role = input.role;
       data.isAdmin = input.role === 'SUPER_ADMIN' || input.role === 'ADMIN';

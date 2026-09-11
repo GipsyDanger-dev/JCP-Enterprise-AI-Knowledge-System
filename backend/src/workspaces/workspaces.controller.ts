@@ -20,6 +20,7 @@ import { AuthenticatedUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { hashPassword } from '../auth/password.util';
+import { seedJabatanDanRoleLabel } from '../../prisma/organization-defaults';
 
 class CreateWorkspaceDto {
   @IsString() @Length(2, 120) name!: string;
@@ -108,7 +109,20 @@ export class WorkspacesController {
           employeeNumber, division, jobTitle } },
         ...(division ? { units: { create: { name: division, code: 'DEFAULT' } } } : {}),
         categories: { create: [{ name: 'Operations', key: 'operations' }, { name: 'HR', key: 'hr' }, { name: 'Finance', key: 'finance' }] },
-      }, select: { id: true, name: true, type: true, subscriptionStatus: true, trialEndsAt: true } });
+      }, select: { id: true, name: true, type: true, subscriptionStatus: true, trialEndsAt: true, users: { select: { id: true }, take: 1 } } });
+      await seedJabatanDanRoleLabel(tx, workspace.id);
+      // Jabatan yang diketik pendaftar belum tentu ada di daftar bawaan. Dibuat
+      // sekalian, bukan dibiarkan sebagai teks yatim, supaya admin pertama pun
+      // langsung punya baris jabatan yang bisa dicentang wewenangnya.
+      if (jobTitle) {
+        const jabatan = await tx.jabatan.upsert({
+          where: { workspaceId_name: { workspaceId: workspace.id, name: jobTitle } },
+          update: {},
+          create: { workspaceId: workspace.id, name: jobTitle, sortOrder: 99 },
+          select: { id: true },
+        });
+        await tx.user.update({ where: { id: workspace.users[0].id }, data: { jabatanId: jabatan.id } });
+      }
       await this.auditLogs.record(tx, {
         actorType: AuditActorType.USER,
         actorUserId: actor.sub,
@@ -117,7 +131,8 @@ export class WorkspacesController {
         targetId: workspace.id,
         metadata: { name: workspace.name },
       });
-      return workspace;
+      const { users: _admin, ...hasil } = workspace;
+      return hasil;
     });
   }
 

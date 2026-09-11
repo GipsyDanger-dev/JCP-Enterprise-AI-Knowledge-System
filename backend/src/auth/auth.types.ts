@@ -14,6 +14,15 @@ export interface JwtPayload {
   sid: string;
 }
 
+/** Wewenang yang menempel pada jabatan, bukan pada tingkat wewenang dokumen. */
+export interface JabatanPermissions {
+  id: string;
+  name: string;
+  canManageAnnouncements: boolean;
+  canViewAnnouncementReaders: boolean;
+  canAssignRequiredReadings: boolean;
+}
+
 export interface AuthenticatedUser extends JwtPayload {
   division?: string | null;
   /**
@@ -23,6 +32,15 @@ export interface AuthenticatedUser extends JwtPayload {
    * menunggu yang bersangkutan login ulang.
    */
   jobTitle?: string | null;
+  /**
+   * Baris jabatannya, kalau sudah tertaut. Null untuk akun yang jabatannya
+   * masih berupa teks bebas warisan — akun seperti itu tidak punya wewenang
+   * tambahan apa pun, persis seperti sebelum jabatan jadi tabel.
+   *
+   * Ikut dibaca ulang setiap permintaan bersama jobTitle, dengan alasan yang
+   * sama: mencabut centang di halaman Orang & akses harus langsung berlaku.
+   */
+  jabatan?: JabatanPermissions | null;
 }
 
 export interface AuthenticatedRequest {
