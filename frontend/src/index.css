@@ -857,6 +857,57 @@ button { cursor: pointer; }
 .modal-hint { font-size: var(--fs-sm); color: var(--text-secondary); margin: 0 0 var(--space-3); }
 .users-loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 48px 0; color: var(--text-muted); font-size: var(--fs-sm); }
 .empty-row { text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: var(--fs-sm); }
+
+/* Tautan "+ Tambah ..." di dalam formulir, sebentuk dengan Tambah kategori. */
+.inline-add-open { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; font-size: var(--fs-xs); font-weight: var(--fw-semibold); cursor: pointer; }
+.inline-add-open:hover { color: var(--brand-700); }
+.inline-add-open:disabled { opacity: .5; cursor: not-allowed; }
+
+.inline-add { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.inline-add input { flex: 1 1 160px; height: 36px; min-width: 0; border: 1px solid var(--brand-600); border-radius: var(--radius-md); padding: 0 10px; font-size: var(--fs-sm); color: var(--text-card); background: var(--bg-card); outline: 0; }
+.inline-add input:focus { box-shadow: 0 0 0 3px var(--brand-100); }
+.inline-add .secondary-button { height: 36px; padding: 0 12px; flex: 0 0 auto; }
+/* Keterangan kode memakai seluruh lebar, jadi bidang isiannya tidak menyempit. */
+.inline-add-hint { flex: 1 0 100%; margin: 0; }
+
+/* ============ Daftar acuan organisasi (unit kerja, jabatan, role) ============ */
+/* Tab pemilih antara daftar orang dan kerangka tempat orang ditaruh. */
+.org-view-tabs { border-bottom: 1px solid var(--border-soft); padding-bottom: 14px; }
+
+.org-add-form { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.org-add-form input { flex: 1 1 240px; height: 38px; min-width: 0; border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 0 12px; font-size: var(--fs-sm); color: var(--text-card); background: var(--bg-card); outline: 0; transition: border-color .15s, box-shadow .15s; }
+.org-add-form input:focus { border-color: var(--brand-600); box-shadow: 0 0 0 3px var(--brand-100); }
+/* Kode unit kerja selalu pendek; diberi lebar tetap supaya kolom namanya lega. */
+.org-add-form .org-code-input { flex: 0 0 140px; text-transform: uppercase; letter-spacing: .06em; }
+
+.org-section-hint { margin: 0 0 18px; }
+
+/* Ganti nama di tempat: bidangnya menempati sel tabel tanpa menggeser barisnya. */
+.org-inline-input { width: 100%; height: 32px; border: 1px solid var(--brand-600); border-radius: var(--radius-md); padding: 0 8px; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-card); background: var(--bg-card); outline: 0; }
+
+.org-code { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: var(--fs-2xs); letter-spacing: .05em; padding: 3px 7px; border-radius: var(--radius-sm); background: var(--bg-subtle); color: var(--text-secondary); }
+
+.org-row-actions { display: flex; align-items: center; gap: 4px; }
+.org-toggle { font-size: var(--fs-2xs); font-weight: var(--fw-semibold); color: var(--text-secondary); background: transparent; border: 0; padding: 0 6px; cursor: pointer; white-space: nowrap; }
+.org-toggle:hover { color: var(--brand-700); }
+
+.org-check-col { text-align: center; }
+.org-checkbox { width: 17px; height: 17px; accent-color: var(--brand-600); cursor: pointer; }
+.org-checkbox:disabled { opacity: .45; cursor: progress; }
+
+/* Nama role yang kembar: bidangnya ditandai dan tombol simpannya mati. */
+/* Warnanya mengikuti .auth-error supaya galat di halaman ini sebentuk dengan
+   galat di formulir lain. */
+.org-input-invalid { border-color: #fca5a5; }
+.org-input-invalid:focus { border-color: #ef4444; box-shadow: 0 0 0 3px #fef2f2; }
+.org-field-error { margin: 6px 0 0; font-size: var(--fs-2xs); line-height: 1.5; color: #991b1b; }
+
+.org-role-list { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.org-role-card { border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-xl); padding: 18px; }
+.org-role-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+/* Perilaku tetap tiap role, sengaja tidak bisa disunting — hanya istilahnya. */
+.org-role-fixed { font-size: var(--fs-2xs); line-height: 1.5; color: var(--text-muted); }
+
 .clickable-row { cursor: pointer; }
 .clickable-row:hover { background: var(--bg-hover); }
 .doc-detail-modal { max-width: 520px; }

@@ -16,10 +16,32 @@ export interface ApiUnitKerja {
   name: string
 }
 
-/** Daftar acuan untuk dropdown pada form pengguna. */
+/** Nomenklatur jabatan beserta wewenang yang menempel padanya. */
+export interface ApiJabatan {
+  id: string
+  name: string
+  canManageAnnouncements: boolean
+  canViewAnnouncementReaders: boolean
+  canAssignRequiredReadings: boolean
+}
+
+/**
+ * Nama tampilan salah satu dari ketiga role.
+ *
+ * Hanya istilahnya yang bisa diubah instansi; perilaku tiap role tetap di kode
+ * backend, jadi daftarnya selalu tiga dan tidak bisa ditambah.
+ */
+export interface ApiRoleLabel {
+  role: ApiRole
+  label: string
+  description?: string | null
+}
+
+/** Daftar acuan untuk dropdown pada form pembuatan akun. */
 export interface ApiUserReferenceData {
   unitKerja: ApiUnitKerja[]
-  jabatan: string[]
+  jabatan: ApiJabatan[]
+  roleLabels: ApiRoleLabel[]
 }
 
 export interface ApiUser {
@@ -33,6 +55,8 @@ export interface ApiUser {
   employeeNumber: string
   division: string
   jobTitle: string
+  jabatanId?: string | null
+  jabatan?: ApiJabatan | null
   role: ApiRole
   unitKerjaId?: string | null
   unitKerja?: ApiUnitKerja | null
@@ -99,6 +123,13 @@ export interface MeResponse {
   employeeNumber: string
   division: string
   jobTitle: string
+  jabatanId?: string | null
+  /**
+   * Wewenang yang menempel pada jabatan pemilik token ini, dibaca ulang server
+   * setiap permintaan. Dipakai frontend untuk memutuskan tombol mana yang
+   * ditampilkan; penegakannya tetap di backend.
+   */
+  jabatan?: ApiJabatan | null
   role: ApiRole
   unitKerjaId?: string | null
   unitKerja?: ApiUnitKerja | null
@@ -128,7 +159,9 @@ export interface CreateUserRequest {
   username: string
   employeeNumber: string
   division: string
-  jobTitle: string
+  /** Diisi backend dari nama jabatanId; hanya dikirim untuk jabatan teks warisan. */
+  jobTitle?: string
+  jabatanId?: string
   role: ApiRole
   unitKerjaId?: string
   password?: string
@@ -140,6 +173,8 @@ export interface UpdateUserRequest {
   employeeNumber?: string
   division?: string
   jobTitle?: string
+  /** String kosong melepaskan jabatannya. */
+  jabatanId?: string
   role?: ApiRole
   unitKerjaId?: string
   isAdmin?: boolean

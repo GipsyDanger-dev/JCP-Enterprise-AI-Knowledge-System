@@ -232,6 +232,13 @@ export function DocumentsPage() {
   const [deleteDoc, setDeleteDoc] = useState<{ id: string; name: string } | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const canManage = role === 'admin' || isPersonal || user?.role === 'ADMIN_UNIT'
+  // Menugaskan bacaan wajib tidak lagi terikat pada wewenang mengelola dokumen:
+  // jabatan yang dicentang di halaman Orang & akses boleh menugaskan tanpa perlu
+  // diberi hak mengunggah, mengganti nama, atau menghapus apa pun.
+  const canAssignReadings = canManage || Boolean(user?.jabatan?.canAssignRequiredReadings)
+  const tombolWajibBaca = (document: DocumentItem) => (
+    <button className="icon-button" title={isId ? 'Jadikan wajib baca' : 'Assign required reading'} onClick={(e) => { e.stopPropagation(); setSelectedDivision(''); setAssignmentError(null); setSelectedEmployeeIds([]); setAssignmentView('assign'); setAssignmentDoc(document) }}><BookOpenCheck size={16} /></button>
+  )
   const isId = language === 'id'
   const [searchParams, setSearchParams] = useSearchParams()
   const initialCollection = searchParams.get('collection') ?? 'All'
@@ -496,8 +503,8 @@ export function DocumentsPage() {
                 {canManage && <button className="icon-button" title={isId ? 'Ubah nama dokumen' : 'Rename document'} onClick={(event) => { event.stopPropagation(); setRenameDoc(document); setRenameTitle(document.name); setRenameError(null) }}><Pencil size={15} /></button>}
                 <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>
                 {isPersonal ? <button className="icon-button danger" title={isId ? 'Hapus dokumen' : 'Delete document'} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button> : canManage
-                  ? <><button className="icon-button" title={isId ? 'Atur akses dokumen' : 'Manage document access'} onClick={(e) => { e.stopPropagation(); openAccessDialog(document) }}><Building2 size={16} /></button>{document.status === 'Ready' && <button className="icon-button" title={isId ? 'Jadikan wajib baca' : 'Assign required reading'} onClick={(e) => { e.stopPropagation(); setSelectedDivision(''); setAssignmentError(null); setSelectedEmployeeIds([]); setAssignmentView('assign'); setAssignmentDoc(document) }}><BookOpenCheck size={16} /></button>}<button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
-                  : <button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button>}
+                  ? <><button className="icon-button" title={isId ? 'Atur akses dokumen' : 'Manage document access'} onClick={(e) => { e.stopPropagation(); openAccessDialog(document) }}><Building2 size={16} /></button>{document.status === 'Ready' && tombolWajibBaca(document)}<button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
+                  : <>{canAssignReadings && document.status === 'Ready' && tombolWajibBaca(document)}<button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button></>}
               </td>
             </tr>
           ))}</tbody>

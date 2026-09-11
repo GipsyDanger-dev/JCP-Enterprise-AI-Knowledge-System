@@ -39,6 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             employeeNumber: profile.employeeNumber,
             division: profile.division,
             jobTitle: profile.jobTitle,
+            // Wewenang yang menempel pada jabatan ikut dipulihkan; tanpa ini
+            // tombol yang bergantung padanya hilang setiap kali halaman dimuat
+            // ulang, sampai pengguna login lagi.
+            jabatanId: profile.jabatanId ?? null,
+            jabatan: profile.jabatan ?? null,
             role: profile.role,
             // Unit kerja ikut dipulihkan: tanpa ini dialog unggah kehilangan
             // unit penggunanya setiap kali halaman dimuat ulang.
