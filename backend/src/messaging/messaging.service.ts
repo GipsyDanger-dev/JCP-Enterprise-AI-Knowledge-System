@@ -1,7 +1,9 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Observable } from 'rxjs';
+import { NotificationType } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { MessagingEventsService, MessagingStreamEvent } from './messaging-events.service';
 
 @Injectable()
@@ -9,6 +11,7 @@ export class MessagingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: MessagingEventsService,
+    private readonly notifications: NotificationsService,
   ) { }
 
   /** SSE stream for the authenticated user (employee) or the shared admin channel. */
@@ -146,6 +149,16 @@ export class MessagingService {
         unreadCount: nextUnread,
       },
     });
+
+    if (sender === 'admin' && conversation) {
+      await this.notifications.createMany([{
+        userId: conversation.employeeId,
+        type: NotificationType.MESSAGE_RECEIVED,
+        title: 'Pesan baru dari admin',
+        body: content || 'Admin mengirim lampiran.',
+        href: '/messages',
+      }]);
+    }
 
     const serialized = this.serializeMessage(msg);
     this.events.emitToConversation(conversation?.employeeId ?? actor.sub, {

@@ -71,7 +71,7 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
     }
     setNotificationsLoading(true)
     load().finally(() => { if (!cancelled) setNotificationsLoading(false) })
-    const interval = window.setInterval(load, 30_000)
+    const interval = window.setInterval(load, 5_000)
     return () => { cancelled = true; window.clearInterval(interval) }
   }, [token])
 

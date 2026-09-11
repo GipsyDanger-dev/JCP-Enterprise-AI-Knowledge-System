@@ -69,6 +69,7 @@ function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: {
           {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} onSelect={onSuggestion} />}
           {msg.citations.length > 0 && (
             <div className="citations">
+              <strong className="citations-label">{isId ? 'Bukti sumber' : 'Source evidence'}</strong>
               {msg.citations.map((c, i) => (
                 <SourceCard
                   key={`${c.documentId}-${c.chunkId}-${i}`}
@@ -249,10 +250,6 @@ export function ChatPage() {
             {sourcePdfLoading && <div className="source-preview-loading">{isId ? 'Memuat PDF asli...' : 'Loading original PDF...'}</div>}
             {sourcePdfUrl ? (
               <div className="source-preview-pdf">
-                <div className="source-preview-evidence">
-                  <span>{isId ? 'Bukti yang digunakan untuk jawaban' : 'Evidence used for this answer'}</span>
-                  <mark>{evidencePreview || (isId ? 'Cuplikan citation tidak tersedia.' : 'Citation excerpt is unavailable.')}</mark>
-                </div>
                 <iframe title={`${documentLabel(selectedSource)} page ${selectedSource.pageNumber ?? 1}`} src={sourcePdfUrl} />
               </div>
             ) : (
