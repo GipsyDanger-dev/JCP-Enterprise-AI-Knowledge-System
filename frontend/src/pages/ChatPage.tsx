@@ -95,6 +95,11 @@ function renderAnswer(answer: string) {
   if (answer.trim() === NO_ANSWER_TEXT) return <strong>{answer}</strong>
 
   return answer.split(/\r?\n/).map((line, lineIndex) => {
+    const sourceLine = /^\s*\*{0,2}\(?\s*(?:sumber|source)\s*:/i.test(line)
+    if (sourceLine) {
+      const source = line.trim().replace(/^\*{1,2}\s*/, '').replace(/\s*\*{1,2}$/, '')
+      return <div key={`${lineIndex}-${line}`}><strong>{source}</strong></div>
+    }
     const parts = line.split(/(\*\*[^*]+\*\*)/g)
     return (
       <div key={`${lineIndex}-${line}`} className={line.trim() === '' ? 'answer-blank' : undefined}>
