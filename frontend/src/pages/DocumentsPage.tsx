@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ArrowUpRight, BookOpenCheck, Building2, CheckCircle2, ChevronDown, Download, FileText, FolderLock, FolderOpen, Pencil, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
@@ -18,7 +18,7 @@ import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
 
-function PdfReader({ source, title }: { source: string; title: string }) {
+function PdfReader({ source, title, onError }: { source: string; title: string; onError: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     let cancelled = false
@@ -34,9 +34,9 @@ function PdfReader({ source, title }: { source: string; title: string }) {
         await page.render({ canvas, viewport }).promise
         if (!cancelled) containerRef.current?.appendChild(canvas)
       }
-    }).catch(() => {})
+    }).catch(() => { if (!cancelled) onError() })
     return () => { cancelled = true; task.destroy() }
-  }, [source, title])
+  }, [onError, source, title])
   return <div ref={containerRef} className="doc-reader-pdf-pages" />
 }
 
@@ -59,6 +59,7 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
   const [readerText, setReaderText] = useState<string | null>(null)
   const [readerLoading, setReaderLoading] = useState(false)
   const [readerError, setReaderError] = useState(false)
+  const handlePdfRenderError = useCallback(() => setReaderError(true), [])
   const viewerRef = useRef<HTMLDivElement>(null)
   const [canComplete, setCanComplete] = useState(false)
   const [completionConfirmed, setCompletionConfirmed] = useState(false)
@@ -88,13 +89,13 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
   }, [requiredReadingId, token])
 
   useEffect(() => {
-    if (doc.status !== 'Ready' || canRenderOriginal || chunks.length > 0) return
+    if (doc.status !== 'Ready' || chunks.length > 0) return
     setChunksLoading(true)
     getDocumentChunks(doc.id, token ?? undefined)
       .then((res) => onChunksLoaded(res.chunks))
       .catch(() => onChunksLoaded([]))
       .finally(() => setChunksLoading(false))
-  }, [canRenderOriginal, chunks.length, doc.id, doc.status, onChunksLoaded, setChunksLoading, token])
+  }, [chunks.length, doc.id, doc.status, onChunksLoaded, setChunksLoading, token])
 
   useEffect(() => {
     if (doc.status !== 'Ready' || !canRenderOriginal) return
@@ -178,7 +179,7 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
               <p>{isId ? 'Memuat dokumen...' : 'Loading document...'}</p>
             </div>
           )}
-          {doc.status === 'Ready' && !readerLoading && readerUrl && <PdfReader source={readerUrl} title={doc.name} />}
+          {doc.status === 'Ready' && !readerLoading && !readerError && readerUrl && <PdfReader source={readerUrl} title={doc.name} onError={handlePdfRenderError} />}
           {doc.status === 'Ready' && !readerLoading && readerText !== null && (
             <article className="doc-reader-paper" aria-label={doc.name}>
               {readerText ? readerText.split(/\n{2,}/).map((paragraph, index) => (
@@ -196,7 +197,7 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
               <p>{isId ? 'Pratinjau tidak tersedia untuk format ini. Unduh dokumen untuk membukanya.' : 'Preview is not available for this format. Download the document to open it.'}</p>
             </div>
           )}
-          {doc.status === 'Ready' && !canRenderOriginal && !chunksLoading && pages.length > 0 && (
+          {doc.status === 'Ready' && !readerLoading && (readerError || !canRenderOriginal) && !chunksLoading && pages.length > 0 && (
             <div className="doc-viewer-pages">
               {pages.map(([pageNum, pageChunks]) => (
                 <div key={pageNum} className="doc-viewer-page">
