@@ -679,13 +679,16 @@ button { cursor: pointer; }
 .assistant-message.no-answer { border-color: var(--warning); background: var(--warning-bg); }
 .assistant-message.no-answer .answer-label { color: var(--warning); }
 .typing-indicator { color: var(--text-muted); font-style: italic; }
-.citations { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-.citations-label { flex: 0 0 100%; color: var(--text-strong); font-size: var(--fs-sm); font-weight: var(--fw-heavy); }
-.citations::-webkit-scrollbar { height: 5px; }
-.citations::-webkit-scrollbar-track { background: transparent; }
-.citations::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-.citations::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-.citations > .source-card { flex: 0 0 auto; width: min(300px, 80%); scroll-snap-align: start; }
+.citations { margin-top: 14px; }
+.citations-label { display: block; margin-bottom: 8px; color: var(--text-strong); font-size: var(--fs-sm); font-weight: var(--fw-heavy); }
+/* Kartu bukti digulir mendatar, bukan dibungkus ke baris berikutnya: jawaban
+   dengan banyak kutipan jadi tidak menumpuk dan mendorong jawaban ke atas. */
+.citations-track { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+.citations-track::-webkit-scrollbar { height: 5px; }
+.citations-track::-webkit-scrollbar-track { background: transparent; }
+.citations-track::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.citations-track::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+.citations-track > .source-card { flex: 0 0 auto; width: min(300px, 80%); scroll-snap-align: start; }
 .chat-suggestions { margin-top: 14px; }
 .chat-suggestions > span { display: block; margin-bottom: 8px; color: var(--text-dim); font-size: var(--fs-xs); font-weight: var(--fw-semibold); }
 .chat-suggestions > div { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1567,7 +1570,7 @@ button { cursor: pointer; }
   .chat-empty { padding: 26px 20px; }
   .conversation { gap: 14px; }
   .user-message { max-width: 82%; }
-  .citations > .source-card { width: min(220px, 70%); }
+  .citations-track > .source-card { width: min(220px, 70%); }
   .chat-composer { width: 100%; }
   .page-heading { flex-direction: column; }
   .heading-actions { width: 100%; }

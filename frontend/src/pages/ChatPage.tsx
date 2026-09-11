@@ -70,16 +70,18 @@ function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: {
           {msg.citations.length > 0 && (
             <div className="citations">
               <strong className="citations-label">{isId ? 'Bukti sumber' : 'Source evidence'}</strong>
-              {msg.citations.map((c, i) => (
-                <SourceCard
-                  key={`${c.documentId}-${c.chunkId}-${i}`}
-                  title={documentLabel(c)}
-                  detail={[c.sectionTitle, c.pageNumber ? `Page ${c.pageNumber}` : null, c.version].filter(Boolean).join(' · ')}
-                  excerpt={c.excerpt}
-                  trailing={<ArrowUpRight size={15} />}
-                  onOpen={() => onOpenSource(c, msg.question)}
-                />
-              ))}
+              <div className="citations-track">
+                {msg.citations.map((c, i) => (
+                  <SourceCard
+                    key={`${c.documentId}-${c.chunkId}-${i}`}
+                    title={documentLabel(c)}
+                    detail={[c.sectionTitle, c.pageNumber ? `Page ${c.pageNumber}` : null, c.version].filter(Boolean).join(' · ')}
+                    excerpt={c.excerpt}
+                    trailing={<ArrowUpRight size={15} />}
+                    onOpen={() => onOpenSource(c, msg.question)}
+                  />
+                ))}
+              </div>
             </div>
           )}
           {/* Ikut syarat kartu sumber di atas: tanpa kutipan tidak ada bukti
