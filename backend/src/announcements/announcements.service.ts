@@ -1,6 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationType } from '@prisma/client';
-import { JABATAN_PENERBIT_PENGUMUMAN } from '../../prisma/reference-data';
 import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -38,29 +37,50 @@ export class AnnouncementsService {
   ) {}
 
   /**
-   * Boleh menerbitkan pengumuman dan melihat daftar pembacanya.
+   * Boleh menerbitkan, menyunting, mengarsipkan, dan menghapus pengumuman.
    *
    * Dinilai dari jabatan, bukan dari UserRole: role adalah tingkat wewenang
    * atas dokumen, sedangkan yang berhak mengumumkan sesuatu ke seluruh pegawai
    * adalah pimpinan perangkat daerah. Keduanya tidak selalu berjalan seiring —
    * seorang Sekretaris tetap PEGAWAI di mata pengelolaan dokumen.
+   *
+   * Dulu dicocokkan dengan konstanta JABATAN_PENERBIT_PENGUMUMAN; sekarang
+   * dibaca dari centang pada baris jabatannya, yang bisa diatur super admin
+   * tanpa deploy ulang.
    */
   private canPublish(actor: AuthenticatedUser) {
     if (actor.accountType !== 'COMPANY') return false;
-    if (actor.isAdmin) return true;
-    const jabatan = actor.jobTitle?.trim().toLowerCase() ?? '';
-    return jabatan.length > 0 && JABATAN_PENERBIT_PENGUMUMAN.some((item) => item.toLowerCase() === jabatan);
+    return actor.isAdmin || (actor.jabatan?.canManageAnnouncements ?? false);
+  }
+
+  /**
+   * Boleh melihat siapa saja yang sudah dan belum membaca.
+   *
+   * Wewenang terpisah dari menerbitkan: ada jabatan yang tugasnya menyebarkan
+   * pengumuman tetapi tidak berkepentingan menakar kepatuhan membaca rekannya,
+   * dan sebaliknya ada pengawas yang perlu laporannya tanpa perlu menerbitkan
+   * apa pun. Sebelum jabatan jadi tabel keduanya masih satu paket.
+   */
+  private canViewReaders(actor: AuthenticatedUser) {
+    if (actor.accountType !== 'COMPANY') return false;
+    return actor.isAdmin || (actor.jabatan?.canViewAnnouncementReaders ?? false);
   }
 
   private assertCanPublish(actor: AuthenticatedUser) {
     if (!this.canPublish(actor)) {
-      throw new ForbiddenException('Hanya admin dan ' + JABATAN_PENERBIT_PENGUMUMAN.join(' / ') + ' yang dapat mengelola pengumuman');
+      throw new ForbiddenException('Jabatan Anda tidak diberi wewenang mengelola pengumuman');
+    }
+  }
+
+  private assertCanViewReaders(actor: AuthenticatedUser) {
+    if (!this.canViewReaders(actor)) {
+      throw new ForbiddenException('Jabatan Anda tidak diberi wewenang melihat laporan pembaca pengumuman');
     }
   }
 
   /** Dipakai frontend untuk memutuskan menampilkan tombol terbit dan laporan baca. */
   permissions(actor: AuthenticatedUser) {
-    return { canPublish: this.canPublish(actor) };
+    return { canPublish: this.canPublish(actor), canViewReaders: this.canViewReaders(actor) };
   }
 
   /**
@@ -74,11 +94,12 @@ export class AnnouncementsService {
   }
 
   async list(actor: AuthenticatedUser) {
-    const canSeeReaders = this.canPublish(actor);
+    const canPublish = this.canPublish(actor);
+    const canSeeReaders = this.canViewReaders(actor);
     const items = await this.prisma.announcement.findMany({
       // Yang boleh menerbitkan juga melihat arsipnya, supaya tombol aktifkan
       // ulang punya tempat; pegawai lain hanya melihat yang masih berlaku.
-      where: { workspaceId: actor.workspaceId, ...(canSeeReaders ? {} : { isActive: true }) },
+      where: { workspaceId: actor.workspaceId, ...(canPublish ? {} : { isActive: true }) },
       select: ANNOUNCEMENT_SELECT,
       orderBy: [{ isActive: 'desc' }, { publishedAt: 'desc' }],
     });
@@ -98,7 +119,7 @@ export class AnnouncementsService {
       select: ANNOUNCEMENT_SELECT,
     });
     await this.notifyEveryone(announcement, actor.sub, actor.workspaceId);
-    return this.toResponse(announcement, true);
+    return this.toResponse(announcement, this.canViewReaders(actor));
   }
 
   /** Notifikasi ke seluruh karyawan aktif, kecuali penerbitnya sendiri. */
@@ -158,7 +179,7 @@ export class AnnouncementsService {
    * laporan tidak pernah bisa penuh.
    */
   async readers(id: string, actor: AuthenticatedUser) {
-    this.assertCanPublish(actor);
+    this.assertCanViewReaders(actor);
     const announcement = await this.prisma.announcement.findUnique({
       where: { id, workspaceId: actor.workspaceId },
       select: { id: true, title: true, createdById: true, publishedAt: true },
@@ -218,7 +239,7 @@ export class AnnouncementsService {
   async update(id: string, input: UpdateAnnouncementDto, actor: AuthenticatedUser) {
     await this.assertCanEdit(id, actor);
     const updated = await this.prisma.announcement.update({ where: { id }, data: input, select: ANNOUNCEMENT_SELECT });
-    return this.toResponse(updated, true);
+    return this.toResponse(updated, this.canViewReaders(actor));
   }
 
   /**

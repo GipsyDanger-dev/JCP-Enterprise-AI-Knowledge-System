@@ -40,14 +40,18 @@ export class CreateUserDto {
   @MaxLength(100)
   division!: string;
 
-  @ApiProperty({ example: 'HR Specialist', minLength: 2, maxLength: 100 })
+  // Opsional sejak jabatan jadi tabel: form mengirim jabatanId, dan namanya
+  // disalin ke sini oleh service. Tetap diterima sebagai teks supaya pemanggil
+  // lama tidak patah.
+  @ApiPropertyOptional({ example: 'HR Specialist', minLength: 2, maxLength: 100 })
+  @IsOptional()
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
   @IsString()
   @MinLength(2)
   @MaxLength(100)
-  jobTitle!: string;
+  jobTitle?: string;
 
   @ApiProperty({ example: 'Employee Name', minLength: 2, maxLength: 100 })
   @Transform(({ value }: { value: unknown }) =>
@@ -68,6 +72,14 @@ export class CreateUserDto {
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+
+  @ApiPropertyOptional({
+    description: 'Baris jabatan penentu wewenang pengumuman dan bacaan wajib. Bila diisi, jobTitle diambil dari namanya.',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  jabatanId?: string;
 
   @ApiPropertyOptional({
     description: 'Unit kerja / OPD penentu akses dokumen. Kosongkan bila pegawai belum ditempatkan.',

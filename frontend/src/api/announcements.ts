@@ -44,9 +44,12 @@ export const deleteAnnouncement = (id: string, token?: string) => request<{ id: 
 export const getAnnouncementUnreadCount = (token?: string) => request<{ count: number; latestTitle: string | null }>('/announcements/unread', { headers: authHeaders(token) })
 export const markAnnouncementsRead = (token?: string) => request<{ ok: boolean; count: number }>('/announcements/read', { method: 'POST', headers: authHeaders(token) })
 /**
- * Wewenang menerbitkan ditanyakan ke server, bukan disimpulkan dari jabatan di
- * sisi klien: daftar jabatan yang berhak hanya ada satu salinan, di backend,
- * jadi tidak ada tombol yang muncul untuk orang yang permintaannya akan ditolak.
+ * Wewenang ditanyakan ke server, bukan disimpulkan dari jabatan di sisi klien:
+ * centang yang menentukannya hanya ada satu salinan, di baris jabatan, jadi
+ * tidak ada tombol yang muncul untuk orang yang permintaannya akan ditolak.
+ *
+ * Menerbitkan dan melihat laporan pembaca adalah dua wewenang terpisah — ada
+ * jabatan yang diberi salah satunya saja.
  */
-export const getAnnouncementPermissions = (token?: string) => request<{ canPublish: boolean }>('/announcements/permissions', { headers: authHeaders(token) })
+export const getAnnouncementPermissions = (token?: string) => request<{ canPublish: boolean; canViewReaders: boolean }>('/announcements/permissions', { headers: authHeaders(token) })
 export const getAnnouncementReaders = (id: string, token?: string) => request<AnnouncementReadReport>(`/announcements/${id}/readers`, { headers: authHeaders(token) })

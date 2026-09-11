@@ -35,13 +35,14 @@ export class JwtAuthGuard implements CanActivate {
         data: { lastActiveAt: new Date() }
       }).catch(() => {});
 
-      // unitKerjaId dan jobTitle sengaja dibaca ulang dari database, bukan
-      // diambil dari payload token: pemindahan pegawai ke unit lain — atau
-      // penurunan jabatannya — langsung berlaku pada permintaan berikutnya,
-      // tanpa menunggu yang bersangkutan login ulang.
+      // unitKerjaId, jobTitle, dan wewenang jabatannya sengaja dibaca ulang dari
+      // database, bukan diambil dari payload token: pemindahan pegawai ke unit
+      // lain — atau pencabutan hak menerbitkan pengumuman dari jabatannya —
+      // langsung berlaku pada permintaan berikutnya, tanpa menunggu yang
+      // bersangkutan login ulang.
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, email: true, username: true, role: true, isAdmin: true, isActive: true, displayName: true, unitKerjaId: true, jobTitle: true, division: true, accountType: true, workspaceId: true, isPlatformOwner: true, workspace: { select: { isActive: true, type: true, subscriptionStatus: true, trialEndsAt: true } } },
+        select: { id: true, email: true, username: true, role: true, isAdmin: true, isActive: true, displayName: true, unitKerjaId: true, jobTitle: true, jabatan: { select: { id: true, name: true, canManageAnnouncements: true, canViewAnnouncementReaders: true, canAssignRequiredReadings: true } }, division: true, accountType: true, workspaceId: true, isPlatformOwner: true, workspace: { select: { isActive: true, type: true, subscriptionStatus: true, trialEndsAt: true } } },
       });
 
       if (!user?.isActive || !user.workspace.isActive || user.accountType !== user.workspace.type || user.workspaceId !== payload.workspaceId) throw new UnauthorizedException('Authentication required');
@@ -54,7 +55,7 @@ export class JwtAuthGuard implements CanActivate {
         }
         throw new UnauthorizedException('Workspace trial has expired');
       }
-      request.user = { sub: user.id, username: user.username ?? user.email ?? '', role: user.role, isAdmin: user.accountType === 'COMPANY' && user.isAdmin, unitKerjaId: user.unitKerjaId, jobTitle: user.jobTitle, division: user.division, displayName: user.displayName, sid: payload.sid, workspaceId: user.workspaceId, accountType: user.accountType, isPlatformOwner: user.isPlatformOwner };
+      request.user = { sub: user.id, username: user.username ?? user.email ?? '', role: user.role, isAdmin: user.accountType === 'COMPANY' && user.isAdmin, unitKerjaId: user.unitKerjaId, jobTitle: user.jobTitle, jabatan: user.jabatan, division: user.division, displayName: user.displayName, sid: payload.sid, workspaceId: user.workspaceId, accountType: user.accountType, isPlatformOwner: user.isPlatformOwner };
       return true;
     } catch {
       throw new UnauthorizedException('Authentication required');

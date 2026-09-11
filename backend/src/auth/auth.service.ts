@@ -12,7 +12,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import { trialDurationDays } from '../config/env.util';
-import { JwtPayload } from './auth.types';
+import { JabatanPermissions, JwtPayload } from './auth.types';
 import { GoogleLoginDto } from './dto/google-login.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterPersonalDto } from './dto/register-personal.dto';
@@ -21,6 +21,16 @@ import { CheckCompanyAvailabilityDto } from './dto/check-company-availability.dt
 import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import { hashPassword, verifyPassword } from './password.util';
 import { BillingService } from '../billing/billing.service';
+import { seedJabatanDanRoleLabel } from '../../prisma/organization-defaults';
+
+/** Kolom jabatan yang boleh ikut ke klien: namanya dan centang wewenangnya. */
+const JABATAN_PERMISSION_SELECT = {
+  id: true,
+  name: true,
+  canManageAnnouncements: true,
+  canViewAnnouncementReaders: true,
+  canAssignRequiredReadings: true,
+} as const;
 
 @Injectable()
 export class AuthService {
@@ -37,7 +47,7 @@ export class AuthService {
     // Existing accounts without a username may still authenticate with their legacy email.
     const user = await this.prisma.user.findFirst({
       where: { OR: [{ username }, { email: username }] },
-      include: { workspace: true },
+      include: { workspace: true, jabatan: { select: JABATAN_PERMISSION_SELECT } },
     });
     const passwordIsValid = user?.passwordHash
       ? await verifyPassword(input.password, user.passwordHash)
@@ -137,6 +147,10 @@ export class AuthService {
         });
         const createdUser = workspace.users[0];
         if (!createdUser) throw new Error('Company administrator could not be created');
+        // Tanpa ini dropdown jabatan di form "Buat akun" kosong sejak hari
+        // pertama, dan admin baru tidak punya cara mengisinya selain mengetik
+        // satu per satu.
+        await seedJabatanDanRoleLabel(transaction, workspace.id);
         await transaction.auditLog.create({
           data: {
             actorType: AuditActorType.USER,
@@ -429,7 +443,7 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { unitKerja: { select: { id: true, code: true, name: true } } } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { unitKerja: { select: { id: true, code: true, name: true } }, jabatan: { select: JABATAN_PERMISSION_SELECT } } });
     if (!user) {
       return {
         sub: userId,

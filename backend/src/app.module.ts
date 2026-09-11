@@ -14,6 +14,7 @@ import { RequiredReadingsModule } from './required-readings/required-readings.mo
 import { NotificationsModule } from './notifications/notifications.module';
 import { AnnouncementsModule } from './announcements/announcements.module';
 import { BillingModule } from './billing/billing.module';
+import { OrganizationModule } from './organization/organization.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { BillingModule } from './billing/billing.module';
     NotificationsModule,
     AnnouncementsModule,
     BillingModule,
+    OrganizationModule,
   ],
   controllers: [HealthController, WorkspacesController],
 })

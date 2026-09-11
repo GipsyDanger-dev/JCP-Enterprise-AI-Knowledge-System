@@ -54,6 +54,14 @@ export class UpdateUserDto {
   photoUrl?: string;
 
   @ApiPropertyOptional({
+    description: 'Baris jabatan penentu wewenang pengumuman dan bacaan wajib. Bila diisi, jobTitle diambil dari namanya.',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  jabatanId?: string;
+
+  @ApiPropertyOptional({
     description: 'Unit kerja / OPD penentu akses dokumen. Kosongkan bila pegawai belum ditempatkan.',
     format: 'uuid',
   })

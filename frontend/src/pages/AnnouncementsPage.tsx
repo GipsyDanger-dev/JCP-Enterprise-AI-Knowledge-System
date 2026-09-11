@@ -115,8 +115,11 @@ export function AnnouncementsPage() {
   const { language, markAnnouncementsSeen } = useWorkspace()
   const isId = language === 'id'
   // Ditanyakan ke server: yang boleh menerbitkan bukan hanya admin, melainkan
-  // juga jabatan pimpinan — dan daftarnya hanya dipegang backend.
+  // juga jabatan yang dicentang wewenangnya — dan centang itu hanya dipegang
+  // backend. Melihat siapa saja yang sudah membaca adalah wewenang tersendiri,
+  // jadi dilacak terpisah.
   const [canManage, setCanManage] = useState(user?.isAdmin ?? false)
+  const [canViewReaders, setCanViewReaders] = useState(user?.isAdmin ?? false)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [showComposer, setShowComposer] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -160,8 +163,16 @@ export function AnnouncementsPage() {
     if (!token) return
     let cancelled = false
     getAnnouncementPermissions(token)
-      .then(({ canPublish }) => { if (!cancelled) setCanManage(canPublish) })
-      .catch(() => { if (!cancelled) setCanManage(user?.isAdmin ?? false) })
+      .then(({ canPublish, canViewReaders: boleh }) => {
+        if (cancelled) return
+        setCanManage(canPublish)
+        setCanViewReaders(boleh)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setCanManage(user?.isAdmin ?? false)
+        setCanViewReaders(user?.isAdmin ?? false)
+      })
     return () => { cancelled = true }
   }, [token, user?.isAdmin])
 
@@ -320,7 +331,7 @@ export function AnnouncementsPage() {
               onCancel={() => setEditingId(null)}
             /> : <>
               <div className="announcement-content"><div className="announcement-meta"><span>{formatPublishedAt(announcement.publishedAt, isId)}</span><span>{isId ? `Oleh ${announcement.createdBy.displayName}` : `By ${announcement.createdBy.displayName}`}</span>{canManage && <b>{announcement.isActive ? (isId ? 'Aktif' : 'Active') : (isId ? 'Diarsipkan' : 'Archived')}</b>}</div><h2>{announcement.title}</h2><p>{announcement.body}</p>
-                {canManage && <button type="button" className="announcement-readers-toggle" aria-expanded={openReport === announcement.id} onClick={() => toggleReport(announcement)}>
+                {canViewReaders && <button type="button" className="announcement-readers-toggle" aria-expanded={openReport === announcement.id} onClick={() => toggleReport(announcement)}>
                   <Users size={15} />
                   {isId ? `${announcement.readCount ?? 0} orang sudah membaca` : `Read by ${announcement.readCount ?? 0}`}
                 </button>}
@@ -333,7 +344,7 @@ export function AnnouncementsPage() {
               </div>}
             </>}
 
-            {canManage && openReport === announcement.id && <div className="announcement-readers">
+            {canViewReaders && openReport === announcement.id && <div className="announcement-readers">
               {reportLoading || !report ? <div className="announcement-readers-loading"><Loader2 size={17} className="spin" /> {isId ? 'Memuat daftar pembaca...' : 'Loading readers...'}</div> : <>
                 <div className="announcement-readers-head">
                   <CheckCheck size={16} />

@@ -96,6 +96,8 @@ model Workspace {
   announcements          Announcement[]
   auditLogs              AuditLog[]
   paymentOrders          PaymentOrder[]
+  jabatan                Jabatan[]
+  roleLabels             RoleLabel[]
 
   @@map("workspaces")
 }
@@ -262,6 +264,11 @@ model User {
   // Sumber kebenaran untuk hak akses adalah unitKerjaId.
   division            String?
   jobTitle            String?              @map("job_title")
+  // Sumber kebenaran untuk wewenang yang menempel pada jabatan. `jobTitle` di
+  // atas tetap diisi dengan namanya supaya akun lama — dan laporan yang sudah
+  // menampilkan teks itu — tidak berubah artinya.
+  jabatanId           String?              @map("jabatan_id") @db.Uuid
+  jabatan             Jabatan?             @relation(fields: [jabatanId], references: [id], onDelete: SetNull)
   unitKerjaId         String?              @map("unit_kerja_id") @db.Uuid
   unitKerja           UnitKerja?           @relation(fields: [unitKerjaId], references: [id], onDelete: SetNull)
   passwordHash        String?              @map("password_hash")
@@ -347,8 +354,76 @@ model UnitKerja {
   categories  DocumentCategory[] @relation("CategoryAccess")
 
   @@unique([workspaceId, code])
+  // Nama ikut dikunci, bukan hanya kode. Yang dilihat dan dipilih orang di
+  // dropdown adalah namanya; dua baris bernama sama — pernah terjadi, dengan
+  // kode berbeda — tampil sebagai dua pilihan yang tak bisa dibedakan, dan
+  // memilih yang salah berarti pegawainya tidak melihat dokumen unitnya.
+  @@unique([workspaceId, name])
   @@index([name])
   @@map("unit_kerja")
+}
+
+/**
+ * Nomenklatur jabatan, beserta wewenang yang menempel padanya.
+ *
+ * Dulu berupa konstanta JABATAN di prisma/reference-data.ts, jadi menambah satu
+ * jabatan berarti deploy ulang. Sekarang baris tabel supaya super admin bisa
+ * mengurusnya sendiri dari halaman Orang & akses.
+ *
+ * Wewenangnya sengaja terpisah dari UserRole: role adalah tingkat wewenang atas
+ * DOKUMEN, sedangkan yang di sini menempel pada posisi struktural — seorang
+ * Sekretaris boleh menerbitkan pengumuman ke seluruh pegawai meski di mata
+ * pengelolaan dokumen ia tetap PEGAWAI biasa.
+ */
+model Jabatan {
+  workspaceId                String    @default("00000000-0000-4000-8000-000000000001") @map("workspace_id") @db.Uuid
+  workspace                  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                         String    @id @default(uuid()) @db.Uuid
+  name                       String
+  /// Boleh menerbitkan, menyunting, mengarsipkan, dan menghapus pengumuman.
+  canManageAnnouncements     Boolean   @default(false) @map("can_manage_announcements")
+  /// Boleh melihat siapa saja yang sudah dan belum membaca pengumuman.
+  canViewAnnouncementReaders Boolean   @default(false) @map("can_view_announcement_readers")
+  /// Boleh menugaskan bacaan wajib dan membaca laporan kepatuhannya.
+  canAssignRequiredReadings  Boolean   @default(false) @map("can_assign_required_readings")
+  // Menonaktifkan, bukan menghapus: jabatan yang masih dipakai pegawai tidak
+  // boleh hilang begitu saja, karena wewenangnya ikut hilang diam-diam.
+  isActive                   Boolean   @default(true) @map("is_active")
+  sortOrder                  Int       @default(0) @map("sort_order")
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
+  users                      User[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, isActive])
+  @@map("jabatan")
+}
+
+/**
+ * Nama tampilan untuk ketiga UserRole yang dipakai.
+ *
+ * Hanya labelnya yang bisa diubah, bukan perilakunya: wewenang tiap role
+ * tertanam di kode (lihat documents/document-visibility.ts dan RolesGuard),
+ * jadi role buatan baru tidak akan punya aturan apa pun di baliknya. Yang
+ * dibutuhkan di lapangan cuma penyesuaian istilah — "Admin Unit" di satu
+ * instansi bisa bernama "Admin Dinas" di instansi lain.
+ */
+model RoleLabel {
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String    @id @default(uuid()) @db.Uuid
+  role        UserRole
+  label       String
+  description String?
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, role])
+  // Dua role tidak boleh bernama sama. Nama inilah yang muncul di dropdown Role
+  // dan di lencana pada daftar pengguna, sedangkan nilai UserRole-nya tidak
+  // pernah terlihat — dua baris bernama "Admin" berarti orang memilih wewenang
+  // secara untung-untungan.
+  @@unique([workspaceId, label])
+  @@map("role_labels")
 }
 
 model DocumentCategory {
