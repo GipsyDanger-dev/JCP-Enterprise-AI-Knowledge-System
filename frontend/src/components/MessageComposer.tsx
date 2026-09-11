@@ -19,15 +19,15 @@ export function MessageComposer({ onSend, onTyping, disabled, placeholder, isId 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) return
+    const files = Array.from(e.target.files ?? [])
     e.target.value = '' // reset
+    if (files.length === 0) return
     setFileError(null)
 
     setUploading(true)
     try {
       const results = await Promise.allSettled(
-        Array.from(files).map(fileToAttachment)
+        files.map(fileToAttachment)
       )
       const accepted: MessageAttachment[] = []
       const errors: string[] = []
