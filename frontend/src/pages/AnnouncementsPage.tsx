@@ -375,10 +375,13 @@ export function AnnouncementsPage() {
                 </button>}
               </div>
               {announcement.imageDataUrl && <div className="announcement-media">
-                <figure className="announcement-image"><img src={announcement.imageDataUrl} alt={isId ? `Gambar untuk pengumuman ${announcement.title}` : `Image for announcement ${announcement.title}`} /></figure>
-                {/* Gambar di kartu sengaja kecil supaya daftar tetap ringkas;
-                    tombol ini yang menyediakan ukuran penuhnya saat diperlukan. */}
-                <button type="button" className="announcement-image-zoom" title={isId ? 'Perbesar gambar' : 'Enlarge image'} aria-label={isId ? 'Perbesar gambar' : 'Enlarge image'} onClick={() => setZoomed(announcement)}><Plus size={16} /></button>
+                <figure className="announcement-image">
+                  <img src={announcement.imageDataUrl} alt={isId ? `Gambar untuk pengumuman ${announcement.title}` : `Image for announcement ${announcement.title}`} />
+                  {/* Bingkainya diisi penuh, jadi gambar yang bentuknya tidak
+                      sepadan akan terpangkas; tombol ini yang menyediakan versi
+                      utuhnya, sekalian ukuran penuh untuk poster yang berteks. */}
+                  <button type="button" className="announcement-image-zoom" title={isId ? 'Perbesar gambar' : 'Enlarge image'} aria-label={isId ? 'Perbesar gambar' : 'Enlarge image'} onClick={() => setZoomed(announcement)}><Plus size={16} /></button>
+                </figure>
               </div>}
             </>}
 

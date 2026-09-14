@@ -1763,7 +1763,7 @@ button { cursor: pointer; }
 /* Lebar tetap, bukan persentase: gambar tidak lagi ikut melebar bersama layar,
    jadi tinggi kartu ditentukan teksnya dan seluruh kartu bergambar berbaris rapi
    di kolom yang sama. */
-.announcement-card.with-image { grid-template-columns: auto minmax(0, 1fr) 200px; }
+.announcement-card.with-image { grid-template-columns: auto minmax(0, 1fr) 240px; }
 .announcement-card.archived { opacity: .62; }
 .announcement-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .announcement-content { min-width: 0; }
@@ -1780,16 +1780,18 @@ button { cursor: pointer; }
    kartu membuat garisnya mencapai tepi atas dan bawah, bukan berhenti menggantung
    di tengah. Warnanya --border-hover: lebih tegas dari garis kartu sehingga
    pemisahannya terbaca, tetapi masih redup dan tidak menarik perhatian. */
-.announcement-media { align-self: stretch; display: grid; align-content: start; gap: 10px; margin-block: -18px; padding: 18px 0 18px 18px; border-left: 1px solid var(--border-hover); }
-/* Tanpa rasio yang dipaksakan: kotaknya mengikuti bentuk gambarnya sendiri,
-   jadi logo persegi maupun foto lebar sama-sama tampil utuh — tidak terpotong
-   seperti object-fit: cover, dan tidak berbilah kosong di sisinya seperti kotak
-   4:3 yang diisi contain. max-height menahan gambar potret yang jangkung, dan
-   contain menjaga bentuknya saat batas itu bekerja. */
-.announcement-image { width: 100%; margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); }
-.announcement-image img { display: block; width: 100%; height: auto; max-height: 180px; object-fit: contain; }
-.announcement-image-zoom { justify-self: end; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--bg-card); color: var(--text-secondary); cursor: pointer; transition: border-color var(--ease-fast), color var(--ease-fast), background var(--ease-fast); }
-.announcement-image-zoom:hover { border-color: var(--accent); color: var(--accent); background: var(--surface-hover); }
+.announcement-media { align-self: stretch; display: grid; align-content: start; margin-block: -18px; padding: 18px 0 18px 18px; border-left: 1px solid var(--border-hover); }
+/* Bingkai persegi yang diisi penuh: apa pun bentuk gambar unggahannya, kartu
+   tidak pernah menyisakan bidang kosong dan seluruh kartu bergambar berbaris
+   dengan tinggi yang sama. Pemangkasan yang jadi konsekuensinya ditebus tombol
+   perbesar di pojoknya, yang menampilkan gambar utuh tanpa dipotong. */
+.announcement-image { position: relative; width: 100%; aspect-ratio: 1; margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); }
+.announcement-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* Di dalam gambar, bukan di bawahnya. Latar gelap semi-tembus menanganinya di
+   atas gambar terang; cincin putih tipis mengurus kebalikannya, sebab di atas
+   gambar gelap latarnya melebur dan hanya glif + yang tersisa terlihat. */
+.announcement-image-zoom { position: absolute; right: 8px; bottom: 8px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid rgba(255, 255, 255, .38); border-radius: 999px; background: rgba(0, 0, 0, .5); backdrop-filter: blur(4px); color: #fff; cursor: pointer; transition: background var(--ease-fast), border-color var(--ease-fast); }
+.announcement-image-zoom:hover { background: rgba(0, 0, 0, .78); border-color: rgba(255, 255, 255, .7); }
 /* Gambar ukuran penuh. z-index di atas modal-overlay supaya tetap di depan kalau
    sempat terbuka bersamaan; kursor zoom-out menandakan latar bisa diklik tutup. */
 .announcement-lightbox { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 32px; background: rgba(0, 0, 0, .72); backdrop-filter: blur(4px); cursor: zoom-out; animation: fadeIn .15s ease; }
@@ -1821,9 +1823,6 @@ button { cursor: pointer; }
   /* Tidak ada ruang untuk dua kolom: panel gambar turun ke bawah teks dan garis
      pemisahnya berputar jadi mendatar, tetap memisahkan hal yang sama. */
   .announcement-media { grid-column: 1 / -1; margin-block: 0; padding: 14px 0 0; border-left: 0; border-top: 1px solid var(--border-hover); }
-  /* Longgar supaya gambar selebar kartu tidak terpangkas batas tingginya dan
-     berbilah kosong; angkanya hanya menahan poster yang benar-benar jangkung. */
-  .announcement-media .announcement-image img { max-height: 380px; }
   .announcement-lightbox { padding: 16px; }
   .announcement-meta { gap: 5px 9px; }
   .announcement-composer-actions { flex-direction: column-reverse; }
