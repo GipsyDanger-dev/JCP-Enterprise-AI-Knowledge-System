@@ -145,6 +145,18 @@ export function AnnouncementsPage() {
   // menimpa panel yang sedang dilihat.
   const requestedReportRef = useRef<string | null>(null)
 
+  /**
+   * Wewenang "kelola pengumuman" memberi hak menerbitkan, tetapi menyunting,
+   * mengarsipkan, dan menghapus tetap terbatas pada terbitan sendiri — hanya
+   * admin yang bebas atas pengumuman orang lain. Aturannya milik backend
+   * (assertCanEdit); di sini tombolnya ikut disembunyikan supaya tidak ada
+   * tombol yang pasti berakhir ditolak.
+   */
+  const canEdit = useCallback(
+    (announcement: Announcement) => canManage && (user?.isAdmin === true || announcement.createdBy.id === user?.id),
+    [canManage, user?.isAdmin, user?.id],
+  )
+
   const loadAnnouncements = useCallback(async () => {
     if (!token) return
     setLoading(true)
@@ -315,7 +327,8 @@ export function AnnouncementsPage() {
       {error && <div className="inline-alert" role="alert">{error}</div>}
       {loading ? <div className="announcement-empty"><Loader2 size={20} className="spin" /> {isId ? 'Memuat pengumuman...' : 'Loading announcements...'}</div> : announcements.length === 0 ? <div className="announcement-empty"><Megaphone size={22} /><strong>{isId ? 'Belum ada pengumuman.' : 'No announcements yet.'}</strong></div> : <div className="announcement-list">
         {announcements.map((announcement) => {
-          const editing = canManage && editingId === announcement.id
+          const mine = canEdit(announcement)
+          const editing = mine && editingId === announcement.id
           const busy = busyId === announcement.id
           return <article key={announcement.id} className={`announcement-card${!announcement.isActive && !editing ? ' archived' : ''}${announcement.imageDataUrl && !editing ? ' with-image' : ''}`}>
             <span className="announcement-icon">{editing ? <Pencil size={19} /> : <Megaphone size={19} />}</span>
@@ -337,7 +350,7 @@ export function AnnouncementsPage() {
                 </button>}
               </div>
               {announcement.imageDataUrl && <figure className="announcement-image"><img src={announcement.imageDataUrl} alt={isId ? `Gambar untuk pengumuman ${announcement.title}` : `Image for announcement ${announcement.title}`} /></figure>}
-              {canManage && <div className="announcement-actions">
+              {mine && <div className="announcement-actions">
                 <button className="icon-button" disabled={busy} title={isId ? 'Sunting pengumuman' : 'Edit announcement'} onClick={() => setEditingId(announcement.id)}><Pencil size={17} /></button>
                 <button className="icon-button" disabled={busy} title={announcement.isActive ? (isId ? 'Arsipkan pengumuman' : 'Archive announcement') : (isId ? 'Aktifkan pengumuman' : 'Restore announcement')} onClick={() => toggleActive(announcement)}>{announcement.isActive ? <Archive size={17} /> : <RotateCcw size={17} />}</button>
                 <button className="icon-button danger" disabled={busy} title={isId ? 'Hapus permanen' : 'Delete permanently'} onClick={() => askDelete(announcement)}>{busy ? <Loader2 size={17} className="spin" /> : <Trash2 size={17} />}</button>
