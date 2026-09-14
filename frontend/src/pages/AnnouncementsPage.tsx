@@ -189,7 +189,7 @@ export function AnnouncementsPage() {
       setAnnouncements((items) => [announcement, ...items])
       setShowComposer(false)
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err, true))
     } finally {
       setSaving(false)
     }
@@ -205,7 +205,7 @@ export function AnnouncementsPage() {
       replaceInList(await updateAnnouncement(announcement.id, values, token))
       setEditingId(null)
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err, true))
     } finally {
       setBusyId(null)
     }
@@ -218,7 +218,7 @@ export function AnnouncementsPage() {
     try {
       replaceInList(await updateAnnouncement(announcement.id, { isActive: !announcement.isActive }, token))
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err, true))
     } finally {
       setBusyId(null)
     }
@@ -245,7 +245,7 @@ export function AnnouncementsPage() {
         requestedReportRef.current = null
       }
     } catch (err) {
-      setDeleteError(errorMessage(err))
+      setDeleteError(errorMessage(err, true))
     } finally {
       setBusyId(null)
     }
@@ -273,7 +273,7 @@ export function AnnouncementsPage() {
       setReport(loaded)
     } catch (err) {
       if (requestedReportRef.current !== announcement.id) return
-      setError(errorMessage(err))
+      setError(errorMessage(err, true))
       setOpenReport(null)
     } finally {
       if (requestedReportRef.current === announcement.id) setReportLoading(false)

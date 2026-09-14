@@ -47,11 +47,20 @@ type ErrorBody = {
   error?: string
 }
 
-/** Pesan error yang ramah pengguna (401/403/network) */
-export function errorMessage(error: unknown): string {
+/**
+ * Pesan error yang ramah pengguna (401/403/network).
+ *
+ * 403 diseragamkan karena sebagian besar penolakan backend berbunyi teknis
+ * ('Insufficient permissions', 'Company account required') dan tidak memberi
+ * tahu pengguna apa pun. Halaman yang penolakannya memang ditulis untuk dibaca
+ * pengguna — mis. pengumuman, yang membedakan "jabatan Anda tidak berwenang"
+ * dari "Anda bukan penerbitnya" — meneruskan pesan aslinya lewat
+ * `keepServerMessage`; di sana justru alasannya yang paling menolong.
+ */
+export function errorMessage(error: unknown, keepServerMessage = false): string {
   if (error instanceof ApiError) {
     if (error.status === 401) return 'Sesi login tidak valid. Silakan masuk kembali.'
-    if (error.status === 403) return 'Akun Anda tidak memiliki akses.'
+    if (error.status === 403 && !(keepServerMessage && error.message)) return 'Akun Anda tidak memiliki akses.'
     return error.message
   }
   return 'Tidak dapat terhubung ke server. Pastikan backend berjalan.'
