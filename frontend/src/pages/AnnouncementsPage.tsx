@@ -144,6 +144,10 @@ export function AnnouncementsPage() {
   // permintaan sebelumnya selesai tidak boleh membuat jawaban yang telat datang
   // menimpa panel yang sedang dilihat.
   const requestedReportRef = useRef<string | null>(null)
+  // Pengumuman yang gambarnya sedang dibuka ukuran penuh. Yang disimpan
+  // pengumumannya, bukan data gambarnya saja, supaya judulnya bisa dipakai
+  // sebagai teks alternatif dan label dialognya.
+  const [zoomed, setZoomed] = useState<Announcement | null>(null)
 
   /**
    * Wewenang "kelola pengumuman" memberi hak menerbitkan, tetapi menyunting,
@@ -251,6 +255,7 @@ export function AnnouncementsPage() {
       setAnnouncements((items) => items.filter((item) => item.id !== announcement.id))
       setPendingDelete(null)
       if (editingId === announcement.id) setEditingId(null)
+      if (zoomed?.id === announcement.id) setZoomed(null)
       if (openReport === announcement.id) {
         setOpenReport(null)
         setReport(null)
@@ -303,6 +308,14 @@ export function AnnouncementsPage() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [pendingDelete, deleting])
 
+  // Esc menutup gambar yang diperbesar, sama seperti dialog konfirmasi hapus.
+  useEffect(() => {
+    if (!zoomed) return
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setZoomed(null) }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [zoomed])
+
   return (
     <div className="standard-page announcements-page">
       <PageHeading
@@ -343,17 +356,29 @@ export function AnnouncementsPage() {
               onSubmit={(values) => saveEdit(announcement, values)}
               onCancel={() => setEditingId(null)}
             /> : <>
-              <div className="announcement-content"><div className="announcement-meta"><span>{formatPublishedAt(announcement.publishedAt, isId)}</span><span>{isId ? `Oleh ${announcement.createdBy.displayName}` : `By ${announcement.createdBy.displayName}`}</span>{canManage && <b>{announcement.isActive ? (isId ? 'Aktif' : 'Active') : (isId ? 'Diarsipkan' : 'Archived')}</b>}</div><h2>{announcement.title}</h2><p>{announcement.body}</p>
+              <div className="announcement-content">
+                {/* Tanggal dan tombol kelola berbagi satu baris kepala supaya
+                    tombolnya berada di sisi kiri garis pemisah, dan letaknya
+                    tetap sama di semua kartu tanpa terseret panjang isinya. */}
+                <div className="announcement-head">
+                  <div className="announcement-meta"><span>{formatPublishedAt(announcement.publishedAt, isId)}</span><span>{isId ? `Oleh ${announcement.createdBy.displayName}` : `By ${announcement.createdBy.displayName}`}</span>{canManage && <b>{announcement.isActive ? (isId ? 'Aktif' : 'Active') : (isId ? 'Diarsipkan' : 'Archived')}</b>}</div>
+                  {mine && <div className="announcement-actions">
+                    <button className="icon-button" disabled={busy} title={isId ? 'Sunting pengumuman' : 'Edit announcement'} onClick={() => setEditingId(announcement.id)}><Pencil size={17} /></button>
+                    <button className="icon-button" disabled={busy} title={announcement.isActive ? (isId ? 'Arsipkan pengumuman' : 'Archive announcement') : (isId ? 'Aktifkan pengumuman' : 'Restore announcement')} onClick={() => toggleActive(announcement)}>{announcement.isActive ? <Archive size={17} /> : <RotateCcw size={17} />}</button>
+                    <button className="icon-button danger" disabled={busy} title={isId ? 'Hapus permanen' : 'Delete permanently'} onClick={() => askDelete(announcement)}>{busy ? <Loader2 size={17} className="spin" /> : <Trash2 size={17} />}</button>
+                  </div>}
+                </div>
+                <h2>{announcement.title}</h2><p>{announcement.body}</p>
                 {canViewReaders && <button type="button" className="announcement-readers-toggle" aria-expanded={openReport === announcement.id} onClick={() => toggleReport(announcement)}>
                   <Users size={15} />
                   {isId ? `${announcement.readCount ?? 0} orang sudah membaca` : `Read by ${announcement.readCount ?? 0}`}
                 </button>}
               </div>
-              {announcement.imageDataUrl && <figure className="announcement-image"><img src={announcement.imageDataUrl} alt={isId ? `Gambar untuk pengumuman ${announcement.title}` : `Image for announcement ${announcement.title}`} /></figure>}
-              {mine && <div className="announcement-actions">
-                <button className="icon-button" disabled={busy} title={isId ? 'Sunting pengumuman' : 'Edit announcement'} onClick={() => setEditingId(announcement.id)}><Pencil size={17} /></button>
-                <button className="icon-button" disabled={busy} title={announcement.isActive ? (isId ? 'Arsipkan pengumuman' : 'Archive announcement') : (isId ? 'Aktifkan pengumuman' : 'Restore announcement')} onClick={() => toggleActive(announcement)}>{announcement.isActive ? <Archive size={17} /> : <RotateCcw size={17} />}</button>
-                <button className="icon-button danger" disabled={busy} title={isId ? 'Hapus permanen' : 'Delete permanently'} onClick={() => askDelete(announcement)}>{busy ? <Loader2 size={17} className="spin" /> : <Trash2 size={17} />}</button>
+              {announcement.imageDataUrl && <div className="announcement-media">
+                <figure className="announcement-image"><img src={announcement.imageDataUrl} alt={isId ? `Gambar untuk pengumuman ${announcement.title}` : `Image for announcement ${announcement.title}`} /></figure>
+                {/* Gambar di kartu sengaja kecil supaya daftar tetap ringkas;
+                    tombol ini yang menyediakan ukuran penuhnya saat diperlukan. */}
+                <button type="button" className="announcement-image-zoom" title={isId ? 'Perbesar gambar' : 'Enlarge image'} aria-label={isId ? 'Perbesar gambar' : 'Enlarge image'} onClick={() => setZoomed(announcement)}><Plus size={16} /></button>
               </div>}
             </>}
 
@@ -381,6 +406,13 @@ export function AnnouncementsPage() {
             </div>}
           </article>
         })}
+      </div>}
+
+      {zoomed?.imageDataUrl && <div className="announcement-lightbox" role="dialog" aria-modal="true" aria-label={zoomed.title} onClick={() => setZoomed(null)}>
+        <button type="button" className="announcement-lightbox-close" aria-label={isId ? 'Tutup' : 'Close'} onClick={() => setZoomed(null)}><X size={20} /></button>
+        {/* Klik pada gambarnya sendiri tidak menutup: menggeser atau menyorot
+            bagian gambar tidak boleh berakhir menutup tampilannya. */}
+        <img src={zoomed.imageDataUrl} alt={isId ? `Gambar untuk pengumuman ${zoomed.title}` : `Image for announcement ${zoomed.title}`} onClick={(event) => event.stopPropagation()} />
       </div>}
 
       {pendingDelete && <div className="modal-overlay" onClick={() => !deleting && setPendingDelete(null)}>
