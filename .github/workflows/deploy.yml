@@ -34,12 +34,49 @@ jobs:
           ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" 'bash -s' <<'REMOTE'
             set -euo pipefail
 
-            cd /opt/jcp-production
+            if [ -f /opt/jcp-production/docker-compose.prod.yml ] && [ -d /opt/jcp-production/.git ]; then
+              APP_DIR=/opt/jcp-production
+            elif [ -f /home/jogjacreativepro/jcp-enterprise-ai/docker-compose.prod.yml ] && [ -d /home/jogjacreativepro/jcp-enterprise-ai/.git ]; then
+              APP_DIR=/home/jogjacreativepro/jcp-enterprise-ai
+            else
+              echo 'No supported production checkout found on VPS' >&2
+              exit 1
+            fi
+
+            cd "$APP_DIR"
             git fetch origin main
             git checkout main
             git pull --ff-only origin main
 
-            docker compose -f docker-compose.prod.yml --env-file .env up -d --build --remove-orphans
+            # Compose Bake/buildx is optional; use the standard builder and pre-pull
+            # every external Dockerfile base image with retries. This avoids a single
+            # transient Docker Hub TLS timeout aborting the deployment.
+            export COMPOSE_BAKE=false
+            pull_base_image() {
+              local image="$1"
+              local attempt
+              for attempt in 1 2 3 4 5; do
+                if docker pull "$image"; then
+                  return 0
+                fi
+                echo "docker pull ${image} failed (attempt ${attempt}/5)" >&2
+                if [ "$attempt" -lt 5 ]; then
+                  sleep $((attempt * 10))
+                fi
+              done
+              return 1
+            }
+
+            mapfile -t base_images < <(
+              awk '$1 == "FROM" && $2 ~ /[.:@\/]/ { print $2 }' \
+                backend/Dockerfile AI/Dockerfile frontend/Dockerfile | sort -u
+            )
+            for image in "${base_images[@]}"; do
+              pull_base_image "$image"
+            done
+
+            docker compose -f docker-compose.prod.yml --env-file .env build --pull=false backend ai-api frontend
+            docker compose -f docker-compose.prod.yml --env-file .env up -d --no-build --remove-orphans
             docker compose -f docker-compose.prod.yml --env-file .env exec -T backend npx prisma migrate deploy
             docker compose -f docker-compose.prod.yml --env-file .env exec -T backend node -e "fetch('http://127.0.0.1:8000/health').then((response) => { if (!response.ok) process.exit(1) })"
             docker compose -f docker-compose.prod.yml --env-file .env exec -T ai-api python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
