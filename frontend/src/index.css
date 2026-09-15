@@ -1825,7 +1825,9 @@ button { cursor: pointer; }
 .announcement-meta { display: flex; flex-wrap: wrap; gap: 7px 12px; color: var(--text-muted); font-size: var(--fs-xs); }
 .announcement-meta b { color: var(--accent); font-weight: var(--fw-heavy); }
 .announcement-card.archived .announcement-meta b { color: var(--text-muted); }
-.announcement-content h2 { margin: 7px 0 6px; color: var(--text-strong); font-size: var(--fs-lg); line-height: 1.35; overflow-wrap: anywhere; }
+/* Jarak ke isinya diambil dari jatah paragraf, bukan dari tinggi kartu: kartu
+   tetap seukuran bingkai gambar, teksnya yang bergulir sedikit lebih awal. */
+.announcement-content h2 { margin: 7px 0 13px; color: var(--text-strong); font-size: var(--fs-lg); line-height: 1.35; overflow-wrap: anywhere; }
 /* Gutter scrollbar dipesan tetap supaya teks berhenti di tempat yang sama pada
    kartu yang isinya muat maupun yang bergulir. overscroll-behavior menahan
    guliran agar tidak melompat ke halaman begitu teksnya mentok. */
