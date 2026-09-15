@@ -15,7 +15,14 @@ const ANNOUNCEMENT_SELECT = {
   publishedAt: true,
   createdAt: true,
   updatedAt: true,
-  createdBy: { select: { id: true, displayName: true } },
+  createdBy: {
+    select: {
+      id: true,
+      displayName: true,
+      jobTitle: true,
+      jabatan: { select: { name: true } },
+    },
+  },
   _count: { select: { reads: true } },
 } as const;
 

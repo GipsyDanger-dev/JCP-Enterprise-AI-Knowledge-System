@@ -361,7 +361,7 @@ export function AnnouncementsPage() {
                     tombolnya berada di sisi kiri garis pemisah, dan letaknya
                     tetap sama di semua kartu tanpa terseret panjang isinya. */}
                 <div className="announcement-head">
-                  <div className="announcement-meta"><span>{formatPublishedAt(announcement.publishedAt, isId)}</span><span>{isId ? `Oleh ${announcement.createdBy.displayName}` : `By ${announcement.createdBy.displayName}`}</span>{canManage && <b>{announcement.isActive ? (isId ? 'Aktif' : 'Active') : (isId ? 'Diarsipkan' : 'Archived')}</b>}</div>
+                  <div className="announcement-meta"><span>{formatPublishedAt(announcement.publishedAt, isId)}</span><span>{[announcement.createdBy.displayName, announcement.createdBy.jabatan?.name ?? announcement.createdBy.jobTitle].filter(Boolean).join(' - ')}</span>{canManage && <b>{announcement.isActive ? (isId ? 'Aktif' : 'Active') : (isId ? 'Diarsipkan' : 'Archived')}</b>}</div>
                   {mine && <div className="announcement-actions">
                     <button className="icon-button" disabled={busy} title={isId ? 'Sunting pengumuman' : 'Edit announcement'} onClick={() => setEditingId(announcement.id)}><Pencil size={17} /></button>
                     <button className="icon-button" disabled={busy} title={announcement.isActive ? (isId ? 'Arsipkan pengumuman' : 'Archive announcement') : (isId ? 'Aktifkan pengumuman' : 'Restore announcement')} onClick={() => toggleActive(announcement)}>{announcement.isActive ? <Archive size={17} /> : <RotateCcw size={17} />}</button>

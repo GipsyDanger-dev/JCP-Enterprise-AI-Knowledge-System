@@ -9,7 +9,12 @@ export interface Announcement {
   publishedAt: string
   createdAt: string
   updatedAt: string
-  createdBy: { id: string; displayName: string }
+  createdBy: {
+    id: string
+    displayName: string
+    jobTitle: string | null
+    jabatan: { name: string } | null
+  }
   /** Jumlah pegawai yang sudah membaca. Null untuk yang tidak berhak melihat laporannya. */
   readCount: number | null
 }
