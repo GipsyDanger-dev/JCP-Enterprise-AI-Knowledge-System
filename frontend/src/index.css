@@ -1798,14 +1798,26 @@ button { cursor: pointer; }
 .announcement-actions .icon-button.danger:hover:not(:disabled) { background: color-mix(in srgb, #e53e3e 13%, transparent); color: #e53e3e; }
 .announcement-empty { min-height: 180px; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--text-muted); text-align: center; }
 .announcement-list { display: grid; gap: 10px; }
-.announcement-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: flex-start; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 18px; }
-/* Lebar tetap, bukan persentase: gambar tidak lagi ikut melebar bersama layar,
-   jadi tinggi kartu ditentukan teksnya dan seluruh kartu bergambar berbaris rapi
-   di kolom yang sama. */
-.announcement-card.with-image { grid-template-columns: auto minmax(0, 1fr) 240px; }
+/* Satu angka yang mengatur dua hal sekaligus: lebar panel gambar, dan — karena
+   bingkainya persegi — tinggi maksimum isi kartu. Keduanya sengaja diikat pada
+   variabel yang sama supaya tidak bisa berselisih. */
+.announcement-card { --announcement-media: 240px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: flex-start; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 18px; }
+/* Lebar tetap, bukan persentase: gambar tidak ikut melebar bersama layar, jadi
+   seluruh kartu bergambar berbaris rapi di kolom yang sama. */
+.announcement-card.with-image { grid-template-columns: auto minmax(0, 1fr) var(--announcement-media); }
 .announcement-card.archived { opacity: .62; }
 .announcement-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.announcement-content { min-width: 0; }
+/* Tinggi kartu dipatok pada gambarnya, bukan pada panjang teksnya: isi yang
+   panjang dulu memanjangkan kartu sampai beberapa layar dan menyisakan kolom
+   gambar kosong menggantung di bawahnya. Sekarang kolom teks berhenti tepat
+   setinggi bingkai gambar dan teksnya yang bergulir di dalam.
+   Flex, bukan max-height pada paragrafnya: jatah paragraf jadi sisa ruang
+   setelah tanggal, judul, dan tombol pembaca — tidak perlu menebak angka yang
+   akan meleset begitu judulnya turun baris. */
+.announcement-content { min-width: 0; display: flex; flex-direction: column; max-height: var(--announcement-media); }
+/* Hanya paragrafnya yang mengalah saat ruangnya kurang; sisanya tetap utuh. */
+.announcement-content > * { flex: 0 0 auto; }
+.announcement-content > p { flex: 1 1 auto; min-height: 0; }
 /* Tombol kelola berbagi baris dengan tanggal, bukan menempati kolom sendiri di
    ujung kartu: letaknya jadi sama di setiap kartu, dan pada kartu bergambar ia
    tetap berada di sisi kiri garis pemisah. */
@@ -1814,7 +1826,10 @@ button { cursor: pointer; }
 .announcement-meta b { color: var(--accent); font-weight: var(--fw-heavy); }
 .announcement-card.archived .announcement-meta b { color: var(--text-muted); }
 .announcement-content h2 { margin: 7px 0 6px; color: var(--text-strong); font-size: var(--fs-lg); line-height: 1.35; overflow-wrap: anywhere; }
-.announcement-content p { margin: 0; color: var(--text-body); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Gutter scrollbar dipesan tetap supaya teks berhenti di tempat yang sama pada
+   kartu yang isinya muat maupun yang bergulir. overscroll-behavior menahan
+   guliran agar tidak melompat ke halaman begitu teksnya mentok. */
+.announcement-content p { margin: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; color: var(--text-body); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Panel gambar, dipisahkan garis setinggi kartu. Margin negatif seukuran padding
    kartu membuat garisnya mencapai tepi atas dan bawah, bukan berhenti menggantung
    di tengah. Warnanya --border-hover: lebih tegas dari garis kartu sehingga
@@ -1837,7 +1852,9 @@ button { cursor: pointer; }
 .announcement-lightbox img { display: block; max-width: 100%; max-height: calc(100dvh - 64px); border-radius: 8px; cursor: default; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
 .announcement-lightbox-close { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .14); color: #fff; cursor: pointer; transition: background var(--ease-fast); }
 .announcement-lightbox-close:hover { background: rgba(255, 255, 255, .26); }
-.announcement-readers-toggle { display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; border: 1px solid var(--border-strong); border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--fs-xs); font-weight: var(--fw-heavy); padding: 6px 13px; cursor: pointer; }
+/* align-self supaya tombolnya tetap selebar isinya: sebagai anak flex kolom,
+   tanpa ini ia terentang selebar kartu. */
+.announcement-readers-toggle { align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; border: 1px solid var(--border-strong); border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--fs-xs); font-weight: var(--fw-heavy); padding: 6px 13px; cursor: pointer; }
 .announcement-readers-toggle:hover, .announcement-readers-toggle[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
 /* Panel laporan adalah anak keempat kartu; dibentangkan supaya tidak terjepit
    di kolom ikon saat grid membuat baris baru. */
@@ -1857,7 +1874,10 @@ button { cursor: pointer; }
 
 @media (max-width: 600px) {
   .announcement-composer, .announcement-card { padding: 14px; }
-  .announcement-card { grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+  /* Layar sempit: gambarnya pindah ke bawah teks dan melebar penuh, jadi tidak
+     ada lagi kolom yang perlu disamakan tingginya — batasnya tinggal menjaga
+     satu kartu tidak menghabiskan hampir seluruh tinggi layar. */
+  .announcement-card { --announcement-media: 13rem; grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
   .announcement-card.with-image { grid-template-columns: auto minmax(0, 1fr); }
   /* Tidak ada ruang untuk dua kolom: panel gambar turun ke bawah teks dan garis
      pemisahnya berputar jadi mendatar, tetap memisahkan hal yang sama. */
