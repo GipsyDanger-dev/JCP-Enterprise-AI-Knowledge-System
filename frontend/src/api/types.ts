@@ -10,6 +10,9 @@ export interface ApiErrorBody {
 // Sisanya nilai lama yang masih mungkin tersimpan di akun lawas.
 export type ApiRole = 'SUPER_ADMIN' | 'ADMIN_UNIT' | 'PEGAWAI' | 'ADMIN' | 'USER' | 'BENDAHARA' | 'SEKRETARIS' | 'OPERASIONAL' | 'HUMAS'
 
+/** Ketiganya yang punya arti di backend; nilai lain di ApiRole hanya warisan. */
+export type ApiCurrentRole = Extract<ApiRole, 'SUPER_ADMIN' | 'ADMIN_UNIT' | 'PEGAWAI'>
+
 export interface ApiUnitKerja {
   id: string
   code: string

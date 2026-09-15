@@ -36,6 +36,9 @@ const READER_SELECT = {
   unitKerja: { select: { name: true } },
 } as const;
 
+/** Sudah membaca dan seluruh sasarannya, untuk satu pengumuman. */
+type ReadStats = { readCount: number; total: number };
+
 @Injectable()
 export class AnnouncementsService {
   constructor(
@@ -95,9 +98,67 @@ export class AnnouncementsService {
    * bagi pegawai biasa angka itu tidak berguna dan hanya membocorkan seberapa
    * ramai rekannya membuka pengumuman.
    */
-  private toResponse<T extends { _count: { reads: number } }>(row: T, canSeeReaders: boolean) {
-    const { _count, ...announcement } = row;
-    return { ...announcement, readCount: canSeeReaders ? _count.reads : null };
+  private toResponse<T>(row: T, stats: ReadStats | null) {
+    return { ...row, readCount: stats?.readCount ?? null, audienceTotal: stats?.total ?? null };
+  }
+
+  /** Satu pengumuman beserta hitungan bacanya, untuk balasan create dan update. */
+  private async toSingleResponse<T extends { id: string; createdBy: { id: string } }>(row: T, actor: AuthenticatedUser) {
+    if (!this.canViewReaders(actor)) return this.toResponse(row, null);
+    const stats = await this.readStats(actor.workspaceId, [{ id: row.id, createdById: row.createdBy.id }]);
+    return this.toResponse(row, stats.get(row.id) ?? null);
+  }
+
+  /**
+   * Sudah membaca dan jumlah sasaran per pengumuman, dihitung dengan aturan
+   * yang sama persis seperti laporan rincinya: hanya pegawai perusahaan yang
+   * masih aktif, dan tanpa penerbitnya sendiri — ia tidak menerima
+   * notifikasinya, jadi tidak pernah menjadi sasaran.
+   *
+   * Dulu dipakai _count relasi mentah, yang ikut menghitung baris baca milik
+   * penerbit dan milik akun yang sudah dinonaktifkan. Akibatnya angka di kartu
+   * selalu lebih besar daripada "x dari y" yang muncul setelah tombolnya
+   * ditekan, padahal keduanya mengaku menghitung hal yang sama.
+   */
+  private async readStats(workspaceId: string, announcements: readonly { id: string; createdById: string }[]) {
+    const stats = new Map<string, ReadStats>();
+    if (announcements.length === 0) return stats;
+
+    const ids = announcements.map((announcement) => announcement.id);
+    const creatorIds = [...new Set(announcements.map((announcement) => announcement.createdById))];
+    const audience = await this.prisma.user.findMany({
+      where: { workspaceId, accountType: 'COMPANY', isActive: true },
+      select: { id: true },
+    });
+    const audienceIds = audience.map((user) => user.id);
+    const [grouped, creatorReads] = await Promise.all([
+      this.prisma.announcementRead.groupBy({
+        by: ['announcementId'],
+        where: { announcementId: { in: ids }, userId: { in: audienceIds } },
+        _count: { _all: true },
+      }),
+      // Baca milik penerbit dikurangkan belakangan: penerbitnya berbeda pada
+      // tiap baris, jadi pengecualiannya tidak bisa ikut masuk ke where di atas.
+      this.prisma.announcementRead.findMany({
+        where: { announcementId: { in: ids }, userId: { in: creatorIds } },
+        select: { announcementId: true, userId: true },
+      }),
+    ]);
+    const readCountById = new Map(grouped.map((row) => [row.announcementId, row._count._all]));
+    const readByCreator = new Set(creatorReads.map((read) => read.announcementId + ':' + read.userId));
+    const audienceIdSet = new Set(audienceIds);
+
+    for (const announcement of announcements) {
+      // Penerbit yang sudah nonaktif tidak ikut terhitung sejak awal, jadi tidak
+      // ada yang perlu dikurangkan untuknya.
+      const creatorCounted = audienceIdSet.has(announcement.createdById);
+      const ownRead = creatorCounted && readByCreator.has(announcement.id + ':' + announcement.createdById);
+      stats.set(announcement.id, {
+        total: audienceIds.length - (creatorCounted ? 1 : 0),
+        readCount: (readCountById.get(announcement.id) ?? 0) - (ownRead ? 1 : 0),
+      });
+    }
+    return stats;
   }
 
   async list(actor: AuthenticatedUser) {
@@ -110,7 +171,10 @@ export class AnnouncementsService {
       select: ANNOUNCEMENT_SELECT,
       orderBy: [{ isActive: 'desc' }, { publishedAt: 'desc' }],
     });
-    return items.map((item) => this.toResponse(item, canSeeReaders));
+    const stats = canSeeReaders
+      ? await this.readStats(actor.workspaceId, items.map((item) => ({ id: item.id, createdById: item.createdBy.id })))
+      : null;
+    return items.map((item) => this.toResponse(item, stats?.get(item.id) ?? null));
   }
 
   async create(input: CreateAnnouncementDto, actor: AuthenticatedUser) {
@@ -126,7 +190,7 @@ export class AnnouncementsService {
       select: ANNOUNCEMENT_SELECT,
     });
     await this.notifyEveryone(announcement, actor.sub, actor.workspaceId);
-    return this.toResponse(announcement, this.canViewReaders(actor));
+    return this.toSingleResponse(announcement, actor);
   }
 
   /** Notifikasi ke seluruh karyawan aktif, kecuali penerbitnya sendiri. */
@@ -246,7 +310,7 @@ export class AnnouncementsService {
   async update(id: string, input: UpdateAnnouncementDto, actor: AuthenticatedUser) {
     await this.assertCanEdit(id, actor);
     const updated = await this.prisma.announcement.update({ where: { id }, data: input, select: ANNOUNCEMENT_SELECT });
-    return this.toResponse(updated, this.canViewReaders(actor));
+    return this.toSingleResponse(updated, actor);
   }
 
   /**
