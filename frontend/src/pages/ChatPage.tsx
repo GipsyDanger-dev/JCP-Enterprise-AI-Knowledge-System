@@ -13,6 +13,11 @@ type Citation = ChatMessage['citations'][number]
 
 const COMMON_QUERY_WORDS = new Set(['yang', 'dengan', 'untuk', 'dalam', 'tentang', 'pada', 'dari', 'atau', 'dan', 'saya', 'kami', 'bisa', 'bagaimana', 'berapa', 'apakah', 'tolong', 'dokumen', 'perusahaan'])
 const NO_ANSWER_TEXT = 'Informasi tidak ditemukan pada dokumen yang tersedia.'
+/**
+ * Sedikit lebih lama daripada --ease-panel di CSS, supaya pemuatan ulang PDF
+ * jatuh setelah panelnya benar-benar berhenti bergerak.
+ */
+const JEDA_MUAT_ULANG_PDF = 280
 
 function formatEvidencePreview(excerpt: string, question: string | null) {
   const normalized = excerpt
@@ -137,6 +142,18 @@ export function ChatPage() {
   const [sourcePdfUrl, setSourcePdfUrl] = useState<string | null>(null)
   const [sourcePdfLoading, setSourcePdfLoading] = useState(false)
   const [sourceExpanded, setSourceExpanded] = useState(false)
+  // PDF menghitung view=FitH sekali saja, saat dimuat, jadi setelah jendelanya
+  // berganti ukuran halamannya tetap selebar jendela yang lama dan iframe-nya
+  // perlu dimuat ulang. Dulu itu dilakukan lewat key yang ikut berubah bersama
+  // sourceExpanded — artinya PDF-nya dimuat ulang tepat saat animasi dimulai,
+  // dan yang terlihat sepanjang perpindahan adalah bingkai putih kosong.
+  // Sekarang pemuatannya ditunda sampai ukurannya diam, jadi yang bergerak
+  // hanya jendelanya, dengan halaman lama masih terbaca di dalamnya.
+  const [pdfMuatUlang, setPdfMuatUlang] = useState(0)
+  const ukuranSebelumnya = useRef(sourceExpanded)
+  // Ukuran PDF selama jendelanya bergerak; null berarti sedang diam.
+  const [pdfBeku, setPdfBeku] = useState<{ lebar: number; tinggi: number } | null>(null)
+  const pdfKotakRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!selectedSource) {
@@ -189,6 +206,33 @@ export function ChatPage() {
   const sourcePdfSrc = sourcePdfUrl
     ? `${sourcePdfUrl}#page=${selectedSource?.pageNumber ?? 1}&view=FitH`
     : null
+
+  useEffect(() => {
+    // Hanya saat ukurannya benar-benar berubah: membuka pratinjau tidak boleh
+    // ikut menjadwalkan pemuatan ulang untuk PDF yang baru saja tampil.
+    if (ukuranSebelumnya.current === sourceExpanded) return
+    ukuranSebelumnya.current = sourceExpanded
+    const jeda = window.setTimeout(() => {
+      setPdfBeku(null)
+      setPdfMuatUlang((nilai) => nilai + 1)
+    }, JEDA_MUAT_ULANG_PDF)
+    return () => window.clearTimeout(jeda)
+  }, [sourceExpanded])
+
+  /**
+   * Menukar ukuran jendela sambil mengunci PDF pada ukurannya yang sekarang.
+   *
+   * Melebarkan iframe-nya ikut, frame demi frame, berarti penampil PDF menata
+   * ulang seluruh halaman puluhan kali sedetik — itu, bukan animasi bingkainya,
+   * yang membuat perpindahan terasa tersendat. Selama bergerak ukurannya
+   * dibekukan dan hanya dipotong oleh bingkai yang berubah; setelah diam
+   * barulah dilepas, lalu dimuat ulang sekali untuk menyesuaikan lebar baru.
+   */
+  const ubahUkuranJendela = () => {
+    const kotak = pdfKotakRef.current
+    if (kotak) setPdfBeku({ lebar: kotak.clientWidth, tinggi: kotak.clientHeight })
+    setSourceExpanded((value) => !value)
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -252,7 +296,7 @@ export function ChatPage() {
       </form>
       {selectedSource && (
         <div className={`source-preview-backdrop ${sourceExpanded ? 'is-expanded' : ''}`} role="presentation" onClick={() => { setSourceExpanded(false); setSelectedSource(null) }}>
-          <section className={`source-preview ${sourceExpanded ? 'is-expanded' : ''}`} role="dialog" aria-modal="true" aria-label="Source preview" onClick={(event) => event.stopPropagation()}>
+          <section className={`source-preview ${sourceExpanded ? 'is-expanded' : ''} ${pdfBeku ? 'is-resizing' : ''}`} role="dialog" aria-modal="true" aria-label="Source preview" onClick={(event) => event.stopPropagation()}>
             <header>
               <span><FileText size={18} /> {sourceExpanded ? documentLabel(selectedSource) : (isId ? 'Sumber jawaban' : 'Answer source')}</span>
               <div className="source-preview-actions">
@@ -260,20 +304,27 @@ export function ChatPage() {
                   type="button"
                   className="icon-button"
                   title={sourceExpanded ? (isId ? 'Perkecil jendela' : 'Shrink window') : (isId ? 'Perbesar jendela' : 'Enlarge window')}
-                  onClick={() => setSourceExpanded((value) => !value)}
+                  onClick={ubahUkuranJendela}
                 >
                   {sourceExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                 </button>
                 <button type="button" className="icon-button" title="Close" onClick={() => { setSourceExpanded(false); setSelectedSourceQuestion(null); setSelectedSource(null) }}><X size={18} /></button>
               </div>
             </header>
-            <strong>{documentLabel(selectedSource)}</strong>
-            <small>{[selectedSource.sectionTitle, selectedSource.pageNumber ? `Page ${selectedSource.pageNumber}` : null, selectedSource.version].filter(Boolean).join(' · ')}</small>
+            {/* Dibungkus dua lapis supaya tingginya bisa dianimasikan sampai nol
+                saat jendelanya dibesarkan; lihat .source-preview-title. */}
+            <div className="source-preview-title">
+              <div>
+                <strong>{documentLabel(selectedSource)}</strong>
+                <small>{[selectedSource.sectionTitle, selectedSource.pageNumber ? `Page ${selectedSource.pageNumber}` : null, selectedSource.version].filter(Boolean).join(' · ')}</small>
+              </div>
+            </div>
             {sourcePdfLoading && <div className="source-preview-loading">{isId ? 'Memuat PDF asli...' : 'Loading original PDF...'}</div>}
             {sourcePdfSrc ? (
-              <div className="source-preview-pdf">
+              <div className={`source-preview-pdf ${pdfBeku ? 'is-frozen' : ''}`} ref={pdfKotakRef}>
                 <iframe
-                  key={String(sourceExpanded)}
+                  key={pdfMuatUlang}
+                  style={pdfBeku ? { width: pdfBeku.lebar, height: pdfBeku.tinggi } : undefined}
                   title={`${documentLabel(selectedSource)} page ${selectedSource.pageNumber ?? 1}`}
                   src={sourcePdfSrc}
                 />
