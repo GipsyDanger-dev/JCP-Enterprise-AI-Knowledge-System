@@ -349,8 +349,8 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
       </form>
       <p className="field-hint org-section-hint">
         {isId
-          ? 'Jabatan tidak menentukan dokumen apa yang terlihat — itu urusan unit kerja. Yang diatur di sini hanya wewenang atas pengumuman dan bacaan wajib. Admin selalu punya ketiganya tanpa perlu dicentang.'
-          : 'Job titles do not decide document access — work units do. What is set here is only authority over announcements and required readings. Admins always have all three.'}
+          ? 'Jabatan tidak menentukan dokumen apa yang terlihat — itu urusan unit kerja. Yang diatur di sini hanya wewenang atas pengumuman. Admin selalu memiliki wewenang tersebut.'
+          : 'Job titles do not decide document access — work units do. This section only manages announcement permissions. Admins always have these permissions.'}
       </p>
 
       <div className="data-table">
@@ -360,7 +360,6 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
               <th>{isId ? 'Jabatan' : 'Job title'}</th>
               <th className="org-check-col">{isId ? 'Kelola pengumuman' : 'Manage announcements'}</th>
               <th className="org-check-col">{isId ? 'Lihat pembaca' : 'View readers'}</th>
-              <th className="org-check-col">{isId ? 'Tugaskan bacaan wajib' : 'Assign required reading'}</th>
               <th>{isId ? 'Pemegang' : 'Holders'}</th>
               <th>Status</th>
               <th />
@@ -368,7 +367,7 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
           </thead>
           <tbody>
             {items.length === 0 ? (
-              <tr><td colSpan={7} className="empty-row">{isId ? 'Belum ada jabatan.' : 'No job titles yet.'}</td></tr>
+              <tr><td colSpan={6} className="empty-row">{isId ? 'Belum ada jabatan.' : 'No job titles yet.'}</td></tr>
             ) : items.map((jabatan) => (
               <tr key={jabatan.id}>
                 <td>
@@ -396,11 +395,6 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
                   checked={jabatan.canViewAnnouncementReaders}
                   disabled={busy === jabatan.id}
                   onChange={(value) => ubah(jabatan, { canViewAnnouncementReaders: value })}
-                />
-                <PermissionCell
-                  checked={jabatan.canAssignRequiredReadings}
-                  disabled={busy === jabatan.id}
-                  onChange={(value) => ubah(jabatan, { canAssignRequiredReadings: value })}
                 />
                 <td>{isId ? `${jabatan.userCount} pengguna` : `${jabatan.userCount} users`}</td>
                 <td>
