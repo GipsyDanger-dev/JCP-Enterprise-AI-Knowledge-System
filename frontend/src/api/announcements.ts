@@ -12,6 +12,8 @@ export interface Announcement {
   createdBy: { id: string; displayName: string }
   /** Jumlah pegawai yang sudah membaca. Null untuk yang tidak berhak melihat laporannya. */
   readCount: number | null
+  /** Seluruh pegawai yang menjadi sasaran, tanpa penerbitnya. Null seperti readCount. */
+  audienceTotal: number | null
 }
 
 export interface AnnouncementReader {

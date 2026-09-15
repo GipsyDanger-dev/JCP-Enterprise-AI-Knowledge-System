@@ -285,7 +285,7 @@ export function AnnouncementsPage() {
       const loaded = await getAnnouncementReaders(announcement.id, token)
       // Angka di tombol berasal dari daftar yang dimuat saat halaman dibuka;
       // laporan ini lebih baru, jadi sekalian dipakai menyegarkannya.
-      setAnnouncements((items) => items.map((item) => item.id === loaded.announcementId ? { ...item, readCount: loaded.readCount } : item))
+      setAnnouncements((items) => items.map((item) => item.id === loaded.announcementId ? { ...item, readCount: loaded.readCount, audienceTotal: loaded.total } : item))
       if (requestedReportRef.current !== announcement.id) return
       setReport(loaded)
     } catch (err) {
@@ -371,7 +371,12 @@ export function AnnouncementsPage() {
                 <h2>{announcement.title}</h2><p>{announcement.body}</p>
                 {canViewReaders && <button type="button" className="announcement-readers-toggle" aria-expanded={openReport === announcement.id} onClick={() => toggleReport(announcement)}>
                   <Users size={15} />
-                  {isId ? `${announcement.readCount ?? 0} orang sudah membaca` : `Read by ${announcement.readCount ?? 0}`}
+                  {/* Disebut lengkap "x dari y" persis seperti kepala laporannya:
+                      selama tombol ini hanya menyebut satu angka, angka itu selalu
+                      terbaca sebagai jumlah lain daripada yang muncul setelah ditekan. */}
+                  {isId
+                    ? `${announcement.readCount ?? 0} dari ${announcement.audienceTotal ?? 0} pegawai sudah membaca`
+                    : `Read by ${announcement.readCount ?? 0} of ${announcement.audienceTotal ?? 0}`}
                 </button>}
               </div>
               {announcement.imageDataUrl && <div className="announcement-media">
