@@ -18,7 +18,7 @@ import { useScrollToError } from '@/hooks/useScrollToError'
 
 // 'employee' sengaja bukan nilai role: yang dimaksud tombolnya adalah "semua
 // yang bukan admin", termasuk akun lama dengan role warisan.
-type FilterRole = 'all' | 'SUPER_ADMIN' | 'employee'
+type FilterRole = 'all' | 'SUPER_ADMIN' | 'ADMIN_UNIT' | 'employee'
 
 /** Halaman ini mengurus dua hal: orangnya, dan kerangka tempat orang ditaruh. */
 type View = 'pengguna' | OrganizationSection
@@ -152,17 +152,20 @@ export function UsersPage() {
   }
 
   // Lewat normalizeRole, bukan dibandingkan mentah: akun lawas ber-role ADMIN
-  // adalah admin penuh di mata backend, jadi menghitungnya sebagai pegawai
-  // membuat kedua angka di tombol saring tidak cocok dengan isi daftarnya.
+  // adalah admin penuh di mata backend, jadi setiap tombol saring tetap cocok
+  // dengan peran efektif yang digunakan oleh server.
   const isAdminRole = (user: ApiUser) => normalizeRole(user.role) === 'SUPER_ADMIN'
   const filtered =
     filter === 'all'
       ? users
       : filter === 'SUPER_ADMIN'
         ? users.filter(isAdminRole)
-        : users.filter((u) => !isAdminRole(u))
+        : filter === 'ADMIN_UNIT'
+          ? users.filter((user) => normalizeRole(user.role) === 'ADMIN_UNIT')
+          : users.filter((user) => normalizeRole(user.role) === 'PEGAWAI')
   const adminCount = users.filter(isAdminRole).length
-  const employeeCount = users.length - adminCount
+  const unitAdminCount = users.filter((user) => normalizeRole(user.role) === 'ADMIN_UNIT').length
+  const employeeCount = users.filter((user) => normalizeRole(user.role) === 'PEGAWAI').length
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
@@ -316,6 +319,9 @@ export function UsersPage() {
         </button>
         <button className={`filter-chip ${filter === 'SUPER_ADMIN' ? 'active' : ''}`} onClick={() => setFilter('SUPER_ADMIN')}>
           Admin ({adminCount})
+        </button>
+        <button className={`filter-chip ${filter === 'ADMIN_UNIT' ? 'active' : ''}`} onClick={() => setFilter('ADMIN_UNIT')}>
+          {roleLabel('ADMIN_UNIT')} ({unitAdminCount})
         </button>
         <button className={`filter-chip ${filter === 'employee' ? 'active' : ''}`} onClick={() => setFilter('employee')}>
           {isId ? 'Karyawan' : 'Employee'} ({employeeCount})
