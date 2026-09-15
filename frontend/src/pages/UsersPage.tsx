@@ -332,6 +332,8 @@ export function UsersPage() {
             <thead>
               <tr>
                 <th>{isId ? 'Orang' : 'Person'}</th>
+                <th>{isId ? 'Unit' : 'Work unit'}</th>
+                <th>{isId ? 'Jabatan' : 'Job title'}</th>
                 <th>Role</th>
                 <th>{isId ? 'Akses' : 'Access'}</th>
                 <th>Status</th>
@@ -340,7 +342,7 @@ export function UsersPage() {
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={5} className="empty-row">Tidak ada pengguna ditemukan.</td></tr>
+                <tr><td colSpan={7} className="empty-row">Tidak ada pengguna ditemukan.</td></tr>
               ) : filtered.map((user) => {
                 // Menonaktifkan diri sendiri langsung mengunci pelakunya keluar, dan
                 // akun pemilik platform (maintainer sistem, bukan admin perusahaan)
@@ -371,22 +373,22 @@ export function UsersPage() {
                         : <span className="avatar">{userInitials(user.displayName)}</span>}
                       <span>
                         <strong>{user.displayName}</strong>
-                        <small>@{user.username}{jabatanNama ? ` · ${jabatanNama}` : ''}</small>
+                        <small>@{user.username}</small>
                       </span>
                     </div>
                   </td>
+                  <td>{penempatan ?? '-'}</td>
+                  <td>{jabatanNama ?? '-'}</td>
                   <td><span className={`role-badge ${peran.toLowerCase()}`}>{roleLabel(user.role)}</span></td>
                   <td>
                     <span className="access-cell">
                       <span>{peran === 'SUPER_ADMIN'
                         ? (isId ? 'Akses penuh' : 'Full access')
-                        : penempatan
-                          ? `${penempatan}${peran === 'ADMIN_UNIT' ? (isId ? ' — kelola' : ' — manage') : ''}`
-                          : (isId ? 'Belum ditempatkan' : 'No work unit')}</span>
-                      {/* Unit kerja admin tidak membatasi apa pun, tetapi divisinya tetap
-                          perlu terbaca di daftar ini — kalau tidak, satu-satunya cara
-                          mengetahuinya adalah membuka formulir suntingnya. */}
-                      {peran === 'SUPER_ADMIN' && penempatan && <small>{penempatan}</small>}
+                        : !penempatan
+                          ? (isId ? 'Belum ditempatkan' : 'No work unit')
+                          : peran === 'ADMIN_UNIT'
+                            ? (isId ? 'Kelola unit' : 'Manage unit')
+                            : (isId ? 'Dokumen unit' : 'Unit documents')}</span>
                     </span>
                   </td>
                   <td>{user.isActive !== false
