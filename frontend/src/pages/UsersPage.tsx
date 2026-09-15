@@ -5,7 +5,7 @@ import { PageHeading } from '@/components/PageHeading'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { errorMessage } from '@/api/client'
 import { changePassword, createUser, deleteUser, getUserReferenceData, listUsers, updateUser } from '@/api/users'
-import { userInitials, userRoleLabel } from '@/utils/users'
+import { normalizeRole, userInitials, userRoleLabel } from '@/utils/users'
 import { prepareProfilePhoto } from '@/utils/profilePhoto'
 import { OrganizationManager } from '@/components/OrganizationManager'
 import { InlineAdd } from '@/components/InlineAdd'
@@ -151,14 +151,18 @@ export function UsersPage() {
     pilih(jabatan.id)
   }
 
+  // Lewat normalizeRole, bukan dibandingkan mentah: akun lawas ber-role ADMIN
+  // adalah admin penuh di mata backend, jadi menghitungnya sebagai pegawai
+  // membuat kedua angka di tombol saring tidak cocok dengan isi daftarnya.
+  const isAdminRole = (user: ApiUser) => normalizeRole(user.role) === 'SUPER_ADMIN'
   const filtered =
     filter === 'all'
       ? users
       : filter === 'SUPER_ADMIN'
-        ? users.filter((u) => u.role === 'SUPER_ADMIN')
-        : users.filter((u) => u.role !== 'SUPER_ADMIN')
-  const adminCount = users.filter((u) => u.role === 'SUPER_ADMIN').length
-  const employeeCount = users.filter((u) => u.role !== 'SUPER_ADMIN').length
+        ? users.filter(isAdminRole)
+        : users.filter((u) => !isAdminRole(u))
+  const adminCount = users.filter(isAdminRole).length
+  const employeeCount = users.length - adminCount
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
@@ -222,7 +226,10 @@ export function UsersPage() {
     // Pengguna yang belum tertaut ke baris jabatan dibuka dengan pilihan
     // penandanya sendiri, bukan dengan dropdown kosong.
     setEditJabatanId(user.jabatanId ?? (user.jobTitle ? JABATAN_TEKS_LAMA : ''))
-    setEditRole(user.role)
+    // Role warisan dibuka pada padanannya yang sekarang, bukan apa adanya:
+    // dropdown hanya memuat ketiga role yang dipakai, dan padanannya membawa
+    // wewenang yang sama persis, jadi menyimpan ulang tidak menggeser apa pun.
+    setEditRole(normalizeRole(user.role))
     setEditPhoto(user.photoUrl ?? '')
     setEditPassword('')
     setEditError(null)
@@ -341,6 +348,15 @@ export function UsersPage() {
                 // dimatikan supaya alasannya terbaca sebelum diklik.
                 const diriSendiri = currentUser?.id === user.id
                 const pemilikPlatform = user.isPlatformOwner === true
+                // Jabatan dibaca dari baris jabatannya; jobTitle adalah teks bebas
+                // warisan yang masih terpakai akun lawas, dan backend menjaga keduanya
+                // sejalan begitu akun itu disunting.
+                const jabatanNama = user.jabatan?.name ?? (user.jobTitle || null)
+                // `division` cuma salinan teks nama unit kerjanya — satu isian yang sama
+                // mengisi keduanya — jadi dipakai sebagai cadangan untuk akun yang belum
+                // tertaut ke baris unit kerja mana pun.
+                const penempatan = user.unitKerja?.name ?? (user.division || null)
+                const peran = normalizeRole(user.role)
                 const alasanTerkunci = diriSendiri
                   ? (isId ? 'Tidak bisa menonaktifkan akun sendiri' : 'You cannot deactivate your own account')
                   : pemilikPlatform
@@ -355,16 +371,24 @@ export function UsersPage() {
                         : <span className="avatar">{userInitials(user.displayName)}</span>}
                       <span>
                         <strong>{user.displayName}</strong>
-                        <small>@{user.username}</small>
+                        <small>@{user.username}{jabatanNama ? ` · ${jabatanNama}` : ''}</small>
                       </span>
                     </div>
                   </td>
-                  <td><span className={`role-badge ${user.role.toLowerCase()}`}>{roleLabel(user.role)}</span></td>
-                  <td>{user.role === 'SUPER_ADMIN'
-                    ? (isId ? 'Akses penuh' : 'Full access')
-                    : user.unitKerja
-                      ? `${user.unitKerja.name}${user.role === 'ADMIN_UNIT' ? (isId ? ' — kelola' : ' — manage') : ''}`
-                      : (isId ? 'Belum ditempatkan' : 'No work unit')}</td>
+                  <td><span className={`role-badge ${peran.toLowerCase()}`}>{roleLabel(user.role)}</span></td>
+                  <td>
+                    <span className="access-cell">
+                      <span>{peran === 'SUPER_ADMIN'
+                        ? (isId ? 'Akses penuh' : 'Full access')
+                        : penempatan
+                          ? `${penempatan}${peran === 'ADMIN_UNIT' ? (isId ? ' — kelola' : ' — manage') : ''}`
+                          : (isId ? 'Belum ditempatkan' : 'No work unit')}</span>
+                      {/* Unit kerja admin tidak membatasi apa pun, tetapi divisinya tetap
+                          perlu terbaca di daftar ini — kalau tidak, satu-satunya cara
+                          mengetahuinya adalah membuka formulir suntingnya. */}
+                      {peran === 'SUPER_ADMIN' && penempatan && <small>{penempatan}</small>}
+                    </span>
+                  </td>
                   <td>{user.isActive !== false
                     ? <span className="active-user"><Check size={13} /> {isId ? 'Aktif' : 'Active'}</span>
                     : <span className="inactive-user"><X size={13} /> {isId ? 'Nonaktif' : 'Inactive'}</span>
@@ -480,12 +504,6 @@ export function UsersPage() {
                       {roleLabels.map((item) => (
                         <option key={item.role} value={item.role}>{item.label}</option>
                       ))}
-                      {/* Role warisan dari sebelum akses berpindah ke unit kerja tidak ada
-                          di daftar; ditampilkan apa adanya supaya menyunting akun lawas
-                          tidak diam-diam menaikkan atau menurunkan wewenangnya. */}
-                      {!roleLabels.some((item) => item.role === editRole) && (
-                        <option value={editRole}>{userRoleLabel(editRole)}</option>
-                      )}
                     </select>
                     <ChevronDown size={15} className="select-icon" />
                   </div>
