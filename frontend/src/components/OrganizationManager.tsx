@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Check, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Check, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { useConfirm } from './ConfirmDialog'
 import {
@@ -98,9 +98,13 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
   const { tanya, dialog: dialogKonfirmasi } = useConfirm()
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
+  const filteredUnits = units.filter((unit) => !normalizedSearch || [unit.name, unit.code].some((value) => value.toLocaleLowerCase().includes(normalizedSearch)))
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault()
@@ -194,6 +198,17 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
           : 'The work unit decides which documents its members can see. The code is the key and cannot be changed afterwards.'}
       </p>
 
+      <div className="filter-search org-list-search">
+        <Search size={16} />
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder={isId ? 'Cari unit kerja atau kode' : 'Search work units or code'}
+          aria-label={isId ? 'Cari unit kerja' : 'Search work units'}
+        />
+      </div>
+
       <div className="data-table">
         <table>
           <thead>
@@ -208,7 +223,9 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
           <tbody>
             {units.length === 0 ? (
               <tr><td colSpan={5} className="empty-row">{isId ? 'Belum ada unit kerja.' : 'No work units yet.'}</td></tr>
-            ) : units.map((unit) => (
+            ) : filteredUnits.length === 0 ? (
+              <tr><td colSpan={5} className="empty-row">{isId ? 'Unit kerja tidak ditemukan.' : 'No matching work units.'}</td></tr>
+            ) : filteredUnits.map((unit) => (
               <tr key={unit.id}>
                 <td>
                   {editingId === unit.id ? (
