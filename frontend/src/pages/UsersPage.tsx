@@ -9,6 +9,7 @@ import { normalizeRole, userInitials, userRoleLabel } from '@/utils/users'
 import { prepareProfilePhoto } from '@/utils/profilePhoto'
 import { OrganizationManager } from '@/components/OrganizationManager'
 import { InlineAdd } from '@/components/InlineAdd'
+import { TableTextScale, useTableTextScale } from '@/components/TableTextScale'
 import { createJabatan, createUnitKerja } from '@/api/organization'
 import type { OrganizationSection } from '@/components/OrganizationManager'
 import type { ApiUser, ApiRole, ApiRoleLabel, ApiJabatan, ApiUnitKerja } from '@/api/types'
@@ -67,6 +68,7 @@ export function UsersPage() {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterRole>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const skalaTeks = useTableTextScale()
   const [jabatanFilter, setJabatanFilter] = useState('')
   const [unitKerjaFilter, setUnitKerjaFilter] = useState('')
   // Daftar acuan dropdown. Unit kerja datang dari database supaya daftarnya bisa
@@ -387,6 +389,8 @@ export function UsersPage() {
           </select>
           <ChevronDown size={15} className="select-icon" />
         </div>
+
+        <TableTextScale {...skalaTeks} isId={isId} />
       </div>
 
       {error && <div className="upload-error-banner">{error}</div>}
@@ -394,7 +398,7 @@ export function UsersPage() {
       {loading ? (
         <div className="users-loading"><Loader2 size={20} className="spin" /> Memuat data pengguna…</div>
       ) : (
-        <div className="data-table">
+        <div className="data-table scaled-table" data-text-scale={skalaTeks.scale}>
           <table>
             <thead>
               <tr>

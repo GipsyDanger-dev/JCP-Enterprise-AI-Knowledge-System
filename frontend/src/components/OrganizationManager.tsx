@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Check, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { errorMessage } from '@/api/client'
 import { useConfirm } from './ConfirmDialog'
+import { TableTextScale, useTableTextScale } from './TableTextScale'
 import {
   createJabatan,
   createUnitKerja,
@@ -96,6 +97,7 @@ interface SectionProps {
 
 function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionProps & { units: OrgUnitKerja[] }) {
   const { tanya, dialog: dialogKonfirmasi } = useConfirm()
+  const skalaTeks = useTableTextScale()
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -198,18 +200,21 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
           : 'The work unit decides which documents its members can see. The code is the key and cannot be changed afterwards.'}
       </p>
 
-      <div className="filter-search org-list-search">
-        <Search size={16} />
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder={isId ? 'Cari unit kerja atau kode' : 'Search work units or code'}
-          aria-label={isId ? 'Cari unit kerja' : 'Search work units'}
-        />
+      <div className="org-list-toolbar">
+        <div className="filter-search org-list-search">
+          <Search size={16} />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={isId ? 'Cari unit kerja atau kode' : 'Search work units or code'}
+            aria-label={isId ? 'Cari unit kerja' : 'Search work units'}
+          />
+        </div>
+        <TableTextScale {...skalaTeks} isId={isId} />
       </div>
 
-      <div className="data-table">
+      <div className="data-table scaled-table" data-text-scale={skalaTeks.scale}>
         <table>
           <thead>
             <tr>
@@ -285,6 +290,7 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
 
 function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps & { items: OrgJabatan[] }) {
   const { tanya, dialog: dialogKonfirmasi } = useConfirm()
+  const skalaTeks = useTableTextScale()
   const [name, setName] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [saving, setSaving] = useState(false)
@@ -374,18 +380,21 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
           : 'Job titles do not decide document access — work units do. This section only manages announcement permissions. Admins always have these permissions.'}
       </p>
 
-      <div className="filter-search org-list-search">
-        <Search size={16} />
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder={isId ? 'Cari jabatan' : 'Search job titles'}
-          aria-label={isId ? 'Cari jabatan' : 'Search job titles'}
-        />
+      <div className="org-list-toolbar">
+        <div className="filter-search org-list-search">
+          <Search size={16} />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={isId ? 'Cari jabatan' : 'Search job titles'}
+            aria-label={isId ? 'Cari jabatan' : 'Search job titles'}
+          />
+        </div>
+        <TableTextScale {...skalaTeks} isId={isId} />
       </div>
 
-      <div className="data-table">
+      <div className="data-table scaled-table" data-text-scale={skalaTeks.scale}>
         <table>
           <thead>
             <tr>

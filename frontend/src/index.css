@@ -648,8 +648,8 @@ button { cursor: pointer; }
 .document-division-badge { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: var(--radius-pill); background: var(--violet-bg); color: var(--violet); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); vertical-align: middle; }
 .person-cell { display: flex; align-items: center; gap: 9px; }
 .person-cell strong, .person-cell small { display: block; }
-.person-cell strong { color: var(--text-card); font-size: var(--fs-sm); }
-.person-cell small { color: var(--text-secondary); font-size: var(--fs-2xs); margin-top: 3px; }
+.person-cell strong { color: var(--text-card); font-size: var(--tbl-text, var(--fs-sm)); }
+.person-cell small { color: var(--text-secondary); font-size: var(--tbl-meta, var(--fs-2xs)); margin-top: 3px; }
 
 /* ============ Chat ============ */
 .chat-page { margin: 0; height: calc(100dvh - 58px); min-height: 520px; display: flex; flex-direction: column; overflow: hidden; padding: 22px clamp(28px, 5vw, 70px) 18px; }
@@ -875,7 +875,35 @@ button { cursor: pointer; }
 /* Unit kerja dan jabatan menumpang di bawah baris utamanya, sebentuk dengan
    nama dan @username di kolom orang. */
 .access-cell { display: flex; flex-direction: column; gap: 3px; }
-.access-cell small { color: var(--text-secondary); font-size: var(--fs-2xs); }
+.access-cell small { color: var(--text-secondary); font-size: var(--tbl-meta, var(--fs-2xs)); }
+
+/* Tabel orang punya pengatur ukurannya sendiri di toolbar, karena isinya
+   paling padat dan paling sering dibaca lama. Tingkatnya hanya berlaku di
+   tabel ini — tabel lain tidak ikut membesar. Tetap dihitung dari token,
+   jadi pengaturan ukuran font di Pengaturan masih berpengaruh, dan pada
+   tingkat 0 ukurannya persis sama dengan tabel lain. */
+.scaled-table {
+  --tbl-step: 2px;
+  --tbl-text: calc(var(--fs-sm) + var(--tbl-step));
+  --tbl-meta: calc(var(--fs-2xs) + var(--tbl-step));
+  --tbl-status: calc(var(--fs-xs) + var(--tbl-step));
+}
+.scaled-table[data-text-scale="0"] { --tbl-step: 0px; }
+.scaled-table[data-text-scale="1"] { --tbl-step: 2px; }
+.scaled-table[data-text-scale="2"] { --tbl-step: 4px; }
+.scaled-table[data-text-scale="3"] { --tbl-step: 6px; }
+/* Ditulis dengan dua kelas supaya menang atas aturan .data-table tanpa
+   bergantung pada urutan penulisan di berkas ini. */
+.data-table.scaled-table td, .data-table.scaled-table .empty-row { font-size: var(--tbl-text); }
+.data-table.scaled-table th { font-size: var(--tbl-meta); }
+.data-table.scaled-table .role-badge { font-size: var(--tbl-meta); }
+.data-table.scaled-table .status-badge,
+.data-table.scaled-table .active-user,
+.data-table.scaled-table .inactive-user { font-size: var(--tbl-status); }
+
+/* Sepasang tombol A-/A+ di toolbar; dempet supaya terbaca sebagai satu alat. */
+.table-text-scale { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); flex-shrink: 0; }
+.table-text-scale button:disabled { opacity: .35; cursor: default; }
 
 /* Detail anggota workspace di halaman organisasi (platform owner). */
 .member-subtext { display: block; font-size: var(--fs-2xs); color: var(--text-secondary); }
@@ -906,7 +934,10 @@ button { cursor: pointer; }
 .org-add-form .org-code-input { flex: 0 0 140px; text-transform: uppercase; letter-spacing: .06em; }
 
 .org-section-hint { margin: 0 0 18px; }
-.org-list-search { width: min(420px, 100%); margin-bottom: 12px; }
+/* Pencarian dan pengatur ukuran berbagi satu baris; jaraknya dipegang baris
+   ini, bukan kotak pencariannya, supaya keduanya rata tengah. */
+.org-list-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.org-list-search { width: min(420px, 100%); flex: 1 1 260px; }
 
 /* Ganti nama di tempat: bidangnya menempati sel tabel tanpa menggeser barisnya. */
 .org-inline-input { width: 100%; height: 32px; border: 1px solid var(--brand-600); border-radius: var(--radius-md); padding: 0 8px; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-card); background: var(--bg-card); outline: 0; }
