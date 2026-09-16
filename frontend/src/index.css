@@ -37,7 +37,7 @@
   --text-secondary: #65635e;  /* nav & sel sekunder */
   --text-dim: #85827c;        /* deskripsi redup */
   --text-muted: #96938d;      /* meta / keterangan */
-  --text-faint: #9a9790;      /* paling redup (header tabel) */
+  --text-faint: #9a9790;      /* paling redup; hanya label & ikon dekoratif */
 
   /* Border */
   --border-strong: #dcdad4;
@@ -640,7 +640,7 @@ button { cursor: pointer; }
 .data-table { overflow-x: auto; border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-xl); }
 .data-table table { width: 100%; border-collapse: collapse; min-width: 760px; }
 .data-table th, .data-table td { height: 57px; padding: 0 16px; border-bottom: 1px solid var(--border-soft); text-align: left; color: var(--text-secondary); font-size: var(--fs-sm); }
-.data-table th { height: 39px; background: var(--bg-subtle); color: var(--text-faint); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .07em; }
+.data-table th { height: 39px; background: var(--bg-subtle); color: var(--text-secondary); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .07em; }
 .data-table tbody tr:last-child td { border-bottom: 0; }
 .data-table tbody tr:hover { background: var(--bg-panel); }
 .document-name { display: flex; align-items: center; gap: 9px; color: var(--text-card); }
@@ -649,7 +649,7 @@ button { cursor: pointer; }
 .person-cell { display: flex; align-items: center; gap: 9px; }
 .person-cell strong, .person-cell small { display: block; }
 .person-cell strong { color: var(--text-card); font-size: var(--fs-sm); }
-.person-cell small { color: var(--text-faint); font-size: var(--fs-2xs); margin-top: 3px; }
+.person-cell small { color: var(--text-secondary); font-size: var(--fs-2xs); margin-top: 3px; }
 
 /* ============ Chat ============ */
 .chat-page { margin: 0; height: calc(100dvh - 58px); min-height: 520px; display: flex; flex-direction: column; overflow: hidden; padding: 22px clamp(28px, 5vw, 70px) 18px; }
@@ -875,7 +875,7 @@ button { cursor: pointer; }
 /* Unit kerja dan jabatan menumpang di bawah baris utamanya, sebentuk dengan
    nama dan @username di kolom orang. */
 .access-cell { display: flex; flex-direction: column; gap: 3px; }
-.access-cell small { color: var(--text-faint); font-size: var(--fs-2xs); }
+.access-cell small { color: var(--text-secondary); font-size: var(--fs-2xs); }
 
 /* Detail anggota workspace di halaman organisasi (platform owner). */
 .member-subtext { display: block; font-size: var(--fs-2xs); color: var(--text-secondary); }
