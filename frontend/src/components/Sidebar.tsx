@@ -1,6 +1,6 @@
-import { Activity, Building2, ChevronsLeft, ChevronsRight, CircleHelp, Clock, CreditCard, LogOut, MessageCircle, Settings, X } from 'lucide-react'
+import { Activity, Building2, ChevronDown, ChevronUp, ChevronsLeft, ChevronsRight, CircleHelp, Clock, CreditCard, LogOut, MessageCircle, Settings, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { authHeaders, request } from '@/api/client'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
@@ -10,6 +10,8 @@ export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: 
   const { person, navigation, language, unreadMessages, unreadAnnouncements } = useWorkspace()
   const { user, token, logout } = useAuth()
   const [workspaceName, setWorkspaceName] = useState('')
+  const scrollRegionRef = useRef<HTMLDivElement>(null)
+  const [scrollState, setScrollState] = useState({ canScrollUp: false, canScrollDown: false })
   useEffect(() => {
     let cancelled = false
     setWorkspaceName('')
@@ -23,6 +25,33 @@ export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: 
   const profileName = isPlatformOwner && !isPersonal ? (workspaceName || 'Jogja Creative') : (user?.displayName ?? person.name)
   const profileLabel = isPlatformOwner && !isPersonal ? 'Maintainer' : (isPersonal ? (isId ? 'Ruang pribadi' : 'Personal workspace') : workspaceName)
   const profileInitials = isPlatformOwner && !isPersonal ? 'JC' : person.initials
+  const syncScrollState = useCallback(() => {
+    const region = scrollRegionRef.current
+    if (!region) return
+    const maxScrollTop = region.scrollHeight - region.clientHeight
+    setScrollState({
+      canScrollUp: region.scrollTop > 1,
+      canScrollDown: region.scrollTop < maxScrollTop - 1,
+    })
+  }, [])
+
+  useEffect(() => {
+    const region = scrollRegionRef.current
+    if (!region) return
+    const frame = requestAnimationFrame(syncScrollState)
+    region.addEventListener('scroll', syncScrollState, { passive: true })
+    window.addEventListener('resize', syncScrollState)
+    return () => {
+      cancelAnimationFrame(frame)
+      region.removeEventListener('scroll', syncScrollState)
+      window.removeEventListener('resize', syncScrollState)
+    }
+  }, [collapsed, navigation, syncScrollState, unreadAnnouncements, unreadMessages])
+
+  const scrollNavigation = (direction: 1 | -1) => {
+    scrollRegionRef.current?.scrollBy({ top: direction * 240, behavior: 'smooth' })
+  }
+
   return (
     <aside className={[menuOpen ? 'sidebar open' : 'sidebar', collapsed ? 'collapsed' : ''].filter(Boolean).join(' ')}>
       <div className="brand-lockup">
@@ -41,7 +70,17 @@ export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: 
         </div>
       )}
       {collapsed && <div className="sidebar-user-avatar">{user?.photoUrl ? <img className="avatar" src={user.photoUrl} alt="" style={{ objectFit: 'cover' }} /> : <span className="avatar">{profileInitials}</span>}</div>}
-      <nav aria-label="Primary navigation">
+      <div className="sidebar-navigation-wrap">
+        <button
+          type="button"
+          className="sidebar-scroll-button sidebar-scroll-button-up"
+          aria-label={isId ? 'Gulir navigasi ke atas' : 'Scroll navigation up'}
+          title={isId ? 'Gulir ke atas' : 'Scroll up'}
+          disabled={!scrollState.canScrollUp}
+          onClick={() => scrollNavigation(-1)}
+        ><ChevronUp size={16} /></button>
+        <div className="sidebar-navigation" ref={scrollRegionRef}>
+          <nav aria-label="Primary navigation">
         {!collapsed && <p>{isId ? 'Ruang kerja' : 'Workspace'}</p>}
         {navigation.map(({ id, label, icon: Icon }) => {
           const badge = id === 'announcements' ? unreadAnnouncements : 0
@@ -60,13 +99,23 @@ export function Sidebar({ menuOpen, collapsed, onToggle, onClose }: { menuOpen: 
         )}
         {isAdmin && <NavLink to="/activity" title={collapsed ? (isId ? 'Log aktivitas' : 'Activity log') : undefined} className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} onClick={onClose}><Activity size={18} />{!collapsed && <span>{isId ? 'Log aktivitas' : 'Activity log'}</span>}</NavLink>}
         <NavLink to="/history" title={collapsed ? (isId ? 'Riwayat chat' : 'Chat history') : undefined} className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} onClick={onClose}><Clock size={18} />{!collapsed && <span>{isId ? 'Riwayat chat' : 'Chat history'}</span>}</NavLink>
-      </nav>
-      <div className="sidebar-lower">
+          </nav>
+          <div className="sidebar-lower">
         {user?.isPlatformOwner && <NavLink to="/workspaces" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'} onClick={onClose} title={isId ? 'Organisasi' : 'Organizations'}><Building2 size={18} />{!collapsed && <span>{isId ? 'Organisasi' : 'Organizations'}</span>}</NavLink>}
         {user?.isPlatformOwner && <NavLink to="/billing" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'} onClick={onClose} title={isId ? 'Billing' : 'Billing'}><CreditCard size={18} />{!collapsed && <span>Billing</span>}</NavLink>}
         <NavLink to="/help" title={collapsed ? (isId ? 'Pusat bantuan' : 'Help center') : undefined} className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} onClick={onClose}><CircleHelp size={18} />{!collapsed && <span>{isId ? 'Pusat bantuan' : 'Help center'}</span>}</NavLink>
         <NavLink to="/settings" title={collapsed ? (isId ? 'Pengaturan' : 'Settings') : undefined} className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} onClick={onClose}><Settings size={18} />{!collapsed && <span>{isId ? 'Pengaturan' : 'Settings'}</span>}</NavLink>
         <button className="nav-item" title={isId ? 'Keluar' : 'Log out'} onClick={logout}><LogOut size={18} />{!collapsed && <span>{isId ? 'Keluar' : 'Log out'}</span>}</button>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="sidebar-scroll-button sidebar-scroll-button-down"
+          aria-label={isId ? 'Gulir navigasi ke bawah' : 'Scroll navigation down'}
+          title={isId ? 'Gulir ke bawah' : 'Scroll down'}
+          disabled={!scrollState.canScrollDown}
+          onClick={() => scrollNavigation(1)}
+        ><ChevronDown size={16} /></button>
       </div>
     </aside>
   )
