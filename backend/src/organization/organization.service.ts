@@ -163,16 +163,66 @@ export class OrganizationService {
   async removeUnitKerja(id: string, actor: AuthenticatedUser) {
     this.assertAdmin(actor);
     const unit = await this.unitMilikWorkspace(id, actor);
-    if (unit._count.users > 0 || unit._count.documents > 0) {
-      throw new ConflictException(
-        `Unit kerja "${unit.name}" masih dipakai ${unit._count.users} pengguna dan ${unit._count.documents} dokumen. ` +
-        'Nonaktifkan saja agar tidak muncul lagi di pilihan, atau pindahkan dulu isinya.',
-      );
-    }
     return this.tulis(AuditAction.USER_UPDATED, 'UNIT_KERJA', actor, async (tx) => {
+      await this.pastikanUnitTakDipakai(tx, unit);
       await tx.unitKerja.delete({ where: { id } });
       return { id, deleted: true };
     });
+  }
+
+  /**
+   * Menolak penghapusan selama masih ada baris yang menunjuk unit ini.
+   *
+   * Dua hal membuatnya tidak sesederhana membaca `_count` dari UNIT_SELECT:
+   *
+   * 1. Dokumen dihitung TANPA menyaring `deletedAt`. Angka di UNIT_SELECT
+   *    sengaja hanya menghitung yang aktif — itu yang berguna dilihat admin di
+   *    tabel — tapi dokumen yang sudah dihapus pun barisnya masih memegang
+   *    unit_kerja_id, dan relasinya `SetNull`. Menghapus unitnya mengosongkan
+   *    penanda itu untuk selamanya, jadi tidak ada lagi yang bisa menjawab unit
+   *    mana yang dulu memiliki dokumen tersebut — padahal justru itu yang dicari
+   *    ketika sebuah kebocoran diusut.
+   *
+   * 2. Pemeriksaannya dijalankan di dalam transaksi penghapusan dan diawali
+   *    mengunci baris unitnya. Tanpa kunci itu ada jeda antara menghitung dan
+   *    `delete` yang cukup untuk satu unggahan masuk; dokumen yang lolos di jeda
+   *    itu kehilangan penandanya tanpa pernah ikut dihitung, dan dokumen tanpa
+   *    penanda terbuka untuk seluruh pegawai. Kunci ini bertabrakan dengan kunci
+   *    yang diambil Postgres saat menyisipkan baris ber-foreign-key ke unit yang
+   *    sama, jadi unggahan yang berbarengan menunggu — lalu gagal karena unitnya
+   *    memang sudah tidak ada, yang justru jawaban yang benar.
+   */
+  private async pastikanUnitTakDipakai(tx: Prisma.TransactionClient, unit: { id: string; name: string }) {
+    await tx.$queryRaw`SELECT id FROM unit_kerja WHERE id = ${unit.id}::uuid FOR UPDATE`;
+    const [pengguna, dokumen, dokumenAktif] = await Promise.all([
+      tx.user.count({ where: { unitKerjaId: unit.id } }),
+      tx.document.count({ where: { unitKerjaId: unit.id } }),
+      tx.document.count({ where: { unitKerjaId: unit.id, deletedAt: null } }),
+    ]);
+    if (pengguna === 0 && dokumen === 0) return;
+
+    // Penghalangnya disebut satu per satu, bukan sebagai satu angka gabungan.
+    // Admin yang membaca "masih dipakai 3" tidak tahu harus membuka halaman
+    // yang mana; yang membaca "2 pengguna, 1 dokumen" langsung tahu keduanya.
+    //
+    // Dokumen terhapus disebut terpisah karena jumlahnya bisa melebihi yang
+    // tertera di tabel, dan karena jalan keluarnya berbeda: penandanya tidak
+    // bisa dilepas dari antarmuka mana pun, jadi menonaktifkan adalah satu-
+    // satunya pilihan yang tersisa. Mengarahkan admin "kosongkan dulu" untuk
+    // sesuatu yang tidak bisa dikosongkan hanya membuatnya berputar-putar.
+    const terhapus = dokumen - dokumenAktif;
+    const penghalang = [
+      pengguna > 0 ? `${pengguna} pengguna masih terdaftar di unit ini` : null,
+      dokumenAktif > 0 ? `${dokumenAktif} dokumen masih ditandai unit ini` : null,
+      terhapus > 0 ? `${terhapus} dokumen yang sudah dihapus masih menyimpan penandanya` : null,
+    ].filter((item): item is string => item !== null);
+
+    throw new ConflictException(
+      `Unit kerja "${unit.name}" belum bisa dihapus: ${penghalang.join(', ')}. ` +
+      (terhapus > 0
+        ? 'Penanda pada dokumen yang sudah dihapus tidak bisa dilepas dari antarmuka, jadi unit ini hanya bisa dinonaktifkan agar tidak muncul lagi di pilihan.'
+        : 'Kosongkan dulu isinya — pindahkan penggunanya lewat tab Orang & akses, dan lepas penanda unitnya lewat Dokumen → Atur akses — atau nonaktifkan saja unit ini agar tidak muncul lagi di pilihan.'),
+    );
   }
 
   // ------------------------------------------------------------------- jabatan
