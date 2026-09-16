@@ -174,6 +174,8 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
       // penandanya tidak bisa dilepas admin. Menyuruhnya "kosongkan dulu" di
       // keadaan itu hanya membuatnya mencari sesuatu yang tidak ada; yang
       // tersisa memang cuma menonaktifkan.
+      // Dokumen terhapus tidak muncul di halaman mana pun, jadi penandanya
+      // tidak bisa dilepas admin dengan cara apa pun — buntu.
       const buntu = unit.deletedDocumentCount > 0
       const bisaDinonaktifkan = unit.isActive
       const setuju = await tanya({

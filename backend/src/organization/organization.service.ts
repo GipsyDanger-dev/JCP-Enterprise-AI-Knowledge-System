@@ -43,13 +43,33 @@ const JABATAN_SELECT = {
   _count: { select: { users: true } },
 } satisfies Prisma.JabatanSelect;
 
-const UNIT_SELECT = {
+/**
+ * Penyaring penggunanya menyamai daftar Orang & akses (UsersService.findAll),
+ * bukan menghitung seluruh baris yang menunjuk unit ini.
+ *
+ * Tanpa disamakan, akun PERSONAL ikut terhitung padahal tidak pernah muncul di
+ * daftar mana pun. Admin lalu membaca "3 pengguna" untuk unit yang hanya berisi
+ * 2 orang, dan tidak punya cara menemukan yang ketiga.
+ *
+ * Akun PERSONAL sengaja diabaikan seluruhnya di konteks perusahaan, bukan
+ * sekadar dilaporkan terpisah: penanda unit pada akun semacam itu adalah data
+ * mati. documentVisibilityWhere tidak pernah melihat unit untuk akun PERSONAL —
+ * aksesnya murni lewat uploadedById — jadi tidak ada yang hilang saat penandanya
+ * ikut kosong. Filter yang sama dipakai pemeriksa penghapusan di bawah, supaya
+ * yang ditampilkan dan yang menahan selalu populasi yang sama persis.
+ */
+const unitSelect = (workspaceId: string) => ({
   id: true,
   code: true,
   name: true,
   isActive: true,
-  _count: { select: { users: true, documents: { where: { deletedAt: null } } } },
-} satisfies Prisma.UnitKerjaSelect;
+  _count: {
+    select: {
+      users: { where: { accountType: AccountType.COMPANY, workspaceId } },
+      documents: { where: { deletedAt: null } },
+    },
+  },
+}) satisfies Prisma.UnitKerjaSelect;
 
 /**
  * Kolom mana yang bentrok pada pelanggaran keunikan.
@@ -106,7 +126,7 @@ export class OrganizationService {
     const [unitKerja, dokumenTerhapus, jabatan, roleLabels] = await Promise.all([
       this.prisma.unitKerja.findMany({
         where: { workspaceId: actor.workspaceId },
-        select: UNIT_SELECT,
+        select: unitSelect(actor.workspaceId),
         orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
       }),
       // Satu groupBy untuk seluruh unit, bukan satu hitungan per baris: daftar
@@ -138,7 +158,7 @@ export class OrganizationService {
     return this.tulis(AuditAction.USER_CREATED, 'UNIT_KERJA', actor, async (tx) => {
       const unit = await tx.unitKerja.create({
         data: { workspaceId: actor.workspaceId, name: input.name, code: input.code },
-        select: UNIT_SELECT,
+        select: unitSelect(actor.workspaceId),
       });
       return ringkasUnit(unit, 0);
     }, {
@@ -157,7 +177,7 @@ export class OrganizationService {
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
         },
-        select: UNIT_SELECT,
+        select: unitSelect(actor.workspaceId),
       });
       // `division` pada pegawai adalah salinan teks nama unit yang dipakai di
       // daftar dan laporan. Tanpa disamakan di sini, mengganti nama unit membuat
@@ -184,7 +204,7 @@ export class OrganizationService {
     this.assertAdmin(actor);
     const unit = await this.unitMilikWorkspace(id, actor);
     return this.tulis(AuditAction.USER_UPDATED, 'UNIT_KERJA', actor, async (tx) => {
-      await this.pastikanUnitTakDipakai(tx, unit);
+      await this.pastikanUnitTakDipakai(tx, unit, actor.workspaceId);
       await tx.unitKerja.delete({ where: { id } });
       return { id, deleted: true };
     });
@@ -195,13 +215,16 @@ export class OrganizationService {
    *
    * Dua hal membuatnya tidak sesederhana membaca `_count` dari UNIT_SELECT:
    *
-   * 1. Dokumen dihitung TANPA menyaring `deletedAt`. Angka di UNIT_SELECT
+   * 1. Dokumen dihitung TANPA menyaring `deletedAt`. Angka di `unitSelect`
    *    sengaja hanya menghitung yang aktif — itu yang berguna dilihat admin di
    *    tabel — tapi dokumen yang sudah dihapus pun barisnya masih memegang
    *    unit_kerja_id, dan relasinya `SetNull`. Menghapus unitnya mengosongkan
-   *    penanda itu untuk selamanya, jadi tidak ada lagi yang bisa menjawab unit
-   *    mana yang dulu memiliki dokumen tersebut — padahal justru itu yang dicari
-   *    ketika sebuah kebocoran diusut.
+   *    penanda itu untuk selamanya, sehingga tidak ada lagi yang bisa menjawab
+   *    unit mana yang dulu memilikinya ketika sebuah kebocoran diusut.
+   *
+   *    Pengguna sebaliknya: dihitung dengan penyaring yang PERSIS sama dengan
+   *    tabel, supaya yang menahan penghapusan selalu orang yang bisa admin
+   *    temukan dan pindahkan. Akun PERSONAL tidak ikut dihitung di mana pun.
    *
    * 2. Pemeriksaannya dijalankan di dalam transaksi penghapusan dan diawali
    *    mengunci baris unitnya. Tanpa kunci itu ada jeda antara menghitung dan
@@ -212,10 +235,14 @@ export class OrganizationService {
    *    sama, jadi unggahan yang berbarengan menunggu — lalu gagal karena unitnya
    *    memang sudah tidak ada, yang justru jawaban yang benar.
    */
-  private async pastikanUnitTakDipakai(tx: Prisma.TransactionClient, unit: { id: string; name: string }) {
+  private async pastikanUnitTakDipakai(tx: Prisma.TransactionClient, unit: { id: string; name: string }, workspaceId: string) {
     await tx.$queryRaw`SELECT id FROM unit_kerja WHERE id = ${unit.id}::uuid FOR UPDATE`;
     const [pengguna, dokumen, dokumenAktif] = await Promise.all([
-      tx.user.count({ where: { unitKerjaId: unit.id } }),
+      // Filter yang sama dengan unitSelect dan daftar Orang & akses: yang
+      // menahan penghapusan harus tepat yang bisa dilihat dan dipindahkan admin.
+      // Akun PERSONAL tidak ikut — penanda unitnya tidak dipakai apa pun, jadi
+      // membiarkannya terlepas tidak mencabut akses siapa-siapa.
+      tx.user.count({ where: { unitKerjaId: unit.id, accountType: AccountType.COMPANY, workspaceId } }),
       tx.document.count({ where: { unitKerjaId: unit.id } }),
       tx.document.count({ where: { unitKerjaId: unit.id, deletedAt: null } }),
     ]);
@@ -226,9 +253,9 @@ export class OrganizationService {
     // yang mana; yang membaca "2 pengguna, 1 dokumen" langsung tahu keduanya.
     //
     // Dokumen terhapus disebut terpisah karena jumlahnya bisa melebihi yang
-    // tertera di tabel, dan karena jalan keluarnya berbeda: penandanya tidak
-    // bisa dilepas dari antarmuka mana pun, jadi menonaktifkan adalah satu-
-    // satunya pilihan yang tersisa. Mengarahkan admin "kosongkan dulu" untuk
+    // tertera di tabel, dan karena jalan keluarnya berbeda: dokumen itu tidak
+    // muncul di halaman mana pun, jadi penandanya tidak bisa dilepas admin dan
+    // yang tersisa hanya menonaktifkan. Mengarahkannya "kosongkan dulu" untuk
     // sesuatu yang tidak bisa dikosongkan hanya membuatnya berputar-putar.
     const terhapus = dokumen - dokumenAktif;
     const penghalang = [
@@ -369,7 +396,7 @@ export class OrganizationService {
   }
 
   private async unitMilikWorkspace(id: string, actor: AuthenticatedUser) {
-    const unit = await this.prisma.unitKerja.findFirst({ where: { id, workspaceId: actor.workspaceId }, select: UNIT_SELECT });
+    const unit = await this.prisma.unitKerja.findFirst({ where: { id, workspaceId: actor.workspaceId }, select: unitSelect(actor.workspaceId) });
     if (!unit) throw new NotFoundException('Unit kerja not found');
     return unit;
   }

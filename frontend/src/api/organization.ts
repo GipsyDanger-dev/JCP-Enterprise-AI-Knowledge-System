@@ -7,6 +7,10 @@ export interface OrgUnitKerja {
   code: string
   name: string
   isActive: boolean
+  /**
+   * Sama isinya dengan daftar Orang & akses: akun perusahaan di workspace ini.
+   * Akun PERSONAL tidak ikut terhitung di mana pun pada konteks perusahaan.
+   */
   userCount: number
   /** Dokumen aktif. Tidak termasuk yang sudah dihapus — lihat di bawah. */
   documentCount: number
