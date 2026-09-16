@@ -316,16 +316,16 @@ export function UsersPage() {
       />
 
       <div className="users-filter org-view-tabs">
-        <button className={`filter-chip ${view === 'pengguna' ? 'active' : ''}`} onClick={() => setView('pengguna')}>
+        <button type="button" className={`filter-chip ${view === 'pengguna' ? 'active' : ''}`} onClick={() => setView('pengguna')}>
           {isId ? 'Pengguna' : 'Users'}
         </button>
-        <button className={`filter-chip ${view === 'unit-kerja' ? 'active' : ''}`} onClick={() => setView('unit-kerja')}>
+        <button type="button" className={`filter-chip ${view === 'unit-kerja' ? 'active' : ''}`} onClick={() => setView('unit-kerja')}>
           {isId ? 'Unit kerja' : 'Work units'}
         </button>
-        <button className={`filter-chip ${view === 'jabatan' ? 'active' : ''}`} onClick={() => setView('jabatan')}>
+        <button type="button" className={`filter-chip ${view === 'jabatan' ? 'active' : ''}`} onClick={() => setView('jabatan')}>
           {isId ? 'Jabatan' : 'Job titles'}
         </button>
-        <button className={`filter-chip ${view === 'role' ? 'active' : ''}`} onClick={() => setView('role')}>
+        <button type="button" className={`filter-chip ${view === 'role' ? 'active' : ''}`} onClick={() => setView('role')}>
           Role
         </button>
       </div>
@@ -334,16 +334,16 @@ export function UsersPage() {
 
       {view === 'pengguna' && <>
       <div className="users-filter">
-        <button className={`filter-chip ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
+        <button type="button" className={`filter-chip ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
           {isId ? 'Semua' : 'All'} ({users.length})
         </button>
-        <button className={`filter-chip ${filter === 'SUPER_ADMIN' ? 'active' : ''}`} onClick={() => setFilter('SUPER_ADMIN')}>
+        <button type="button" className={`filter-chip ${filter === 'SUPER_ADMIN' ? 'active' : ''}`} onClick={() => setFilter('SUPER_ADMIN')}>
           Admin ({adminCount})
         </button>
-        <button className={`filter-chip ${filter === 'ADMIN_UNIT' ? 'active' : ''}`} onClick={() => setFilter('ADMIN_UNIT')}>
+        <button type="button" className={`filter-chip ${filter === 'ADMIN_UNIT' ? 'active' : ''}`} onClick={() => setFilter('ADMIN_UNIT')}>
           {roleLabel('ADMIN_UNIT')} ({unitAdminCount})
         </button>
-        <button className={`filter-chip ${filter === 'employee' ? 'active' : ''}`} onClick={() => setFilter('employee')}>
+        <button type="button" className={`filter-chip ${filter === 'employee' ? 'active' : ''}`} onClick={() => setFilter('employee')}>
           {isId ? 'Karyawan' : 'Employee'} ({employeeCount})
         </button>
       </div>
