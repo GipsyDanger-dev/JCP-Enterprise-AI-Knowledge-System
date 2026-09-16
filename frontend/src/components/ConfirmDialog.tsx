@@ -6,7 +6,13 @@ export interface ConfirmRequest {
   title: string
   /** Penjelasan akibatnya — boleh memuat <strong> untuk menebalkan nama. */
   body: ReactNode
-  confirmLabel: string
+  /**
+   * Teks tombol aksinya. Dikosongkan untuk dialog yang hanya mengabarkan
+   * sesuatu — tanpa ini, kabar "belum bisa dihapus" terpaksa dipasangi tombol
+   * yang tidak melakukan apa-apa, dan tombol semacam itu selalu terbaca sebagai
+   * "lanjutkan saja".
+   */
+  confirmLabel?: string
   cancelLabel: string
   /** 'danger' untuk tindakan yang mencabut sesuatu; selain itu tombol biasa. */
   tone?: 'danger' | 'primary'
@@ -81,14 +87,16 @@ function ConfirmDialog({ request, onAnswer }: { request: ConfirmRequest; onAnswe
           <button type="button" className="secondary-button" onClick={() => onAnswer(false)}>
             {request.cancelLabel}
           </button>
-          <button
-            type="button"
-            className={request.tone === 'primary' ? 'primary-button' : 'danger-button'}
-            autoFocus
-            onClick={() => onAnswer(true)}
-          >
-            {request.confirmLabel}
-          </button>
+          {request.confirmLabel && (
+            <button
+              type="button"
+              className={request.tone === 'primary' ? 'primary-button' : 'danger-button'}
+              autoFocus
+              onClick={() => onAnswer(true)}
+            >
+              {request.confirmLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

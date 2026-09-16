@@ -71,9 +71,16 @@ function ringkasJabatan<T extends { _count: { users: number } }>(row: T) {
   return { ...jabatan, userCount: _count.users };
 }
 
-function ringkasUnit<T extends { _count: { users: number; documents: number } }>(row: T) {
+/**
+ * `deletedDocumentCount` dipisah dari `documentCount`, bukan dijumlahkan ke
+ * dalamnya: yang berguna dilihat admin sehari-hari adalah dokumen aktif, tapi
+ * yang menahan penghapusan adalah kedua-duanya. Tanpa angka kedua ini
+ * antarmuka tidak punya cara tahu kenapa unit yang tertulis "0 dokumen" tetap
+ * ditolak, dan admin hanya melihat penolakan yang tampak asal-asalan.
+ */
+function ringkasUnit<T extends { _count: { users: number; documents: number } }>(row: T, deletedDocumentCount: number) {
   const { _count, ...unit } = row;
-  return { ...unit, userCount: _count.users, documentCount: _count.documents };
+  return { ...unit, userCount: _count.users, documentCount: _count.documents, deletedDocumentCount };
 }
 
 /**
@@ -96,11 +103,18 @@ export class OrganizationService {
   /** Seluruh daftar acuan dalam satu permintaan — halaman pengelolanya butuh ketiganya sekaligus. */
   async overview(actor: AuthenticatedUser) {
     this.assertAdmin(actor);
-    const [unitKerja, jabatan, roleLabels] = await Promise.all([
+    const [unitKerja, dokumenTerhapus, jabatan, roleLabels] = await Promise.all([
       this.prisma.unitKerja.findMany({
         where: { workspaceId: actor.workspaceId },
         select: UNIT_SELECT,
         orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
+      }),
+      // Satu groupBy untuk seluruh unit, bukan satu hitungan per baris: daftar
+      // ini dimuat ulang setiap kali ada perubahan apa pun di halamannya.
+      this.prisma.document.groupBy({
+        by: ['unitKerjaId'],
+        where: { workspaceId: actor.workspaceId, unitKerjaId: { not: null }, deletedAt: { not: null } },
+        _count: { _all: true },
       }),
       this.prisma.jabatan.findMany({
         where: { workspaceId: actor.workspaceId },
@@ -109,7 +123,12 @@ export class OrganizationService {
       }),
       this.roleLabels(actor.workspaceId),
     ]);
-    return { unitKerja: unitKerja.map(ringkasUnit), jabatan: jabatan.map(ringkasJabatan), roleLabels };
+    const terhapusPerUnit = new Map(dokumenTerhapus.map((baris) => [baris.unitKerjaId, baris._count._all]));
+    return {
+      unitKerja: unitKerja.map((unit) => ringkasUnit(unit, terhapusPerUnit.get(unit.id) ?? 0)),
+      jabatan: jabatan.map(ringkasJabatan),
+      roleLabels,
+    };
   }
 
   // ---------------------------------------------------------------- unit kerja
@@ -121,7 +140,7 @@ export class OrganizationService {
         data: { workspaceId: actor.workspaceId, name: input.name, code: input.code },
         select: UNIT_SELECT,
       });
-      return ringkasUnit(unit);
+      return ringkasUnit(unit, 0);
     }, {
       name: 'Unit kerja dengan nama itu sudah ada',
       code: 'Kode unit kerja sudah dipakai di workspace ini',
@@ -146,7 +165,8 @@ export class OrganizationService {
       if (input.name !== undefined) {
         await tx.user.updateMany({ where: { unitKerjaId: id }, data: { division: input.name } });
       }
-      return ringkasUnit(unit);
+      const terhapus = await tx.document.count({ where: { unitKerjaId: id, deletedAt: { not: null } } });
+      return ringkasUnit(unit, terhapus);
     }, { name: 'Unit kerja dengan nama itu sudah ada' });
   }
 

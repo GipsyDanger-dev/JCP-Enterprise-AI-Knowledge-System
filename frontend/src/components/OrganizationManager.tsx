@@ -147,12 +147,57 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
     }
   }
 
+  /**
+   * Apa saja yang masih menahan penghapusan, disebut satu per satu.
+   *
+   * Dihitung di klien dari angka yang sudah ada di daftar supaya peringatannya
+   * muncul SEBELUM tombolnya ditekan. Backend tetap memeriksa ulang dan tetap
+   * yang menentukan — tapi penolakan yang baru datang setelah admin menekan
+   * "Hapus" pada dialog merah terbaca seperti sistemnya rusak, bukan seperti
+   * syarat yang memang belum dipenuhi.
+   */
+  const penghalangHapus = (unit: OrgUnitKerja) => [
+    unit.userCount > 0
+      && (isId ? `${unit.userCount} pengguna masih terdaftar di unit ini` : `${unit.userCount} users still belong to it`),
+    unit.documentCount > 0
+      && (isId ? `${unit.documentCount} dokumen masih ditandai unit ini` : `${unit.documentCount} documents are still tagged to it`),
+    unit.deletedDocumentCount > 0
+      && (isId
+        ? `${unit.deletedDocumentCount} dokumen yang sudah dihapus masih menyimpan penandanya`
+        : `${unit.deletedDocumentCount} deleted documents still carry its tag`),
+  ].filter((item): item is string => typeof item === 'string')
+
   const hapus = async (unit: OrgUnitKerja) => {
+    const penghalang = penghalangHapus(unit)
+    if (penghalang.length > 0) {
+      // Dokumen yang sudah dihapus tidak muncul di halaman mana pun, jadi
+      // penandanya tidak bisa dilepas admin. Menyuruhnya "kosongkan dulu" di
+      // keadaan itu hanya membuatnya mencari sesuatu yang tidak ada; yang
+      // tersisa memang cuma menonaktifkan.
+      const buntu = unit.deletedDocumentCount > 0
+      const bisaDinonaktifkan = unit.isActive
+      const setuju = await tanya({
+        title: isId ? 'Belum bisa dihapus' : 'Cannot be deleted yet',
+        body: isId
+          ? <><strong>{unit.name}</strong> masih dipakai — {penghalang.join(', ')}. {buntu
+              ? 'Penanda pada dokumen yang sudah dihapus tidak bisa dilepas dari antarmuka, jadi unit ini hanya bisa dinonaktifkan agar tidak muncul lagi di pilihan.'
+              : 'Kosongkan dulu isinya: pindahkan penggunanya lewat tab Orang & akses, lalu lepas penanda unitnya lewat Dokumen → Atur akses.'}</>
+          : <><strong>{unit.name}</strong> is still in use — {penghalang.join(', ')}. {buntu
+              ? 'Tags on deleted documents cannot be cleared from any screen, so this unit can only be deactivated to hide it from the pickers.'
+              : 'Empty it first: move its users from the People & access tab, then clear the unit tag under Documents → Document access.'}</>,
+        confirmLabel: bisaDinonaktifkan ? (isId ? 'Nonaktifkan saja' : 'Deactivate instead') : undefined,
+        cancelLabel: isId ? 'Tutup' : 'Close',
+        tone: 'primary',
+      })
+      if (setuju && bisaDinonaktifkan) await ubahStatus(unit)
+      return
+    }
+
     const setuju = await tanya({
       title: isId ? 'Hapus unit kerja' : 'Delete work unit',
       body: isId
-        ? <><strong>{unit.name}</strong> hanya bisa dihapus kalau belum dipakai pengguna maupun dokumen.</>
-        : <><strong>{unit.name}</strong> can only be deleted while no user or document still refers to it.</>,
+        ? <><strong>{unit.name}</strong> tidak lagi dipakai pengguna maupun dokumen, jadi bisa dihapus permanen. Tindakan ini tidak bisa dibatalkan.</>
+        : <><strong>{unit.name}</strong> is no longer used by any user or document, so it can be deleted for good. This cannot be undone.</>,
       confirmLabel: isId ? 'Hapus' : 'Delete',
       cancelLabel: isId ? 'Batal' : 'Cancel',
       tone: 'danger',
@@ -253,6 +298,13 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
                   {isId
                     ? `${unit.userCount} pengguna · ${unit.documentCount} dokumen`
                     : `${unit.userCount} users · ${unit.documentCount} docs`}
+                  {unit.deletedDocumentCount > 0 && (
+                    <small className="org-hint">
+                      {isId
+                        ? ` · ${unit.deletedDocumentCount} arsip terhapus`
+                        : ` · ${unit.deletedDocumentCount} deleted archived`}
+                    </small>
+                  )}
                 </td>
                 <td>
                   {unit.isActive

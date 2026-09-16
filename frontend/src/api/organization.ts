@@ -8,7 +8,16 @@ export interface OrgUnitKerja {
   name: string
   isActive: boolean
   userCount: number
+  /** Dokumen aktif. Tidak termasuk yang sudah dihapus — lihat di bawah. */
   documentCount: number
+  /**
+   * Dokumen yang sudah dihapus tapi barisnya masih menunjuk unit ini.
+   *
+   * Ikut menahan penghapusan meski tidak terlihat di halaman Dokumen. Tanpa
+   * angka ini antarmuka tidak bisa menjelaskan kenapa unit yang tertulis
+   * "0 dokumen" tetap ditolak.
+   */
+  deletedDocumentCount: number
 }
 
 export interface OrgJabatan {

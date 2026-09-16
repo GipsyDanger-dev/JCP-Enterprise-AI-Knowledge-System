@@ -944,6 +944,12 @@ button { cursor: pointer; }
 
 .org-code { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: var(--fs-2xs); letter-spacing: .05em; padding: 3px 7px; border-radius: var(--radius-sm); background: var(--bg-subtle); color: var(--text-secondary); }
 
+/* Arsip terhapus yang masih memegang unit: menahan penghapusan tanpa pernah
+   terlihat di halaman Dokumen, jadi disebut di sini supaya penolakannya bisa
+   diduga dari tabel. Sengaja lebih redup — ini catatan kaki, bukan angka
+   yang dipakai admin sehari-hari. */
+.org-hint { color: var(--text-muted, var(--text-secondary)); font-size: var(--fs-2xs); }
+
 .org-row-actions { display: flex; align-items: center; gap: 4px; }
 .org-toggle { font-size: var(--fs-2xs); font-weight: var(--fw-semibold); color: var(--text-secondary); background: transparent; border: 0; padding: 0 6px; cursor: pointer; white-space: nowrap; }
 .org-toggle:hover { color: var(--brand-700); }
