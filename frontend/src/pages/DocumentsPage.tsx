@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowUpRight, BookOpenCheck, Building2, CheckCircle2, ChevronDown, Download, FileText, FolderLock, FolderOpen, Pencil, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { ArrowUpRight, Building2, ChevronDown, Download, FileText, FolderLock, FolderOpen, Pencil, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { DataTable } from '@/components/DataTable'
@@ -12,9 +12,8 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import { useScrollToError } from '@/hooks/useScrollToError'
 import type { DocumentItem } from '@/types/domain'
 import type { ApiDocumentCategory } from '@/api/types'
-import { assignRequiredReading, completeRequiredReading, listMyRequiredReadings, requiredReadingReport, updateRequiredReadingProgress, type RequiredReadingReport } from '@/api/requiredReadings'
-import { getUserReferenceData, listUsers } from '@/api/users'
-import type { ApiUnitKerja, ApiUser } from '@/api/types'
+import { getUserReferenceData } from '@/api/users'
+import type { ApiUnitKerja } from '@/api/types'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -42,12 +41,11 @@ function PdfReader({ source, title, onError }: { source: string; title: string; 
   return <div ref={containerRef} className="doc-reader-pdf-pages" />
 }
 
-function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, onDelete, onChunksLoaded, chunks, chunksLoading, setChunksLoading }: {
+function DocViewer({ doc, isId, canManage, token, onClose, onDelete, onChunksLoaded, chunks, chunksLoading, setChunksLoading }: {
   doc: DocumentItem
   isId: boolean
   canManage: boolean
   token: string | null
-  requiredReadingId: string | null
   onClose: () => void
   onDelete: (id: string, name: string) => void
   onChunksLoaded: (chunks: DocumentChunk[]) => void
@@ -62,34 +60,6 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
   const [readerLoading, setReaderLoading] = useState(false)
   const [readerError, setReaderError] = useState(false)
   const handlePdfRenderError = useCallback(() => setReaderError(true), [])
-  const viewerRef = useRef<HTMLDivElement>(null)
-  const [canComplete, setCanComplete] = useState(false)
-  const [completionConfirmed, setCompletionConfirmed] = useState(false)
-  const [completionSaving, setCompletionSaving] = useState(false)
-  const trackReading = () => { const el = viewerRef.current; if (!el || !requiredReadingId || !token) return; const progress = Math.min(99, Math.round((el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight)) * 100)); setCanComplete(progress >= 95); updateRequiredReadingProgress(requiredReadingId, progress, token).catch(() => {}) }
-  const completeReading = async () => {
-    if (!requiredReadingId || !token || !canComplete || completionSaving) return
-    setCompletionSaving(true)
-    try {
-      await updateRequiredReadingProgress(requiredReadingId, 99, token)
-      await completeRequiredReading(requiredReadingId, token)
-      setCanComplete(false)
-      setCompletionConfirmed(true)
-    } finally {
-      setCompletionSaving(false)
-    }
-  }
-
-  useEffect(() => {
-    if (!requiredReadingId || !token) return
-    listMyRequiredReadings(token).then((items) => {
-      const reading = items.find((item) => item.id === requiredReadingId)
-      if (!reading) return
-      setCanComplete(reading.progress >= 95 && reading.progress < 100)
-      setCompletionConfirmed(reading.progress >= 100)
-    }).catch(() => {})
-  }, [requiredReadingId, token])
-
   useEffect(() => {
     if (doc.status !== 'Ready' || chunks.length > 0) return
     setChunksLoading(true)
@@ -148,12 +118,10 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
                 <StatusBadge status={doc.status} />
                 <span>{doc.collection}</span>
                 <span>{doc.updatedAt}</span>
-                {completionConfirmed && <span className="reading-verification-badge" role="status"><CheckCircle2 size={14} /> {isId ? 'Pembacaan terverifikasi' : 'Reading verified'}</span>}
               </span>
             </div>
           </div>
           <div className="doc-viewer-actions">
-            {requiredReadingId && <button className={completionConfirmed ? 'reading-complete-button' : 'primary-button'} disabled={completionSaving || completionConfirmed || !canComplete} onClick={completeReading}>{completionConfirmed ? <><CheckCircle2 size={17} /> {isId ? 'Terverifikasi selesai' : 'Verified complete'}</> : (completionSaving ? (isId ? 'Memverifikasi...' : 'Verifying...') : (isId ? 'Tandai selesai' : 'Mark complete'))}</button>}
             {doc.status === 'Ready' && (
               <button className="secondary-button" onClick={() => downloadDocument(doc.id, doc.name, token ?? undefined)}>
                 <Download size={15} /> {isId ? 'Unduh' : 'Download'}
@@ -168,7 +136,7 @@ function DocViewer({ doc, isId, canManage, token, requiredReadingId, onClose, on
           </div>
         </div>
 
-        <div className="doc-viewer-content" ref={viewerRef} onScroll={trackReading}>
+        <div className="doc-viewer-content">
           {doc.status !== 'Ready' && (
             <div className="doc-viewer-status">
               <p>{doc.status === 'Processing' ? (isId ? 'Dokumen sedang diproses...' : 'Document is being processed...')
@@ -236,20 +204,11 @@ export function DocumentsPage() {
   const [deleteDoc, setDeleteDoc] = useState<{ id: string; name: string } | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const canManage = role === 'admin' || isPersonal || user?.role === 'ADMIN_UNIT'
-  // Menugaskan bacaan wajib tidak lagi terikat pada wewenang mengelola dokumen:
-  // jabatan yang dicentang di halaman Orang & akses boleh menugaskan tanpa perlu
-  // diberi hak mengunggah, mengganti nama, atau menghapus apa pun.
-  const canAssignReadings = canManage || Boolean(user?.jabatan?.canAssignRequiredReadings)
-  const tombolWajibBaca = (document: DocumentItem) => (
-    <button className="icon-button" title={isId ? 'Jadikan wajib baca' : 'Assign required reading'} onClick={(e) => { e.stopPropagation(); setSelectedDivision(''); setAssignmentError(null); setSelectedEmployeeIds([]); setAssignmentView('assign'); setAssignmentDoc(document) }}><BookOpenCheck size={16} /></button>
-  )
   const isId = language === 'id'
   const [searchParams, setSearchParams] = useSearchParams()
   const initialCollection = searchParams.get('collection') ?? 'All'
   const initialQuery = searchParams.get('q') ?? ''
   const requestedDocumentId = searchParams.get('doc')
-  const requestedAssignmentDocumentId = searchParams.get('assign')
-  const requiredReadingId = searchParams.get('reading')
   const [query, setQuery] = useState(initialQuery)
   const [collection, setCollection] = useState(initialCollection)
   // Kategori datang dari server dan sudah tersaring: hanya yang benar-benar
@@ -263,14 +222,6 @@ export function DocumentsPage() {
   const [showDocumentAccess, setShowDocumentAccess] = useState(false)
   const [docChunks, setDocChunks] = useState<DocumentChunk[]>([])
   const [chunksLoading, setChunksLoading] = useState(false)
-  const [assignmentDoc, setAssignmentDoc] = useState<DocumentItem | null>(null)
-  const [employees, setEmployees] = useState<ApiUser[]>([])
-  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([])
-  const [assigning, setAssigning] = useState(false)
-  const [assignmentView, setAssignmentView] = useState<'assign' | 'progress'>('assign')
-  const [readingReport, setReadingReport] = useState<RequiredReadingReport[]>([])
-  const [selectedDivision, setSelectedDivision] = useState('')
-  const [assignmentError, setAssignmentError] = useState<string | null>(null)
 
   // Dialog atur akses. Hanya super admin yang melihatnya: mengunci dokumen ke
   // unit kerja adalah keputusan tingkat organisasi.
@@ -288,31 +239,6 @@ export function DocumentsPage() {
     const document = documents.find((item) => item.id === requestedDocumentId)
     if (document) setSelectedDoc(document)
   }, [documents, requestedDocumentId, selectedDoc])
-
-  useEffect(() => {
-    if (!requestedAssignmentDocumentId || assignmentDoc) return
-    const document = documents.find((item) => item.id === requestedAssignmentDocumentId)
-    if (!document) return
-    setSelectedDivision('')
-    setAssignmentError(null)
-    setSelectedEmployeeIds([])
-    setAssignmentView('progress')
-    setAssignmentDoc(document)
-  }, [assignmentDoc, documents, requestedAssignmentDocumentId])
-
-  useEffect(() => {
-    if (!assignmentDoc || !token) return
-    let active = true
-    Promise.all([listUsers(token), requiredReadingReport(token)]).then(([users, report]) => {
-      if (!active) return
-      const activeEmployees = users.filter((user) => user.isActive !== false && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')
-      const assignedIds = new Set((report.find((item) => item.documentId === assignmentDoc.id)?.readers ?? []).map((reader) => reader.userId))
-      setEmployees(activeEmployees)
-      setReadingReport(report)
-      setSelectedEmployeeIds(activeEmployees.filter((employee) => !assignedIds.has(employee.id)).map((employee) => employee.id))
-    }).catch(() => { if (active) { setEmployees([]); setSelectedEmployeeIds([]); setReadingReport([]) } })
-    return () => { active = false }
-  }, [assignmentDoc, token])
 
   useEffect(() => {
     if (!accessDoc || !token || unitKerjaList.length > 0) return
@@ -346,11 +272,6 @@ export function DocumentsPage() {
       return matchesQuery && matchesCollection
     })
   }, [documents, query, collection])
-  const divisions = useMemo(() => Array.from(new Set(employees.map((employee) => employee.division))).sort(), [employees])
-  const visibleEmployees = selectedDivision ? employees.filter((employee) => employee.division === selectedDivision) : employees
-  const assignedEmployeeIds = useMemo(() => new Set((readingReport.find((item) => item.documentId === assignmentDoc?.id)?.readers ?? []).map((reader) => reader.userId)), [assignmentDoc?.id, readingReport])
-  const visibleAssignableEmployees = useMemo(() => visibleEmployees.filter((employee) => !assignedEmployeeIds.has(employee.id)), [assignedEmployeeIds, visibleEmployees])
-  const selectedAssignableEmployeeIds = useMemo(() => selectedEmployeeIds.filter((id) => !assignedEmployeeIds.has(id)), [assignedEmployeeIds, selectedEmployeeIds])
 
   const handleCollectionChange = (c: string) => {
     setCollection(c)
@@ -368,14 +289,6 @@ export function DocumentsPage() {
     setDocChunks([])
     const nextSearchParams = new URLSearchParams(searchParams)
     nextSearchParams.delete('doc')
-    nextSearchParams.delete('reading')
-    setSearchParams(nextSearchParams)
-  }
-
-  const handleCloseAssignment = () => {
-    setAssignmentDoc(null)
-    const nextSearchParams = new URLSearchParams(searchParams)
-    nextSearchParams.delete('assign')
     setSearchParams(nextSearchParams)
   }
 
@@ -419,23 +332,6 @@ export function DocumentsPage() {
       setAccessError(error instanceof Error ? error.message : (isId ? 'Perubahan akses gagal disimpan.' : 'Access change could not be saved.'))
     } finally {
       setAccessSaving(false)
-    }
-  }
-
-  const assignReading = async () => {
-    if (!token || !assignmentDoc || selectedAssignableEmployeeIds.length === 0) return
-    setAssigning(true)
-    setAssignmentError(null)
-    try {
-      await assignRequiredReading(assignmentDoc.id, selectedAssignableEmployeeIds, token)
-      const report = await requiredReadingReport(token)
-      setReadingReport(report)
-      setSelectedEmployeeIds([])
-      setAssignmentView('progress')
-    } catch (error) {
-      setAssignmentError(error instanceof Error ? error.message : (isId ? 'Penugasan gagal disimpan.' : 'Assignment could not be saved.'))
-    } finally {
-      setAssigning(false)
     }
   }
 
@@ -508,8 +404,8 @@ export function DocumentsPage() {
                 {canManage && <button className="icon-button" title={isId ? 'Ubah nama dokumen' : 'Rename document'} onClick={(event) => { event.stopPropagation(); setRenameDoc(document); setRenameTitle(document.name); setRenameError(null) }}><Pencil size={15} /></button>}
                 <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>
                 {isPersonal ? <button className="icon-button danger" title={isId ? 'Hapus dokumen' : 'Delete document'} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button> : canManage
-                  ? <><button className="icon-button" title={isId ? 'Atur akses dokumen' : 'Manage document access'} onClick={(e) => { e.stopPropagation(); openAccessDialog(document) }}><Building2 size={16} /></button>{document.status === 'Ready' && tombolWajibBaca(document)}<button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
-                  : <>{canAssignReadings && document.status === 'Ready' && tombolWajibBaca(document)}<button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button></>}
+                  ? <><button className="icon-button" title={isId ? 'Atur akses dokumen' : 'Manage document access'} onClick={(e) => { e.stopPropagation(); openAccessDialog(document) }}><Building2 size={16} /></button><button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
+                  : <><button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button></>}
               </td>
             </tr>
           ))}</tbody>
@@ -517,7 +413,7 @@ export function DocumentsPage() {
       </DataTable>
 
       {selectedDoc && (
-        <DocViewer doc={selectedDoc} isId={isId} canManage={canManage} token={token} requiredReadingId={requiredReadingId} onClose={handleCloseDocument} onDelete={handleDelete} onChunksLoaded={setDocChunks} chunks={docChunks} chunksLoading={chunksLoading} setChunksLoading={setChunksLoading} />
+        <DocViewer doc={selectedDoc} isId={isId} canManage={canManage} token={token} onClose={handleCloseDocument} onDelete={handleDelete} onChunksLoaded={setDocChunks} chunks={docChunks} chunksLoading={chunksLoading} setChunksLoading={setChunksLoading} />
       )}
 
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
@@ -625,60 +521,6 @@ export function DocumentsPage() {
               <button className="primary-button" onClick={saveAccess} disabled={accessSaving}>
                 {accessSaving ? (isId ? 'Menyimpan…' : 'Saving…') : (isId ? 'Simpan' : 'Save')}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {assignmentDoc && (
-        <div className="modal-overlay" onClick={handleCloseAssignment}>
-          <div className="modal-card assignment-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-header">
-              <div><h2>{isId ? 'Wajib baca' : 'Required reading'}</h2><p className="modal-copy">{assignmentDoc.name}</p></div>
-              <button className="icon-button" onClick={handleCloseAssignment}><X size={18} /></button>
-            </div>
-            <div className="assignment-tabs">
-              <button className={assignmentView === 'assign' ? 'active' : ''} onClick={() => setAssignmentView('assign')}>{isId ? 'Tetapkan' : 'Assign'}</button>
-              <button className={assignmentView === 'progress' ? 'active' : ''} onClick={() => setAssignmentView('progress')}>{isId ? 'Progres' : 'Progress'}</button>
-            </div>
-            <div className="modal-body">
-              {assignmentView === 'assign' ? <>
-                <div className="assignment-target">
-                  <label htmlFor="assignment-division">{isId ? 'Target divisi' : 'Target division'}</label>
-                  <select id="assignment-division" value={selectedDivision} onChange={(event) => {
-                    const division = event.target.value
-                    setSelectedDivision(division)
-                    setSelectedEmployeeIds((division ? employees.filter((employee) => employee.division === division) : employees).filter((employee) => !assignedEmployeeIds.has(employee.id)).map((employee) => employee.id))
-                  }}>
-                    <option value="">{isId ? 'Semua divisi' : 'All divisions'}</option>
-                    {divisions.map((division) => <option key={division} value={division}>{division}</option>)}
-                  </select>
-                </div>
-                <label className="assignment-select-all">
-                  <input type="checkbox" disabled={visibleAssignableEmployees.length === 0} checked={visibleAssignableEmployees.length > 0 && visibleAssignableEmployees.every((employee) => selectedEmployeeIds.includes(employee.id))} onChange={() => setSelectedEmployeeIds((ids) => visibleAssignableEmployees.every((employee) => ids.includes(employee.id)) ? ids.filter((id) => !visibleAssignableEmployees.some((employee) => employee.id === id)) : Array.from(new Set([...ids, ...visibleAssignableEmployees.map((employee) => employee.id)])))} />
-                  {isId ? 'Pilih semua karyawan yang tampil' : 'Select all visible employees'}
-                </label>
-                <div className="assignment-table">
-                  {visibleEmployees.map((employee) => {
-                    const alreadyAssigned = assignedEmployeeIds.has(employee.id)
-                    return <label key={employee.id} className={`assignment-person${alreadyAssigned ? ' is-assigned' : ''}`}>
-                      <input type="checkbox" disabled={alreadyAssigned} checked={alreadyAssigned || selectedEmployeeIds.includes(employee.id)} onChange={() => setSelectedEmployeeIds((ids) => ids.includes(employee.id) ? ids.filter((id) => id !== employee.id) : [...ids, employee.id])} />
-                      <span><strong>{employee.displayName}</strong><small>{employee.employeeNumber} · {employee.division} · {employee.jobTitle}{alreadyAssigned && <> · <em>{isId ? 'Sudah ditugaskan' : 'Already assigned'}</em></>}</small></span>
-                      {alreadyAssigned && <CheckCircle2 className="assignment-person-status" size={18} aria-label={isId ? 'Sudah ditugaskan' : 'Already assigned'} />}
-                    </label>
-                  })}
-                </div>
-              </> : <div className="assignment-progress-list">
-                {(readingReport.find((item) => item.documentId === assignmentDoc.id)?.readers ?? []).map((reader) => <div className="reading-report-person" key={reader.employeeNumber}>
-                  <span><strong>{reader.displayName}</strong><small>{reader.employeeNumber} · {reader.division} · {reader.jobTitle}</small></span>
-                  <b>{reader.progress === 100 ? (isId ? 'Selesai' : 'Complete') : `${reader.progress}%`}</b>
-                </div>)}
-                {!(readingReport.find((item) => item.documentId === assignmentDoc.id)?.readers.length) && <p className="empty-row">{isId ? 'Belum ada karyawan yang ditugaskan.' : 'No employees assigned yet.'}</p>}
-              </div>}
-            </div>
-            <div className="modal-actions">
-              {assignmentError && <p className="assignment-error" role="alert">{assignmentError}</p>}
-              <button className="secondary-button" onClick={handleCloseAssignment}>{isId ? 'Tutup' : 'Close'}</button>
-              {assignmentView === 'assign' && <button className="primary-button" disabled={assigning || selectedAssignableEmployeeIds.length === 0} onClick={assignReading}>{assigning ? (isId ? 'Menyimpan...' : 'Saving...') : (selectedAssignableEmployeeIds.length === 0 ? (isId ? 'Semua sudah ditugaskan' : 'All already assigned') : (isId ? `Tetapkan (${selectedAssignableEmployeeIds.length})` : `Assign (${selectedAssignableEmployeeIds.length})`))}</button>}
             </div>
           </div>
         </div>

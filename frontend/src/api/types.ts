@@ -25,7 +25,6 @@ export interface ApiJabatan {
   name: string
   canManageAnnouncements: boolean
   canViewAnnouncementReaders: boolean
-  canAssignRequiredReadings: boolean
 }
 
 /**

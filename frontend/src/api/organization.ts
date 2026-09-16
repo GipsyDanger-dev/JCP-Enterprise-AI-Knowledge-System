@@ -16,7 +16,6 @@ export interface OrgJabatan {
   name: string
   canManageAnnouncements: boolean
   canViewAnnouncementReaders: boolean
-  canAssignRequiredReadings: boolean
   isActive: boolean
   sortOrder: number
   userCount: number
@@ -30,7 +29,7 @@ export interface OrganizationOverview {
 
 export type JabatanInput = Partial<Pick<
   OrgJabatan,
-  'name' | 'canManageAnnouncements' | 'canViewAnnouncementReaders' | 'canAssignRequiredReadings' | 'isActive' | 'sortOrder'
+  'name' | 'canManageAnnouncements' | 'canViewAnnouncementReaders' | 'isActive' | 'sortOrder'
 >>
 
 export const getOrganization = (token?: string) =>

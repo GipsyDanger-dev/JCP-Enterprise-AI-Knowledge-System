@@ -6,14 +6,12 @@ import { Collection } from '@/components/Collection'
 import { DocumentActivity } from '@/components/DocumentActivity'
 import { Metric } from '@/components/Metric'
 import { PageHeading } from '@/components/PageHeading'
-import { RequiredRead } from '@/components/RequiredRead'
 import { SectionHeading } from '@/components/SectionHeading'
 import { SourceCard } from '@/components/SourceCard'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
 import { listConversations } from '@/api/chat'
 import { useAuth } from '@/hooks/useAuth'
-import { listMyRequiredReadings, requiredReadingReport, type RequiredReading, type RequiredReadingReport } from '@/api/requiredReadings'
 import { listAnnouncements, type Announcement } from '@/api/announcements'
 
 function greeting(isId: boolean, hour = new Date().getHours()) {
@@ -56,9 +54,7 @@ function AdminOverview({ isId }: { isId: boolean }) {
   const { documents, uploadError, registerUploadedDocument } = useWorkspace()
   const [showUpload, setShowUpload] = useState(false)
   const [conversationCount, setConversationCount] = useState(0)
-  const [readingReport, setReadingReport] = useState<RequiredReadingReport[]>([])
   useEffect(() => { if (token) listConversations(token).then((items) => setConversationCount(items.length)).catch(() => setConversationCount(0)) }, [token])
-  useEffect(() => { if (token) requiredReadingReport(token).then(setReadingReport).catch(() => setReadingReport([])) }, [token])
   const readyCount = documents.filter((document) => document.status === 'Ready').length
   const totalChunks = documents.reduce((sum, document) => sum + (document.chunks ?? 0), 0)
   const documentCollections = Array.from(new Set(documents.map((document) => document.collection).filter(Boolean))).sort()
@@ -90,7 +86,6 @@ function AdminOverview({ isId }: { isId: boolean }) {
             })}
           </div>
         </section>
-        {readingReport.length > 0 && <section className="required-section"><SectionHeading title={isId ? 'Laporan wajib baca' : 'Required reading report'} detail={isId ? 'Progres karyawan per dokumen' : 'Employee progress by document'} /><div className="required-list">{readingReport.map((item) => <div key={item.documentId} className="required-report"><RequiredRead title={item.title} category={`${item.completed}/${item.total} ${isId ? 'selesai' : 'completed'}`} status={`${item.progress}%`} progress={item.progress} onClick={() => navigate(`/documents?assign=${encodeURIComponent(item.documentId)}`)} /><div className="reading-report-people">{item.readers.map((reader) => <div key={reader.employeeNumber} className="reading-report-person"><span><strong>{reader.displayName}</strong><small>{reader.employeeNumber} · {reader.division} · {reader.jobTitle}</small></span><b>{reader.progress === 100 ? (isId ? 'Sudah membaca' : 'Read') : `${reader.progress}%`}</b></div>)}</div></div>)}</div></section>}
       </section>
 
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
@@ -103,12 +98,9 @@ function EmployeeOverview({ isId }: { isId: boolean }) {
   const { user, token } = useAuth()
   const { question, setQuestion, onAsk, askQuestion, language, chatHistory, documents } = useWorkspace()
   const [conversationCount, setConversationCount] = useState(0)
-  const [requiredReadings, setRequiredReadings] = useState<RequiredReading[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   useEffect(() => { if (token) listConversations(token).then((items) => setConversationCount(items.length)).catch(() => setConversationCount(0)) }, [token])
-  useEffect(() => { if (token) listMyRequiredReadings(token).then(setRequiredReadings).catch(() => setRequiredReadings([])) }, [token])
   useEffect(() => { if (token) listAnnouncements(token).then(setAnnouncements).catch(() => setAnnouncements([])) }, [token])
-  const pendingRequiredReadings = requiredReadings.filter((reading) => reading.completedAt === null && reading.progress < 100)
   const answer = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].answer : ''
   const latestCitation = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].citations[0] : null
   const docsLabel = isId ? 'dokumen' : 'documents'
@@ -138,12 +130,6 @@ function EmployeeOverview({ isId }: { isId: boolean }) {
             </div>
           </section>
 
-          {pendingRequiredReadings.length > 0 && <section className="required-section">
-            <SectionHeading title={isId ? 'Wajib baca' : 'Required reading'} detail={isId ? 'Kebijakan yang ditugaskan untuk Anda' : 'Policies assigned to you'} />
-            <div className="required-list">
-              {pendingRequiredReadings.map((reading) => <RequiredRead key={reading.id} title={reading.document.title} category={reading.document.collection ?? (isId ? 'Tanpa kategori' : 'Uncategorized')} status={`${reading.progress}%`} progress={reading.progress} onClick={() => navigate(`/documents?doc=${encodeURIComponent(reading.documentId)}&reading=${encodeURIComponent(reading.id)}`)} />)}
-            </div>
-          </section>}
         </div>
 
         <aside className="employee-sidebar">
