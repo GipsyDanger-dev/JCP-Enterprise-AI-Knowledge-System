@@ -286,12 +286,16 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
 function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps & { items: OrgJabatan[] }) {
   const { tanya, dialog: dialogKonfirmasi } = useConfirm()
   const [name, setName] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   // Id yang permintaannya sedang berjalan, supaya centang tidak bisa diklik dua
   // kali sebelum jawaban pertamanya sampai.
   const [busy, setBusy] = useState<string | null>(null)
+
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
+  const filteredItems = items.filter((jabatan) => !normalizedSearch || jabatan.name.toLocaleLowerCase().includes(normalizedSearch))
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault()
@@ -370,6 +374,17 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
           : 'Job titles do not decide document access — work units do. This section only manages announcement permissions. Admins always have these permissions.'}
       </p>
 
+      <div className="filter-search org-list-search">
+        <Search size={16} />
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder={isId ? 'Cari jabatan' : 'Search job titles'}
+          aria-label={isId ? 'Cari jabatan' : 'Search job titles'}
+        />
+      </div>
+
       <div className="data-table">
         <table>
           <thead>
@@ -385,7 +400,9 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
           <tbody>
             {items.length === 0 ? (
               <tr><td colSpan={6} className="empty-row">{isId ? 'Belum ada jabatan.' : 'No job titles yet.'}</td></tr>
-            ) : items.map((jabatan) => (
+            ) : filteredItems.length === 0 ? (
+              <tr><td colSpan={6} className="empty-row">{isId ? 'Jabatan tidak ditemukan.' : 'No matching job titles.'}</td></tr>
+            ) : filteredItems.map((jabatan) => (
               <tr key={jabatan.id}>
                 <td>
                   {editingId === jabatan.id ? (
