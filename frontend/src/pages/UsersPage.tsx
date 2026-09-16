@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Camera, Check, ChevronDown, Loader2, Pencil, Plus, UserX, X } from 'lucide-react'
+import { Camera, Check, ChevronDown, Loader2, Pencil, Plus, Search, UserX, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { errorMessage } from '@/api/client'
@@ -66,6 +66,9 @@ export function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterRole>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [jabatanFilter, setJabatanFilter] = useState('')
+  const [unitKerjaFilter, setUnitKerjaFilter] = useState('')
   // Daftar acuan dropdown. Unit kerja datang dari database supaya daftarnya bisa
   // direvisi tanpa deploy ulang; jabatan hanya keterangan dan tidak memengaruhi akses.
   const [unitKerjaList, setUnitKerjaList] = useState<ApiUnitKerja[]>([])
@@ -155,7 +158,7 @@ export function UsersPage() {
   // adalah admin penuh di mata backend, jadi setiap tombol saring tetap cocok
   // dengan peran efektif yang digunakan oleh server.
   const isAdminRole = (user: ApiUser) => normalizeRole(user.role) === 'SUPER_ADMIN'
-  const filtered =
+  const roleFiltered =
     filter === 'all'
       ? users
       : filter === 'SUPER_ADMIN'
@@ -163,6 +166,23 @@ export function UsersPage() {
         : filter === 'ADMIN_UNIT'
           ? users.filter((user) => normalizeRole(user.role) === 'ADMIN_UNIT')
           : users.filter((user) => normalizeRole(user.role) === 'PEGAWAI')
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
+  const filtered = roleFiltered.filter((user) => {
+    const unitKerja = user.unitKerja?.name ?? user.division ?? ''
+    const jabatan = user.jabatan?.name ?? user.jobTitle ?? ''
+    const matchesSearch = !normalizedSearch || [
+      user.displayName,
+      user.username,
+      user.employeeNumber,
+      user.email ?? '',
+      unitKerja,
+      jabatan,
+    ].some((value) => value.toLocaleLowerCase().includes(normalizedSearch))
+    const matchesJabatan = !jabatanFilter || user.jabatanId === jabatanFilter || user.jabatan?.id === jabatanFilter
+    const matchesUnitKerja = !unitKerjaFilter || user.unitKerjaId === unitKerjaFilter || user.unitKerja?.id === unitKerjaFilter
+
+    return matchesSearch && matchesJabatan && matchesUnitKerja
+  })
   const adminCount = users.filter(isAdminRole).length
   const unitAdminCount = users.filter((user) => normalizeRole(user.role) === 'ADMIN_UNIT').length
   const employeeCount = users.filter((user) => normalizeRole(user.role) === 'PEGAWAI').length
@@ -326,6 +346,47 @@ export function UsersPage() {
         <button className={`filter-chip ${filter === 'employee' ? 'active' : ''}`} onClick={() => setFilter('employee')}>
           {isId ? 'Karyawan' : 'Employee'} ({employeeCount})
         </button>
+      </div>
+
+      <div className="users-data-toolbar">
+        <label className="filter-search">
+          <Search size={16} />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={isId ? 'Cari nama, username, unit, atau jabatan' : 'Search name, username, unit, or job title'}
+            aria-label={isId ? 'Cari pengguna' : 'Search users'}
+          />
+        </label>
+
+        <div className="select-wrapper">
+          <select
+            value={jabatanFilter}
+            onChange={(event) => setJabatanFilter(event.target.value)}
+            aria-label={isId ? 'Filter berdasarkan jabatan' : 'Filter by job title'}
+          >
+            <option value="">{isId ? 'Semua jabatan' : 'All job titles'}</option>
+            {jabatanList.map((jabatan) => (
+              <option key={jabatan.id} value={jabatan.id}>{jabatan.name}</option>
+            ))}
+          </select>
+          <ChevronDown size={15} className="select-icon" />
+        </div>
+
+        <div className="select-wrapper">
+          <select
+            value={unitKerjaFilter}
+            onChange={(event) => setUnitKerjaFilter(event.target.value)}
+            aria-label={isId ? 'Filter berdasarkan unit' : 'Filter by work unit'}
+          >
+            <option value="">{isId ? 'Semua unit' : 'All work units'}</option>
+            {unitKerjaList.map((unit) => (
+              <option key={unit.id} value={unit.id}>{unit.name}</option>
+            ))}
+          </select>
+          <ChevronDown size={15} className="select-icon" />
+        </div>
       </div>
 
       {error && <div className="upload-error-banner">{error}</div>}

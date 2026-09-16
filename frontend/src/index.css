@@ -871,6 +871,11 @@ button { cursor: pointer; }
 .filter-chip { border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-xl); padding: 6px 14px; font-size: var(--fs-xs); color: var(--text-secondary); font-weight: var(--fw-semibold); cursor: pointer; transition: all var(--ease-fast); }
 .filter-chip:hover { border-color: var(--border-hover); background: var(--bg-subtle); }
 .filter-chip.active { border-color: var(--brand-600); background: var(--brand-100); color: var(--brand-800); }
+.users-data-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.users-data-toolbar .filter-search { flex: 1 1 300px; min-width: 220px; }
+.users-data-toolbar .select-wrapper { flex: 0 1 220px; min-width: 180px; }
+.users-data-toolbar .select-wrapper select { width: 100%; height: 36px; padding: 0 32px 0 11px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--bg-card); color: var(--text-card); font-size: var(--fs-sm); outline: 0; appearance: none; cursor: pointer; }
+.users-data-toolbar .select-wrapper select:focus { border-color: var(--brand-600); box-shadow: 0 0 0 3px var(--brand-100); }
 .role-badge { display: inline-block; padding: 3px 10px; border-radius: var(--radius-xl); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: .05em; }
 .role-badge.admin, .role-badge.super_admin { background: var(--brand-100); color: var(--brand-800); }
 .role-badge.user, .role-badge.pegawai { background: var(--success-bg); color: var(--success); }
