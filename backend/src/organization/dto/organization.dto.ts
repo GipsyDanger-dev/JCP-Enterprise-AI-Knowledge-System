@@ -54,11 +54,6 @@ export class CreateJabatanDto {
   @IsBoolean()
   canViewAnnouncementReaders?: boolean;
 
-  @ApiPropertyOptional({ description: 'Boleh menugaskan bacaan wajib dan membaca laporan kepatuhannya.' })
-  @IsOptional()
-  @IsBoolean()
-  canAssignRequiredReadings?: boolean;
-
   @ApiPropertyOptional({ description: 'Urutan tampil di dropdown.' })
   @IsOptional()
   @IsInt()
@@ -87,11 +82,6 @@ export class UpdateJabatanDto {
   @IsOptional()
   @IsBoolean()
   canViewAnnouncementReaders?: boolean;
-
-  @ApiPropertyOptional({ description: 'Boleh menugaskan bacaan wajib dan membaca laporan kepatuhannya.' })
-  @IsOptional()
-  @IsBoolean()
-  canAssignRequiredReadings?: boolean;
 
   @ApiPropertyOptional({ description: 'Urutan tampil di dropdown.' })
   @IsOptional()

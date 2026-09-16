@@ -10,7 +10,6 @@ import { HealthController } from './health.controller';
 import { MessagingModule } from './messaging/messaging.module';
 import { ProcessingJobsModule } from './processing-jobs/processing-jobs.module';
 import { UsersModule } from './users/users.module';
-import { RequiredReadingsModule } from './required-readings/required-readings.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AnnouncementsModule } from './announcements/announcements.module';
 import { BillingModule } from './billing/billing.module';
@@ -27,7 +26,6 @@ import { OrganizationModule } from './organization/organization.module';
     ChatModule,
     MessagingModule,
     AiModule,
-    RequiredReadingsModule,
     NotificationsModule,
     AnnouncementsModule,
     BillingModule,

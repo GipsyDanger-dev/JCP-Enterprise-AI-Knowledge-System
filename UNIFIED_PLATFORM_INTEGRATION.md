@@ -36,7 +36,7 @@ not the final conflict count for the combined result.
 - Personal AI queries filter by uploader for personal users, by role for organization
   employees, and omit retrieval filters for organization administrators.
 - Categories in Personal are global. They must become workspace-local alongside
-  documents, announcements, users, required reading, messaging, and audit access.
+  documents, announcements, users, messaging, and audit access.
 - All AI paths need the same boundary: retrieval, inventory/metadata answers,
   follow-up context, and citation validation. Restricting only the document list is insufficient.
 - Keep main's multipart ingestion and realtime messaging while incorporating shared
@@ -80,7 +80,7 @@ Required acceptance evidence:
 - Organization admins manage only their own employees and content.
 - Personal registration cannot select administrator privileges or another workspace.
 - Login, logout, expired sessions, and inactive accounts preserve workspace boundaries.
-- Categories, document ingestion/preview, required-reading assignment/progress/completion,
+- Categories, document ingestion/preview,
   announcement previews/readership, and messaging work within the intended workspace.
 - AI metadata answers, citations, follow-ups, and failures cannot expose foreign data.
 - Existing database records retain their files, reading history, and ownership after

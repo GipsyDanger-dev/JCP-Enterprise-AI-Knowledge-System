@@ -42,7 +42,7 @@ export class JwtAuthGuard implements CanActivate {
       // bersangkutan login ulang.
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, email: true, username: true, role: true, isAdmin: true, isActive: true, displayName: true, unitKerjaId: true, jobTitle: true, jabatan: { select: { id: true, name: true, canManageAnnouncements: true, canViewAnnouncementReaders: true, canAssignRequiredReadings: true } }, division: true, accountType: true, workspaceId: true, isPlatformOwner: true, workspace: { select: { isActive: true, type: true, subscriptionStatus: true, trialEndsAt: true } } },
+        select: { id: true, email: true, username: true, role: true, isAdmin: true, isActive: true, displayName: true, unitKerjaId: true, jobTitle: true, jabatan: { select: { id: true, name: true, canManageAnnouncements: true, canViewAnnouncementReaders: true } }, division: true, accountType: true, workspaceId: true, isPlatformOwner: true, workspace: { select: { isActive: true, type: true, subscriptionStatus: true, trialEndsAt: true } } },
       });
 
       if (!user?.isActive || !user.workspace.isActive || user.accountType !== user.workspace.type || user.workspaceId !== payload.workspaceId) throw new UnauthorizedException('Authentication required');

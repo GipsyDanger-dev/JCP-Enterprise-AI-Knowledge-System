@@ -60,7 +60,6 @@ async function main() {
   for (const account of personal) {
     await call('/users', account.accessToken, 'GET', undefined, 403);
     await call('/workspaces', account.accessToken, 'GET', undefined, 403);
-    await call('/required-readings/report', account.accessToken, 'GET', undefined, 403);
     await call('/messaging/conversations', account.accessToken, 'GET', undefined, 403);
   }
   console.log('PASS personal registration creates separate private spaces and rejects elevated access');
@@ -105,17 +104,7 @@ async function main() {
     }
     assert(ready, 'Document ingestion did not finish');
   }
-  await call(`/required-readings/documents/${docs[0].id}/assign`, a.admin.accessToken, 'POST', { userIds: [b.employee.id] }, 400);
-  await call(`/required-readings/documents/${docs[0].id}/assign`, a.admin.accessToken, 'POST', { userIds: [a.employee.id] }, 201);
-  await call(`/required-readings/documents/${docs[0].id}/assign`, a.admin.accessToken, 'POST', { userIds: [a.employee.id] }, 400);
-  const readings = await call('/required-readings/mine', a.employeeLogin.accessToken);
-  assert.equal(readings.length, 1);
-  await call(`/required-readings/${readings[0].id}/complete`, a.employeeLogin.accessToken, 'POST', {}, 400);
-  await call(`/required-readings/${readings[0].id}/progress`, a.employeeLogin.accessToken, 'POST', { progress: 99 }, 201);
-  await call(`/required-readings/${readings[0].id}/complete`, a.employeeLogin.accessToken, 'POST', {}, 201);
-  assert.equal((await call('/required-readings/report', a.admin.accessToken))[0].completed, 1);
-  assert.equal((await call('/required-readings/report', b.admin.accessToken)).length, 0);
-  console.log('PASS ingestion and required-reading assignment, duplicate protection, completion and reports');
+  console.log('PASS ingestion across separate organizations');
 
   const announcement = await call('/announcements', a.admin.accessToken, 'POST', { title: 'Alpha announcement', body: 'Only alpha employees.' }, 201);
   assert((await call('/announcements', a.employeeLogin.accessToken)).some((item) => item.id === announcement.id));

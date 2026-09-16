@@ -18,7 +18,7 @@ assert url.path == '/codex_unified_integration_20260906', 'Isolated database req
 dsn = urlunsplit(url._replace(query=urlencode([(k, v) for k, v in parse_qsl(url.query) if k != 'schema'])))
 schema = 'migration_' + uuid4().hex
 legacy_workspace = '00000000-0000-4000-8000-000000000001'
-ids = {name: uuid4() for name in ['admin', 'employee', 'document', 'version', 'file', 'reading', 'announcement']}
+ids = {name: uuid4() for name in ['admin', 'employee', 'document', 'version', 'file', 'announcement']}
 content = b'Legacy handbook with preserved binary content.'
 with psycopg.connect(dsn, autocommit=True) as conn:
     conn.execute(sql.SQL('CREATE SCHEMA {}').format(sql.Identifier(schema)))
@@ -36,9 +36,8 @@ with psycopg.connect(dsn, autocommit=True) as conn:
                  (ids['version'], ids['document'], 'handbook.txt', 'text/plain', len(content), hashlib.sha256(content).hexdigest()))
     conn.execute('INSERT INTO document_files (id,document_version_id,content) VALUES (%s,%s,%s)', (ids['file'], ids['version'], content))
     conn.execute('INSERT INTO chunks (chunk_id,document_version_id,text) VALUES (%s,%s,%s)', ('legacy-chunk', ids['version'], content.decode()))
-    conn.execute('INSERT INTO required_readings (id,document_id,user_id,progress,due_at,completed_at) VALUES (%s,%s,%s,100,now(),now())', (ids['reading'], ids['document'], ids['employee']))
     conn.execute('INSERT INTO announcements (id,title,body,created_by_id,updated_at) VALUES (%s,%s,%s,%s,now())', (ids['announcement'], 'Legacy news', 'Keep this announcement', ids['admin']))
-    tables = ['users', 'documents', 'document_versions', 'document_files', 'chunks', 'required_readings', 'announcements', 'document_categories']
+    tables = ['users', 'documents', 'document_versions', 'document_files', 'chunks', 'announcements', 'document_categories']
     before = {}
     for table in tables:
         rows = conn.execute(sql.SQL('SELECT * FROM {}').format(sql.Identifier(table)))
@@ -55,5 +54,5 @@ with psycopg.connect(dsn, autocommit=True) as conn:
     assert unit.version == 4
     assert conn.execute('SELECT unit_kerja_id FROM documents WHERE id=%s', (ids['document'],)).fetchone()[0] == unit
     assert bytes(conn.execute('SELECT content FROM document_files WHERE id=%s', (ids['file'],)).fetchone()[0]) == content
-    print(f'PASS {len(migrations)} migrations; legacy rows, file bytes, completed readings, roles and unit ownership preserved')
+    print(f'PASS {len(migrations)} migrations; legacy rows, file bytes, roles and unit ownership preserved')
     (root / '.local/unified-migration-results.json').write_text(json.dumps({'passed': True, 'schema': schema, 'tables': tables, 'migrations': len(migrations)}))

@@ -29,7 +29,6 @@ const JABATAN_PERMISSION_SELECT = {
   name: true,
   canManageAnnouncements: true,
   canViewAnnouncementReaders: true,
-  canAssignRequiredReadings: true,
 } as const;
 
 @Injectable()

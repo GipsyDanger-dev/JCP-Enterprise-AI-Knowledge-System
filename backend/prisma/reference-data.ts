@@ -126,8 +126,6 @@ export interface JabatanSeed {
   canManageAnnouncements?: boolean;
   /** Boleh melihat siapa saja yang sudah dan belum membaca pengumuman. */
   canViewAnnouncementReaders?: boolean;
-  /** Boleh menugaskan bacaan wajib dan membaca laporan kepatuhannya. */
-  canAssignRequiredReadings?: boolean;
 }
 
 /**

@@ -20,7 +20,6 @@ export interface JabatanPermissions {
   name: string;
   canManageAnnouncements: boolean;
   canViewAnnouncementReaders: boolean;
-  canAssignRequiredReadings: boolean;
 }
 
 export interface AuthenticatedUser extends JwtPayload {
