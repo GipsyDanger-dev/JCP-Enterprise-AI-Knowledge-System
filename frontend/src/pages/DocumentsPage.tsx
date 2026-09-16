@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { ArrowUpRight, BookOpenCheck, Building2, CheckCircle2, ChevronDown, Download, FileText, FolderLock, FolderOpen, Pencil, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
+import { DataTable } from '@/components/DataTable'
 import { UploadModal } from '@/components/UploadModal'
 import { DocumentAccessModal } from '@/components/DocumentAccessModal'
 import { downloadDocument, getDocumentBlob, getDocumentChunks, listDocumentCategories, updateDocument, updateDocumentAccess, type DocumentChunk } from '@/api/documents'
@@ -484,7 +485,7 @@ export function DocumentsPage() {
         </div>
         )}
       </div>
-      <div className="data-table">
+      <DataTable>
         <table>
           <thead><tr><th>{isId ? 'Dokumen' : 'Document'}</th><th>{isId ? 'Koleksi' : 'Collection'}</th><th>{isId ? 'Diperbarui' : 'Updated'}</th><th>Status</th><th>Chunks</th><th aria-label={isId ? 'Aksi' : 'Actions'} /></tr></thead>
           <tbody>{filtered.length === 0 ? (
@@ -513,7 +514,7 @@ export function DocumentsPage() {
             </tr>
           ))}</tbody>
         </table>
-      </div>
+      </DataTable>
 
       {selectedDoc && (
         <DocViewer doc={selectedDoc} isId={isId} canManage={canManage} token={token} requiredReadingId={requiredReadingId} onClose={handleCloseDocument} onDelete={handleDelete} onChunksLoaded={setDocChunks} chunks={docChunks} chunksLoading={chunksLoading} setChunksLoading={setChunksLoading} />
