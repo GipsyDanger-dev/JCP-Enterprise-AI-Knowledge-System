@@ -11,6 +11,9 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  *
  * Aturannya:
  *  - Admin melihat semua yang belum dihapus, apa pun status dan kategorinya.
+ *  - Admin unit melihat seluruh isi unitnya sendiri dengan keleluasaan yang
+ *    sama, termasuk yang belum selesai diproses dan rancangan. Di luar unitnya
+ *    ia tunduk pada aturan pegawai.
  *  - Pegawai biasa hanya melihat dokumen yang sudah selesai diproses (READY).
  *  - Rancangan tidak pernah terlihat oleh pegawai biasa. Ini bukan soal
  *    kerahasiaan tapi soal benar/salah: menjawab pakai draft yang angkanya
@@ -23,9 +26,45 @@ export function documentVisibilityWhere(actor: AuthenticatedUser): Prisma.Docume
   if (actor.accountType === 'PERSONAL') return { workspaceId: actor.workspaceId, uploadedById: actor.sub, deletedAt: null };
   if (actor.isAdmin) return { workspaceId: actor.workspaceId, deletedAt: null };
 
+  const dasar = { workspaceId: actor.workspaceId, deletedAt: null };
+
+  /*
+   * Admin unit melihat SELURUH isi unitnya sendiri, apa pun status pemrosesan
+   * dan status keberlakuannya; di luar unitnya ia tetap pegawai biasa.
+   *
+   * Tanpa cabang ini ia tidak bisa mengurus apa pun yang belum READY — padahal
+   * dokumen yang baru diunggah selalu berstatus QUEUED. Akibatnya dokumen
+   * menghilang dari daftar tepat setelah ia mengunggahnya, halaman status
+   * pemrosesan menjawab "tidak ditemukan", dan unggahan yang gagal diproses
+   * (FAILED) tidak pernah bisa ia lihat apalagi hapus. Rancangan unitnya pun
+   * tak terlihat, sehingga wewenang menyuntingnya tidak ada gunanya.
+   *
+   * Dokumen TANPA penanda unit sengaja tidak ikut dibuka meski belum READY:
+   * itu milik seluruh organisasi, dan canManageForUnit memang tidak
+   * mengizinkannya mengelola dokumen semacam itu. Membukanya di sini hanya akan
+   * memperlihatkan rancangan tingkat organisasi kepada orang yang tidak boleh
+   * menyentuhnya.
+   *
+   * Yang TIDAK ikut melonggar adalah jalur tanya-jawab AI: batas yang dikirim
+   * ke sana disusun terpisah di chat.service.ts dan tetap menolak rancangan
+   * untuk siapa pun selain admin. Terlihat di daftar dan boleh dikutip sebagai
+   * jawaban adalah dua hal berbeda — rancangan aman diurus, tidak aman dikutip.
+   */
+  if (actor.role === UserRole.ADMIN_UNIT && actor.unitKerjaId) {
+    return { ...dasar, OR: [{ unitKerjaId: actor.unitKerjaId }, aturanPegawai(actor)] };
+  }
+
+  return { ...dasar, ...aturanPegawai(actor) };
+}
+
+/**
+ * Aturan untuk pegawai biasa, tanpa batas workspace dan `deletedAt` yang selalu
+ * ikut. Dipisah supaya admin unit bisa memakainya apa adanya untuk dokumen di
+ * luar unitnya — kalau disalin, keduanya akan berbeda diam-diam pada perubahan
+ * berikutnya, dan yang menyimpang adalah aturan akses.
+ */
+function aturanPegawai(actor: AuthenticatedUser): Prisma.DocumentWhereInput {
   return {
-    workspaceId: actor.workspaceId,
-    deletedAt: null,
     status: DocumentStatus.READY,
     legalStatus: { not: LegalStatus.RANCANGAN },
     // Penanda per dokumen. Hanya mempersempit: dokumen tanpa penanda ikut
