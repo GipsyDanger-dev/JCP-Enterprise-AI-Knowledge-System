@@ -244,8 +244,6 @@ enum AuditAction {
 }
 
 enum NotificationType {
-  REQUIRED_READING_ASSIGNED
-  REQUIRED_READING_COMPLETED
   ANNOUNCEMENT_PUBLISHED
   MESSAGE_RECEIVED
 }
@@ -285,7 +283,6 @@ model User {
   directConversations DirectConversation[]
   auditLogs           AuditLog[]
   sessions            Session[]
-  requiredReadings    RequiredReading[]
   notifications       AppNotification[]
   announcements       Announcement[]
   announcementReads   AnnouncementRead[]
@@ -327,7 +324,6 @@ model Document {
   deletedAt        DateTime?         @map("deleted_at")
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
-  requiredReadings RequiredReading[]
 
   @@index([status])
   @@index([uploadedById])
@@ -384,8 +380,6 @@ model Jabatan {
   canManageAnnouncements     Boolean   @default(false) @map("can_manage_announcements")
   /// Boleh melihat siapa saja yang sudah dan belum membaca pengumuman.
   canViewAnnouncementReaders Boolean   @default(false) @map("can_view_announcement_readers")
-  /// Boleh menugaskan bacaan wajib dan membaca laporan kepatuhannya.
-  canAssignRequiredReadings  Boolean   @default(false) @map("can_assign_required_readings")
   // Menonaktifkan, bukan menghapus: jabatan yang masih dipakai pegawai tidak
   // boleh hilang begitu saja, karena wewenangnya ikut hilang diam-diam.
   isActive                   Boolean   @default(true) @map("is_active")
@@ -442,24 +436,6 @@ model DocumentCategory {
   @@unique([workspaceId, key])
   @@index([name])
   @@map("document_categories")
-}
-
-model RequiredReading {
-  id             String    @id @default(uuid()) @db.Uuid
-  documentId     String    @map("document_id") @db.Uuid
-  userId         String    @map("user_id") @db.Uuid
-  progress       Int       @default(0)
-  assignedAt     DateTime  @default(now()) @map("assigned_at")
-  dueAt          DateTime  @map("due_at")
-  lastProgressAt DateTime? @map("last_progress_at")
-  completedAt    DateTime? @map("completed_at")
-  document       Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([documentId, userId])
-  @@index([userId, completedAt])
-  @@index([documentId, completedAt])
-  @@map("required_readings")
 }
 
 model AppNotification {
