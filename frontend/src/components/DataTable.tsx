@@ -10,16 +10,27 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
  * garis nyangkut di atas tabel.
  */
 export function DataTable({ children }: { children: ReactNode }) {
+  const wrapRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const railRef = useRef<HTMLDivElement>(null)
-  const [scrollWidth, setScrollWidth] = useState(0)
+  const [railWidth, setRailWidth] = useState(0)
   const [overflowing, setOverflowing] = useState(false)
 
   useEffect(() => {
+    const wrap = wrapRef.current
     const body = bodyRef.current
-    if (!body) return
+    if (!wrap || !body) return
     const measure = () => {
-      setScrollWidth(body.scrollWidth)
+      // `.data-table` punya border 1px dan relnya tidak, jadi lebar-dalam
+      // keduanya beda 2px. Kalau spacer dibuat sama persis dengan scrollWidth
+      // tabel, scrollLeft maksimum rel jadi 2px lebih pendek: begitu tabel
+      // mentok, nilai yang dioper ke rel dipangkas browser dan rel menyeret
+      // tabel mundur lagi — tarik-menarik tepat di ujung. Spacer dilebihkan
+      // sebesar selisih itu supaya jangkauan keduanya identik. Diukur, bukan
+      // dipatok 2px, supaya ikut benar kalau border atau padangnya berubah.
+      const relBox = railRef.current ?? wrap
+      const selisih = relBox.clientWidth - body.clientWidth
+      setRailWidth(body.scrollWidth + selisih)
       setOverflowing(body.scrollWidth - body.clientWidth > 1)
     }
     measure()
@@ -40,21 +51,31 @@ export function DataTable({ children }: { children: ReactNode }) {
     if (body && rail) rail.scrollLeft = body.scrollLeft
   }, [overflowing])
 
-  // Menyetel scrollLeft ke nilai yang sama tidak memicu event scroll lagi,
-  // jadi pantulan antar kedua elemen berhenti sendiri tanpa perlu flag.
-  const mirror = (from: 'body' | 'rail') => () => {
+  // Menyetel scrollLeft memicu event scroll di elemen tujuan, dan event itu
+  // memantul balik ke sini. Event scroll dikirim asinkron, jadi penanda tidak
+  // bisa dilepas tepat setelah penyetelan — dilepas di frame berikutnya.
+  // Selama satu sisi masih menggerakkan yang lain, gema dari seberang diabaikan.
+  const penggerak = useRef<'body' | 'rail' | null>(null)
+  const lepas = useRef(0)
+  const mirror = (dari: 'body' | 'rail') => () => {
     const body = bodyRef.current
     const rail = railRef.current
     if (!body || !rail) return
-    if (from === 'body') rail.scrollLeft = body.scrollLeft
-    else body.scrollLeft = rail.scrollLeft
+    if (penggerak.current && penggerak.current !== dari) return
+    penggerak.current = dari
+    const [asal, tujuan] = dari === 'body' ? [body, rail] : [rail, body]
+    tujuan.scrollLeft = asal.scrollLeft
+    cancelAnimationFrame(lepas.current)
+    lepas.current = requestAnimationFrame(() => { penggerak.current = null })
   }
 
+  useEffect(() => () => cancelAnimationFrame(lepas.current), [])
+
   return (
-    <div className="data-table-wrap">
+    <div className="data-table-wrap" ref={wrapRef}>
       {overflowing && (
         <div className="data-table-rail" ref={railRef} onScroll={mirror('rail')} aria-hidden="true">
-          <div style={{ width: scrollWidth }} />
+          <div style={{ width: railWidth }} />
         </div>
       )}
       <div className="data-table" ref={bodyRef} onScroll={mirror('body')}>{children}</div>
