@@ -483,6 +483,19 @@ export class DocumentsService {
     const deletedAt = new Date();
     await this.prisma.$transaction(async (transaction) => {
       await this.storage.deleteByDocumentId(transaction, id);
+      // Potongan teks ikut dibuang, bukan hanya berkas aslinya. Isi dokumen
+      // tersimpan dua kali — sebagai berkas dan sebagai chunk beserta vektornya
+      // — jadi membuang berkasnya saja meninggalkan seluruh teks di database
+      // untuk dokumen yang sudah diminta hilang.
+      //
+      // Aman terhadap riwayat chat: baris Citation menyimpan salinannya sendiri
+      // (excerpt, halaman, judul bagian) dan hanya ber-foreign-key ke
+      // document_versions, yang tetap ada. Jawaban lama tetap utuh terbaca.
+      // Jalur pengambilan AI pun sudah menyaring deleted_at, jadi tidak ada
+      // yang kehilangan hasil — yang berubah cuma teksnya tidak lagi disimpan.
+      await transaction.documentChunk.deleteMany({
+        where: { documentVersion: { documentId: id } },
+      });
       await transaction.processingJob.updateMany({
         where: {
           documentVersion: { documentId: id },
