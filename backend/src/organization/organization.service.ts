@@ -49,7 +49,7 @@ const UNIT_SELECT = {
   code: true,
   name: true,
   isActive: true,
-  _count: { select: { users: true, documents: true } },
+  _count: { select: { users: true, documents: { where: { deletedAt: null } } } },
 } satisfies Prisma.UnitKerjaSelect;
 
 /**
