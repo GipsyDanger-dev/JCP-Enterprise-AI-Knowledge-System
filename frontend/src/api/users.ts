@@ -25,6 +25,11 @@ export function deleteUser(id: string, token?: string): Promise<void> {
   return request<void>(`/users/${id}`, { method: 'DELETE', headers: authHeaders(token) })
 }
 
+/** Aktifkan kembali akun yang dinonaktifkan. Pasangan dari deleteUser. */
+export function restoreUser(id: string, token?: string): Promise<{ id: string; isActive: boolean }> {
+  return request<{ id: string; isActive: boolean }>(`/users/${id}/activate`, { method: 'PUT', headers: authHeaders(token) })
+}
+
 /**
  * Hapus akun beserta data pribadinya secara permanen. Tidak bisa dibatalkan.
  *

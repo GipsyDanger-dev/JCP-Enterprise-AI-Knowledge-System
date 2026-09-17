@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Camera, Check, ChevronDown, Loader2, Pencil, Plus, Search, Trash2, UserX, X } from 'lucide-react'
+import { Camera, Check, ChevronDown, Loader2, Pencil, Plus, Search, Trash2, UserCheck, UserX, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { errorMessage } from '@/api/client'
-import { changePassword, createUser, deleteUser, getUserReferenceData, listUsers, purgeUser, updateUser } from '@/api/users'
+import { changePassword, createUser, deleteUser, getUserReferenceData, listUsers, purgeUser, restoreUser, updateUser } from '@/api/users'
 import { normalizeRole, userInitials, userRoleLabel } from '@/utils/users'
 import { prepareProfilePhoto } from '@/utils/profilePhoto'
 import { OrganizationManager } from '@/components/OrganizationManager'
@@ -256,6 +256,25 @@ export function UsersPage() {
     }
   }
 
+  const handleRestore = async (user: ApiUser) => {
+    const setuju = await tanya({
+      title: isId ? 'Aktifkan kembali pengguna' : 'Reactivate user',
+      body: isId
+        ? <><strong>{user.displayName}</strong> bisa login lagi dengan akses yang sama seperti sebelum dinonaktifkan.</>
+        : <><strong>{user.displayName}</strong> will be able to sign in again, with the same access as before.</>,
+      confirmLabel: isId ? 'Aktifkan' : 'Reactivate',
+      cancelLabel: isId ? 'Batal' : 'Cancel',
+      tone: 'primary',
+    })
+    if (!setuju) return
+    try {
+      await restoreUser(user.id, token ?? undefined)
+      setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, isActive: true } : u))
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
   const handlePurge = async (user: ApiUser) => {
     const setuju = await tanya({
       title: isId ? 'Hapus akun permanen' : 'Permanently delete account',
@@ -457,6 +476,7 @@ export function UsersPage() {
                 // akun pemilik platform (maintainer sistem, bukan admin perusahaan)
                 // dilindungi backend. Keduanya sudah ditolak di sana; di sini tombolnya
                 // dimatikan supaya alasannya terbaca sebelum diklik.
+                const aktif = user.isActive !== false
                 const diriSendiri = currentUser?.id === user.id
                 const pemilikPlatform = user.isPlatformOwner === true
                 // Jabatan dibaca dari baris jabatannya; jobTitle adalah teks bebas
@@ -512,7 +532,7 @@ export function UsersPage() {
                             : (isId ? 'Dokumen unit' : 'Unit documents')}</span>
                     </span>
                   </td>
-                  <td>{user.isActive !== false
+                  <td>{aktif
                     ? <span className="active-user"><Check size={13} /> {isId ? 'Aktif' : 'Active'}</span>
                     : <span className="inactive-user"><X size={13} /> {isId ? 'Nonaktif' : 'Inactive'}</span>
                   }</td>
@@ -521,9 +541,19 @@ export function UsersPage() {
                       <button className="icon-button" title={isId ? `Edit ${user.displayName}` : `Edit ${user.displayName}`} onClick={() => openEdit(user)}>
                         <Pencil size={15} />
                       </button>
-                      <button className="icon-button" disabled={alasanTerkunci !== null} title={alasanTerkunci ?? (isId ? `Nonaktifkan ${user.displayName}` : `Deactivate ${user.displayName}`)} onClick={() => handleDelete(user)}>
-                        <UserX size={15} />
-                      </button>
+                      {/* Satu tempat, dua arah. Sebelumnya tombol nonaktifkan
+                          tetap hidup untuk akun yang sudah nonaktif — menekannya
+                          memunculkan dialog yang sama dan tidak mengubah apa pun,
+                          sementara tidak ada jalan sama sekali untuk kembali. */}
+                      {aktif ? (
+                        <button className="icon-button" disabled={alasanTerkunci !== null} title={alasanTerkunci ?? (isId ? `Nonaktifkan ${user.displayName}` : `Deactivate ${user.displayName}`)} onClick={() => handleDelete(user)}>
+                          <UserX size={15} />
+                        </button>
+                      ) : (
+                        <button className="icon-button" title={isId ? `Aktifkan kembali ${user.displayName}` : `Reactivate ${user.displayName}`} onClick={() => handleRestore(user)}>
+                          <UserCheck size={15} />
+                        </button>
+                      )}
                       <button className="icon-button" disabled={alasanHapusTerkunci !== null} title={alasanHapusTerkunci ?? (isId ? `Hapus ${user.displayName} permanen` : `Permanently delete ${user.displayName}`)} onClick={() => handlePurge(user)}>
                         <Trash2 size={15} />
                       </button>

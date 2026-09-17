@@ -250,6 +250,43 @@ export class UsersService {
     return { id, isActive: false };
   }
   /**
+   * Aktifkan kembali akun yang dinonaktifkan.
+   *
+   * Pasangan dari `remove`. Tanpa ini, menonaktifkan adalah pintu satu arah:
+   * satu klik keliru mengunci sebuah akun selamanya, padahal yang dituju
+   * biasanya cuma menjeda -- pegawai cuti panjang, pindah lalu kembali, atau
+   * ditutup karena salah orang.
+   *
+   * Tidak ada yang perlu dipulihkan selain penandanya: menonaktifkan hanya
+   * menyetel isActive, tidak menyentuh unit kerja, jabatan, maupun dokumennya.
+   */
+  async restore(id: string, actor: AuthenticatedUser) {
+    await this.assertOrganizationAdmin(actor);
+    const user = await this.prisma.user.findFirst({
+      where: { id, workspaceId: actor.workspaceId, accountType: AccountType.COMPANY },
+      select: { id: true, username: true, isActive: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.isActive) throw new ConflictException('Account is already active');
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.user.update({
+        where: { id },
+        data: { isActive: true },
+      });
+      await this.auditLogs.record(transaction, {
+        ...pelakuAktor(actor),
+        action: AuditAction.USER_UPDATED,
+        targetType: 'USER',
+        targetId: id,
+        metadata: { action: 'reactivated', username: user.username },
+      });
+    });
+
+    return { id, isActive: true };
+  }
+
+  /**
    * Hapus akun beserta jejaknya secara permanen. Tidak bisa dibatalkan.
    *
    * Berbeda dari `remove` di atas, yang hanya menonaktifkan dan masih bisa

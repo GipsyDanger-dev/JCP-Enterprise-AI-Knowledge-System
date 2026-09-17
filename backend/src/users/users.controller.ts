@@ -86,6 +86,17 @@ export class UsersController {
     return this.usersService.remove(id, actor);
   }
 
+  @Put(':id/activate')
+  @ApiOperation({ summary: 'Reactivate a deactivated user account' })
+  @ApiOkResponse({ description: 'User reactivated' })
+  @ApiConflictResponse({ description: 'The account is already active' })
+  restore(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.usersService.restore(id, actor);
+  }
+
   // Rute terpisah, bukan sebuah parameter pada DELETE di atas. Menghapus
   // permanen tidak bisa dibatalkan, jadi memanggilnya harus merupakan keputusan
   // tersendiri -- bukan sesuatu yang bisa terjadi karena satu tanda benar salah
