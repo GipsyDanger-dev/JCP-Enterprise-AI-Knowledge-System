@@ -376,6 +376,19 @@ export class OrganizationService {
           'atau nonaktifkan saja jabatan ini agar tidak muncul lagi di pilihan.',
         );
       }
+      // Kosongkan teksnya sekalian. Relasinya `SetNull`, jadi menghapus baris
+      // jabatan hanya melepas `jabatanId` dan meninggalkan salinan namanya di
+      // `users.job_title` — pemegangnya lalu tampil berjabatan "Sekretaris"
+      // tanpa satu pun wewenangnya, dan tidak ada yang menjelaskan kenapa.
+      //
+      // Yang tersisa di sini hanya pemegang nonaktif; yang aktif sudah ditolak
+      // di atas. Dulu tidak apa-apa karena akun nonaktif tidak bisa kembali,
+      // tetapi sekarang bisa diaktifkan lagi lewat Orang & akses, jadi teks
+      // basi itu punya jalan untuk muncul kembali.
+      await tx.user.updateMany({
+        where: { jabatanId: id, workspaceId: actor.workspaceId },
+        data: { jobTitle: null },
+      });
       await tx.jabatan.delete({ where: { id } });
       return { id, deleted: true };
     });

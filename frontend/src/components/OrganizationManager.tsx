@@ -138,6 +138,23 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
   }
 
   const ubahStatus = async (unit: OrgUnitKerja) => {
+    // Menonaktifkan unit TIDAK mencabut apa pun dari anggotanya — mereka tetap
+    // melihat dokumen unit ini, dan admin unit tetap mengelolanya. Yang berubah
+    // hanya unitnya hilang dari pilihan. Justru karena itu dikonfirmasi: kata
+    // "nonaktifkan" terbaca seperti mencabut akses, dan admin yang mengira
+    // begitu akan berhenti mencari cara yang benar.
+    if (unit.isActive && unit.userCount > 0) {
+      const setuju = await tanya({
+        title: isId ? 'Nonaktifkan unit kerja' : 'Deactivate work unit',
+        body: isId
+          ? <><strong>{unit.name}</strong> tidak akan muncul lagi saat memilih unit untuk akun atau dokumen baru. {unit.userCount} akun yang sudah terdaftar di sini <strong>tetap punya akses yang sama</strong> — untuk memindahkan mereka, pakai tab Orang &amp; akses.</>
+          : <><strong>{unit.name}</strong> will no longer appear when choosing a unit for new accounts or documents. The {unit.userCount} {unit.userCount === 1 ? 'account' : 'accounts'} already in it <strong>{unit.userCount === 1 ? 'keeps' : 'keep'} the same access</strong> — to move {unit.userCount === 1 ? 'it' : 'them'}, use the People &amp; access tab.</>,
+        confirmLabel: isId ? 'Nonaktifkan' : 'Deactivate',
+        cancelLabel: isId ? 'Batal' : 'Cancel',
+        tone: 'primary',
+      })
+      if (!setuju) return
+    }
     onError(null)
     try {
       await updateUnitKerja(unit.id, { isActive: !unit.isActive }, token ?? undefined)
@@ -373,6 +390,39 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
     }
   }
 
+  /**
+   * Menonaktifkan jabatan sekarang benar-benar mencabut wewenangnya dari
+   * pemegangnya, bukan sekadar menyembunyikannya dari pilihan. Karena itu
+   * dikonfirmasi, dan wewenang yang hilang disebut satu per satu: "3 akun
+   * terdampak" tidak memberi tahu apa yang sebenarnya berhenti bekerja.
+   *
+   * Jabatan tanpa centang apa pun tidak mencabut apa-apa, jadi tidak perlu
+   * menakut-nakuti — peringatan yang muncul untuk hal yang tidak berakibat
+   * mengajari orang mengabaikan peringatan berikutnya.
+   */
+  const ubahStatus = async (jabatan: OrgJabatan) => {
+    if (jabatan.isActive && jabatan.userCount > 0) {
+      const wewenang = [
+        jabatan.canUploadDocuments ? (isId ? 'mengunggah dokumen' : 'uploading documents') : null,
+        jabatan.canManageAnnouncements ? (isId ? 'menerbitkan pengumuman' : 'publishing announcements') : null,
+        jabatan.canViewAnnouncementReaders ? (isId ? 'melihat daftar pembaca pengumuman' : 'viewing announcement readers') : null,
+      ].filter((item): item is string => item !== null)
+      if (wewenang.length > 0) {
+        const setuju = await tanya({
+          title: isId ? 'Nonaktifkan jabatan' : 'Deactivate job title',
+          body: isId
+            ? <><strong>{jabatan.userCount} akun aktif</strong> memegang <strong>{jabatan.name}</strong> dan langsung kehilangan hak {wewenang.join(', ')}. Nama jabatannya tetap tampil di profil mereka, dan haknya kembali kalau jabatan ini diaktifkan lagi.</>
+            : <><strong>{jabatan.userCount} active {jabatan.userCount === 1 ? 'account' : 'accounts'}</strong> {jabatan.userCount === 1 ? 'holds' : 'hold'} <strong>{jabatan.name}</strong> and immediately {jabatan.userCount === 1 ? 'loses' : 'lose'} the right to {wewenang.join(', ')}. The title still shows on their profile, and the rights come back if it is reactivated.</>,
+          confirmLabel: isId ? 'Nonaktifkan' : 'Deactivate',
+          cancelLabel: isId ? 'Batal' : 'Cancel',
+          tone: 'danger',
+        })
+        if (!setuju) return
+      }
+    }
+    await ubah(jabatan, { isActive: !jabatan.isActive })
+  }
+
   const ubah = async (jabatan: OrgJabatan, input: JabatanInput) => {
     setBusy(jabatan.id)
     onError(null)
@@ -555,7 +605,7 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
                     >
                       <Pencil size={15} />
                     </button>
-                    <button className="link-button org-toggle" onClick={() => ubah(jabatan, { isActive: !jabatan.isActive })}>
+                    <button className="link-button org-toggle" onClick={() => ubahStatus(jabatan)}>
                       {jabatan.isActive ? (isId ? 'Nonaktifkan' : 'Deactivate') : (isId ? 'Aktifkan' : 'Activate')}
                     </button>
                     <button className="icon-button danger" title={isId ? 'Hapus' : 'Delete'} onClick={() => hapus(jabatan)}>
