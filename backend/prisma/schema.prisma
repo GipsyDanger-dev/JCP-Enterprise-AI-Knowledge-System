@@ -484,8 +484,14 @@ model Announcement {
   publishedAt DateTime           @default(now()) @map("published_at")
   createdAt   DateTime           @default(now()) @map("created_at")
   updatedAt   DateTime           @updatedAt @map("updated_at")
-  createdById String             @map("created_by_id") @db.Uuid
-  createdBy   User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  /// Penerbitnya, dan salinan namanya. Alasannya sama dengan `uploadedBy` di
+  /// Document: pengumuman adalah catatan resmi instansi, jadi akun penerbitnya
+  /// harus boleh dihapus tanpa ikut menghapus pengumumannya — sementara
+  /// keterangan siapa yang menerbitkan tidak boleh hilang bersamanya.
+  createdById       String?      @map("created_by_id") @db.Uuid
+  createdBy         User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdByName     String       @default("") @map("created_by_name")
+  createdByUsername String?      @map("created_by_username")
   reads       AnnouncementRead[]
 
   @@index([isActive, publishedAt])

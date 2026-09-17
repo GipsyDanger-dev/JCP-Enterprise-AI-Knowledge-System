@@ -23,6 +23,10 @@ const ANNOUNCEMENT_SELECT = {
       jabatan: { select: { name: true } },
     },
   },
+  // Ikut dikirim supaya penerbitnya tetap bisa disebut setelah akunnya
+  // dihapus, saat relasi createdBy di atas sudah kosong.
+  createdByName: true,
+  createdByUsername: true,
   _count: { select: { reads: true } },
 } as const;
 
@@ -103,9 +107,9 @@ export class AnnouncementsService {
   }
 
   /** Satu pengumuman beserta hitungan bacanya, untuk balasan create dan update. */
-  private async toSingleResponse<T extends { id: string; createdBy: { id: string } }>(row: T, actor: AuthenticatedUser) {
+  private async toSingleResponse<T extends { id: string; createdBy: { id: string } | null }>(row: T, actor: AuthenticatedUser) {
     if (!this.canViewReaders(actor)) return this.toResponse(row, null);
-    const stats = await this.readStats(actor.workspaceId, [{ id: row.id, createdById: row.createdBy.id }]);
+    const stats = await this.readStats(actor.workspaceId, [{ id: row.id, createdById: row.createdBy?.id ?? null }]);
     return this.toResponse(row, stats.get(row.id) ?? null);
   }
 
@@ -120,12 +124,16 @@ export class AnnouncementsService {
    * selalu lebih besar daripada "x dari y" yang muncul setelah tombolnya
    * ditekan, padahal keduanya mengaku menghitung hal yang sama.
    */
-  private async readStats(workspaceId: string, announcements: readonly { id: string; createdById: string }[]) {
+  private async readStats(workspaceId: string, announcements: readonly { id: string; createdById: string | null }[]) {
     const stats = new Map<string, ReadStats>();
     if (announcements.length === 0) return stats;
 
     const ids = announcements.map((announcement) => announcement.id);
-    const creatorIds = [...new Set(announcements.map((announcement) => announcement.createdById))];
+    // Penerbit yang akunnya sudah dihapus tidak punya id untuk dicari, dan
+    // membiarkan null masuk ke `in` membuat querynya tidak sah.
+    const creatorIds = [...new Set(announcements
+      .map((announcement) => announcement.createdById)
+      .filter((id): id is string => id !== null))];
     const audience = await this.prisma.user.findMany({
       where: { workspaceId, accountType: 'COMPANY', isActive: true },
       select: { id: true },
@@ -151,7 +159,9 @@ export class AnnouncementsService {
     for (const announcement of announcements) {
       // Penerbit yang sudah nonaktif tidak ikut terhitung sejak awal, jadi tidak
       // ada yang perlu dikurangkan untuknya.
-      const creatorCounted = audienceIdSet.has(announcement.createdById);
+      // Penerbit yang sudah nonaktif atau sudah dihapus sama-sama tidak ada di
+      // daftar sasaran, jadi tidak ada yang perlu dikurangkan untuknya.
+      const creatorCounted = announcement.createdById !== null && audienceIdSet.has(announcement.createdById);
       const ownRead = creatorCounted && readByCreator.has(announcement.id + ':' + announcement.createdById);
       stats.set(announcement.id, {
         total: audienceIds.length - (creatorCounted ? 1 : 0),
@@ -172,7 +182,7 @@ export class AnnouncementsService {
       orderBy: [{ isActive: 'desc' }, { publishedAt: 'desc' }],
     });
     const stats = canSeeReaders
-      ? await this.readStats(actor.workspaceId, items.map((item) => ({ id: item.id, createdById: item.createdBy.id })))
+      ? await this.readStats(actor.workspaceId, items.map((item) => ({ id: item.id, createdById: item.createdBy?.id ?? null })))
       : null;
     return items.map((item) => this.toResponse(item, stats?.get(item.id) ?? null));
   }
@@ -185,6 +195,9 @@ export class AnnouncementsService {
         body: input.body,
         imageDataUrl: input.imageDataUrl ?? null,
         createdById: actor.sub,
+        // Salinan identitas penerbit, ditulis sekali di sini.
+        createdByName: actor.displayName ?? actor.username,
+        createdByUsername: actor.username,
         workspaceId: actor.workspaceId,
       },
       select: ANNOUNCEMENT_SELECT,
@@ -259,7 +272,14 @@ export class AnnouncementsService {
 
     const [audience, reads] = await Promise.all([
       this.prisma.user.findMany({
-        where: { workspaceId: actor.workspaceId, accountType: 'COMPANY', isActive: true, id: { not: announcement.createdById } },
+        where: {
+          workspaceId: actor.workspaceId,
+          accountType: 'COMPANY',
+          isActive: true,
+          // Penerbitnya dikecualikan karena ia tidak pernah jadi sasaran. Kalau
+          // akunnya sudah dihapus, tidak ada siapa pun yang perlu dikecualikan.
+          ...(announcement.createdById ? { id: { not: announcement.createdById } } : {}),
+        },
         select: READER_SELECT,
         orderBy: { displayName: 'asc' },
       }),

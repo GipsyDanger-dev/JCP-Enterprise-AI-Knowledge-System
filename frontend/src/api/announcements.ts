@@ -9,12 +9,16 @@ export interface Announcement {
   publishedAt: string
   createdAt: string
   updatedAt: string
+  /** Null bila akun penerbitnya sudah dihapus; pakai createdByName sebagai gantinya. */
   createdBy: {
     id: string
     displayName: string
     jobTitle: string | null
     jabatan: { name: string } | null
-  }
+  } | null
+  /** Salinan identitas penerbit di baris pengumumannya, tetap ada setelah akunnya dihapus. */
+  createdByName: string
+  createdByUsername: string | null
   /** Jumlah pegawai yang sudah membaca. Null untuk yang tidak berhak melihat laporannya. */
   readCount: number | null
   /** Seluruh pegawai yang menjadi sasaran, tanpa penerbitnya. Null seperti readCount. */
