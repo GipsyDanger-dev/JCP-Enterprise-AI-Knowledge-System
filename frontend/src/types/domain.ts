@@ -31,6 +31,11 @@ export interface DocumentItem {
    * keadaan sekarang tanpa memuat ulang dokumennya satu per satu.
    */
   unitKerja: { id: string; name: string } | null
+  /**
+   * Pengunggahnya. Dipakai untuk memutuskan tombol ubah/hapus: pemegang izin
+   * unggah lewat jabatan hanya boleh membereskan apa yang ia naikkan sendiri.
+   */
+  uploadedById: string | null
 }
 
 export type IconType = ComponentType<{ size?: number | string }>

@@ -203,7 +203,39 @@ export function DocumentsPage() {
   const renameErrorRef = useScrollToError<HTMLDivElement>(renameError)
   const [deleteDoc, setDeleteDoc] = useState<{ id: string; name: string } | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
-  const canManage = role === 'admin' || isPersonal || user?.role === 'ADMIN_UNIT'
+  /*
+   * Cerminan dari canTargetUnit / canManageDocument / canUploadDocuments di
+   * backend (documents/document-visibility.ts). Ditulis ulang di sini hanya
+   * untuk memutuskan tombol mana yang muncul — penegakannya tetap di server.
+   *
+   * Sengaja ditiru semirip mungkin, bukan disederhanakan jadi satu boolean:
+   * tombol yang muncul lalu berakhir 403 lebih membingungkan daripada tombol
+   * yang memang tidak ada.
+   */
+  const ownUnitId = user?.unitKerja?.id ?? user?.unitKerjaId ?? null
+  const isUnitAdmin = user?.role === 'ADMIN_UNIT'
+  const jabatanBolehUnggah = user?.jabatan?.canUploadDocuments ?? false
+
+  const bolehUntukUnit = (unitId: string | null) => {
+    if (isPersonal) return !unitId
+    if (role === 'admin') return true
+    if (!ownUnitId) return false
+    if (!isUnitAdmin && !jabatanBolehUnggah) return false
+    return unitId === ownUnitId
+  }
+
+  const canUpload = isPersonal || role === 'admin' || ((isUnitAdmin || jabatanBolehUnggah) && Boolean(ownUnitId))
+
+  /** Boleh mengubah nama, mengatur akses, atau menghapus dokumen ini. */
+  const bolehUrus = (document: DocumentItem) => {
+    if (!bolehUntukUnit(document.unitKerja?.id ?? null)) return false
+    if (isPersonal || role === 'admin' || isUnitAdmin) return true
+    return document.uploadedById === user?.id
+  }
+
+  // Panel massal mengunci dan membuka dokumen seluruh workspace — itu urusan
+  // admin dan admin unit, bukan pemegang izin unggah lewat jabatan.
+  const bolehKelolaMassal = role === 'admin' || isUnitAdmin
   const isId = language === 'id'
   const [searchParams, setSearchParams] = useSearchParams()
   const initialCollection = searchParams.get('collection') ?? 'All'
@@ -335,9 +367,9 @@ export function DocumentsPage() {
     }
   }
 
-  const action = canManage ? (
+  const action = canUpload ? (
     <>
-      {!isPersonal && <button className="secondary-button" onClick={() => setShowDocumentAccess(true)}>
+      {!isPersonal && bolehKelolaMassal && <button className="secondary-button" onClick={() => setShowDocumentAccess(true)}>
         <FolderLock size={16} /> {isId ? 'Manajemen dokumen' : 'Document management'}
       </button>}
       <button className="primary-button" onClick={() => setShowUpload(true)}>
@@ -348,7 +380,7 @@ export function DocumentsPage() {
 
   return (
     <div className="standard-page">
-      <PageHeading eyebrow={isId ? 'Basis pengetahuan' : 'Knowledge base'} title={canManage ? (isId ? 'Dokumen' : 'Documents') : (isId ? 'Perpustakaan pengetahuan' : 'Knowledge library')} detail={canManage ? `${documents.length} ${isId ? 'sumber terhubung ke ruang kerja ini.' : 'sources connected to this workspace.'}` : `${documents.length} ${isId ? 'sumber terpercaya tersedia untuk Anda.' : 'trusted sources available to you.'}`} action={action} />
+      <PageHeading eyebrow={isId ? 'Basis pengetahuan' : 'Knowledge base'} title={canUpload ? (isId ? 'Dokumen' : 'Documents') : (isId ? 'Perpustakaan pengetahuan' : 'Knowledge library')} detail={canUpload ? `${documents.length} ${isId ? 'sumber terhubung ke ruang kerja ini.' : 'sources connected to this workspace.'}` : `${documents.length} ${isId ? 'sumber terpercaya tersedia untuk Anda.' : 'trusted sources available to you.'}`} action={action} />
       {uploadError && <div className="inline-alert" role="alert"><ShieldAlert size={15} /> {uploadError}</div>}
       <div className="table-toolbar">
         <div className="filter-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isId ? 'Cari dokumen' : 'Search documents'} /></div>
@@ -401,9 +433,9 @@ export function DocumentsPage() {
               <td><StatusBadge status={document.status} /></td>
               <td>{document.chunks ?? '—'}</td>
               <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                {canManage && <button className="icon-button" title={isId ? 'Ubah nama dokumen' : 'Rename document'} onClick={(event) => { event.stopPropagation(); setRenameDoc(document); setRenameTitle(document.name); setRenameError(null) }}><Pencil size={15} /></button>}
+                {bolehUrus(document) && <button className="icon-button" title={isId ? 'Ubah nama dokumen' : 'Rename document'} onClick={(event) => { event.stopPropagation(); setRenameDoc(document); setRenameTitle(document.name); setRenameError(null) }}><Pencil size={15} /></button>}
                 <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>
-                {isPersonal ? <button className="icon-button danger" title={isId ? 'Hapus dokumen' : 'Delete document'} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button> : canManage
+                {isPersonal ? <button className="icon-button danger" title={isId ? 'Hapus dokumen' : 'Delete document'} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button> : bolehUrus(document)
                   ? <><button className="icon-button" title={isId ? 'Atur akses dokumen' : 'Manage document access'} onClick={(e) => { e.stopPropagation(); openAccessDialog(document) }}><Building2 size={16} /></button><button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
                   : <><button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button></>}
               </td>
@@ -413,7 +445,7 @@ export function DocumentsPage() {
       </DataTable>
 
       {selectedDoc && (
-        <DocViewer doc={selectedDoc} isId={isId} canManage={canManage} token={token} onClose={handleCloseDocument} onDelete={handleDelete} onChunksLoaded={setDocChunks} chunks={docChunks} chunksLoading={chunksLoading} setChunksLoading={setChunksLoading} />
+        <DocViewer doc={selectedDoc} isId={isId} canManage={bolehUrus(selectedDoc)} token={token} onClose={handleCloseDocument} onDelete={handleDelete} onChunksLoaded={setDocChunks} chunks={docChunks} chunksLoading={chunksLoading} setChunksLoading={setChunksLoading} />
       )}
 
       <UploadModal open={showUpload} onClose={() => setShowUpload(false)} onUploaded={registerUploadedDocument} />
