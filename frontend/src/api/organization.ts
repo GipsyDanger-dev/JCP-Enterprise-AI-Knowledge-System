@@ -37,7 +37,18 @@ export interface OrgJabatan {
   canViewAnnouncementReaders: boolean
   isActive: boolean
   sortOrder: number
+  /**
+   * Pemegang yang akunnya masih aktif. Hanya mereka yang menahan penghapusan:
+   * akun nonaktif tidak bisa masuk, jadi tidak ada wewenang yang benar-benar
+   * hilang saat jabatannya lepas.
+   */
   userCount: number
+  /**
+   * Pemegang yang akunnya sudah dinonaktifkan. Tidak menahan penghapusan, tapi
+   * disebut di dialognya: jabatan mereka ikut lepas dan tidak kembali sendiri
+   * kalau akunnya diaktifkan lagi.
+   */
+  inactiveUserCount: number
 }
 
 export interface OrganizationOverview {
@@ -76,7 +87,7 @@ export const createJabatan = (input: JabatanInput & { name: string }, token?: st
 export const updateJabatan = (id: string, input: JabatanInput, token?: string) =>
   request<OrgJabatan>(`/organization/jabatan/${id}`, { method: 'PUT', body: input, headers: authHeaders(token) })
 
-/** Sama seperti unit kerja: ditolak selama masih ada yang memegangnya. */
+/** Sama seperti unit kerja: ditolak selama masih ada akun aktif yang memegangnya. */
 export const deleteJabatan = (id: string, token?: string) =>
   request<{ id: string; deleted: boolean }>(`/organization/jabatan/${id}`, { method: 'DELETE', headers: authHeaders(token) })
 

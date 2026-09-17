@@ -392,12 +392,44 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
     setEditingId(null)
   }
 
+  /**
+   * Syaratnya diperiksa sebelum dialog merahnya muncul, bukan sesudah.
+   *
+   * Sama alasannya dengan unit kerja: dialog yang menawarkan "Hapus" lalu
+   * dijawab penolakan terbaca seperti sistemnya rusak, padahal yang terjadi
+   * adalah syarat yang memang belum dipenuhi. Angkanya diambil dari daftar yang
+   * sudah dimuat; backend tetap memeriksa ulang dan tetap yang menentukan.
+   *
+   * Yang menahan hanya pemegang yang akunnya masih aktif — menghapus jabatan
+   * mencabut wewenang pengumuman dan unggahan mereka tanpa pesan apa pun.
+   * Pemegang yang akunnya sudah nonaktif tidak menahan apa-apa, tapi tetap
+   * disebut supaya admin tahu jabatan mereka ikut lepas.
+   */
   const hapus = async (jabatan: OrgJabatan) => {
+    if (jabatan.userCount > 0) {
+      const bisaDinonaktifkan = jabatan.isActive
+      const setuju = await tanya({
+        title: isId ? 'Belum bisa dihapus' : 'Cannot be deleted yet',
+        body: isId
+          ? <><strong>{jabatan.name}</strong> masih dipegang {jabatan.userCount} akun aktif, dan wewenangnya ikut hilang kalau jabatan ini dihapus. Lepas dulu jabatannya lewat tab Orang & akses — atau nonaktifkan/hapus akun pemegangnya — baru jabatan ini bisa dihapus permanen.</>
+          : <><strong>{jabatan.name}</strong> is still held by {jabatan.userCount} active accounts, and deleting it would strip their permissions. Clear the job title from them under the People & access tab — or deactivate/delete those accounts — before this can be deleted for good.</>,
+        confirmLabel: bisaDinonaktifkan ? (isId ? 'Nonaktifkan saja' : 'Deactivate instead') : undefined,
+        cancelLabel: isId ? 'Tutup' : 'Close',
+        tone: 'primary',
+      })
+      if (setuju && bisaDinonaktifkan) await ubah(jabatan, { isActive: false })
+      return
+    }
+
     const setuju = await tanya({
       title: isId ? 'Hapus jabatan' : 'Delete job title',
       body: isId
-        ? <><strong>{jabatan.name}</strong> hanya bisa dihapus kalau belum dipegang siapa pun.</>
-        : <><strong>{jabatan.name}</strong> can only be deleted while nobody holds it.</>,
+        ? <><strong>{jabatan.name}</strong> tidak dipegang akun aktif mana pun, jadi bisa dihapus permanen.{jabatan.inactiveUserCount > 0
+            ? ` Tapi ${jabatan.inactiveUserCount} akun nonaktif masih tercatat memegangnya — jabatan itu ikut lepas, dan tidak kembali sendiri kalau akunnya diaktifkan lagi.`
+            : ''} Tindakan ini tidak bisa dibatalkan.</>
+        : <><strong>{jabatan.name}</strong> is not held by any active account, so it can be deleted for good.{jabatan.inactiveUserCount > 0
+            ? ` However, ${jabatan.inactiveUserCount} deactivated accounts still carry it — they will lose the job title, and it will not come back if they are reactivated.`
+            : ''} This cannot be undone.</>,
       confirmLabel: isId ? 'Hapus' : 'Delete',
       cancelLabel: isId ? 'Batal' : 'Cancel',
       tone: 'danger',
@@ -499,7 +531,16 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
                   disabled={busy === jabatan.id}
                   onChange={(value) => ubah(jabatan, { canUploadDocuments: value })}
                 />
-                <td>{isId ? `${jabatan.userCount} pengguna` : `${jabatan.userCount} users`}</td>
+                <td>
+                  {isId ? `${jabatan.userCount} pengguna` : `${jabatan.userCount} users`}
+                  {jabatan.inactiveUserCount > 0 && (
+                    <small className="org-hint">
+                      {isId
+                        ? ` · ${jabatan.inactiveUserCount} akun nonaktif`
+                        : ` · ${jabatan.inactiveUserCount} deactivated`}
+                    </small>
+                  )}
+                </td>
                 <td>
                   {jabatan.isActive
                     ? <span className="active-user"><Check size={13} /> {isId ? 'Aktif' : 'Active'}</span>
