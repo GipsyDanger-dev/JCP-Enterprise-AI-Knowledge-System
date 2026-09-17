@@ -403,7 +403,16 @@ export class AuthService {
     };
   }
 
-  private safeProfile(user: User) {
+  /**
+   * Profil yang boleh dikirim ke klien.
+   *
+   * `jabatan` ikut, bukan hanya namanya di `jobTitle`: frontend memakai centang
+   * wewenangnya untuk memutuskan tombol mana yang muncul. Kedua pemanggilnya
+   * sudah memuatnya lewat JABATAN_PERMISSION_SELECT, tetapi daftar kolom di
+   * bawah ditulis tangan sehingga hasilnya dibuang lagi di sini, dan
+   * AuthProvider yang sudah membacanya selalu menerima undefined.
+   */
+  private safeProfile(user: User & { jabatan?: JabatanPermissions | null }) {
     return {
       workspaceId: user.workspaceId,
       isPlatformOwner: user.isPlatformOwner,
@@ -419,6 +428,8 @@ export class AuthService {
       isAdmin: user.isAdmin,
       accountType: user.accountType,
       photoUrl: user.photoUrl,
+      jabatanId: user.jabatanId,
+      jabatan: user.jabatan ?? null,
     };
   }
 
