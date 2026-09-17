@@ -33,7 +33,18 @@ const BAWAAN_ROLE: Record<string, { label: string; description: string }> = {
   [UserRole.PEGAWAI]: { label: 'Pegawai', description: 'Membaca dokumen yang terbuka untuk unit kerjanya.' },
 };
 
-const JABATAN_SELECT = {
+/**
+ * Pemegangnya disaring seperti unit kerja — akun perusahaan di workspace ini —
+ * ditambah satu syarat: hanya yang akunnya masih aktif yang ikut terhitung.
+ *
+ * Yang menahan penghapusan harus orang yang wewenangnya benar-benar bisa
+ * terpakai. Akun nonaktif tidak bisa masuk sama sekali, jadi menahannya demi
+ * mereka hanya menyisakan jabatan yang tidak akan pernah bisa dibersihkan
+ * selain dengan menghapus akunnya. Jumlah pemegang nonaktif tetap dihitung
+ * terpisah (`inactiveUserCount`) supaya antarmuka bisa memperingatkan bahwa
+ * jabatan mereka ikut lepas kalau akunnya diaktifkan lagi.
+ */
+const jabatanSelect = (workspaceId: string) => ({
   id: true,
   name: true,
   canManageAnnouncements: true,
@@ -41,8 +52,8 @@ const JABATAN_SELECT = {
   canUploadDocuments: true,
   isActive: true,
   sortOrder: true,
-  _count: { select: { users: true } },
-} satisfies Prisma.JabatanSelect;
+  _count: { select: { users: { where: { accountType: AccountType.COMPANY, workspaceId, isActive: true } } } },
+}) satisfies Prisma.JabatanSelect;
 
 /**
  * Penyaring penggunanya menyamai daftar Orang & akses (UsersService.findAll),
@@ -87,9 +98,9 @@ function pesanKonflik(error: Prisma.PrismaClientKnownRequestError, peta: Record<
   return cocok?.[1] ?? bawaan;
 }
 
-function ringkasJabatan<T extends { _count: { users: number } }>(row: T) {
+function ringkasJabatan<T extends { _count: { users: number } }>(row: T, inactiveUserCount: number) {
   const { _count, ...jabatan } = row;
-  return { ...jabatan, userCount: _count.users };
+  return { ...jabatan, userCount: _count.users, inactiveUserCount };
 }
 
 /**
@@ -124,7 +135,7 @@ export class OrganizationService {
   /** Seluruh daftar acuan dalam satu permintaan — halaman pengelolanya butuh ketiganya sekaligus. */
   async overview(actor: AuthenticatedUser) {
     this.assertAdmin(actor);
-    const [unitKerja, dokumenTerhapus, jabatan, roleLabels] = await Promise.all([
+    const [unitKerja, dokumenTerhapus, jabatan, pemegangNonaktifPerJabatan, roleLabels] = await Promise.all([
       this.prisma.unitKerja.findMany({
         where: { workspaceId: actor.workspaceId },
         select: unitSelect(actor.workspaceId),
@@ -139,15 +150,23 @@ export class OrganizationService {
       }),
       this.prisma.jabatan.findMany({
         where: { workspaceId: actor.workspaceId },
-        select: JABATAN_SELECT,
+        select: jabatanSelect(actor.workspaceId),
         orderBy: [{ isActive: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+      }),
+      // Sama alasannya dengan dokumen terhapus di atas: satu groupBy untuk
+      // seluruh jabatan, bukan satu hitungan per baris.
+      this.prisma.user.groupBy({
+        by: ['jabatanId'],
+        where: { workspaceId: actor.workspaceId, jabatanId: { not: null }, accountType: AccountType.COMPANY, isActive: false },
+        _count: { _all: true },
       }),
       this.roleLabels(actor.workspaceId),
     ]);
     const terhapusPerUnit = new Map(dokumenTerhapus.map((baris) => [baris.unitKerjaId, baris._count._all]));
+    const nonaktifPerJabatan = new Map(pemegangNonaktifPerJabatan.map((baris) => [baris.jabatanId, baris._count._all]));
     return {
       unitKerja: unitKerja.map((unit) => ringkasUnit(unit, terhapusPerUnit.get(unit.id) ?? 0)),
-      jabatan: jabatan.map(ringkasJabatan),
+      jabatan: jabatan.map((baris) => ringkasJabatan(baris, nonaktifPerJabatan.get(baris.id) ?? 0)),
       roleLabels,
     };
   }
@@ -287,9 +306,10 @@ export class OrganizationService {
           canUploadDocuments: input.canUploadDocuments ?? false,
           sortOrder: input.sortOrder ?? 99,
         },
-        select: JABATAN_SELECT,
+        select: jabatanSelect(actor.workspaceId),
       });
-      return ringkasJabatan(jabatan);
+      // Baru dibuat, jadi belum mungkin ada pemegangnya — aktif maupun tidak.
+      return ringkasJabatan(jabatan, 0);
     }, { name: 'Jabatan dengan nama itu sudah ada' });
   }
 
@@ -307,28 +327,55 @@ export class OrganizationService {
           ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
           ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
         },
-        select: JABATAN_SELECT,
+        select: jabatanSelect(actor.workspaceId),
       });
       // Sama alasannya dengan unit kerja: users.job_title adalah salinan teks
       // yang ikut tampil di laporan pembaca pengumuman.
       if (input.name !== undefined) {
         await tx.user.updateMany({ where: { jabatanId: id }, data: { jobTitle: input.name } });
       }
-      return ringkasJabatan(jabatan);
+      // Dihitung terpisah karena `_count` tidak bisa menghitung satu relasi dua kali.
+      const nonaktif = await tx.user.count({
+        where: { jabatanId: id, workspaceId: actor.workspaceId, accountType: AccountType.COMPANY, isActive: false },
+      });
+      return ringkasJabatan(jabatan, nonaktif);
     }, { name: 'Jabatan dengan nama itu sudah ada' });
   }
 
-  /** Seperti unit kerja: yang masih dipakai ditolak, bukan dihapus beserta wewenangnya. */
+  /**
+   * Seperti unit kerja: yang masih dipegang ditolak, bukan dihapus beserta
+   * wewenangnya.
+   *
+   * Yang menahan hanya pemegang yang akunnya masih aktif. Relasinya `SetNull`,
+   * jadi menghapus jabatan yang masih dipakai mencabut wewenang pengumuman dan
+   * unggahan pemegangnya tanpa pesan apa pun — tapi akun nonaktif tidak bisa
+   * masuk, jadi tidak ada wewenang yang benar-benar hilang di sana, dan
+   * menahannya demi mereka hanya menyisakan jabatan yang tidak bisa dibersihkan
+   * tanpa menghapus akun orang.
+   *
+   * Hitungannya diambil di dalam transaksi setelah baris jabatannya dikunci.
+   * Tanpa kunci itu ada jeda antara menghitung dan `delete` yang cukup untuk
+   * satu akun baru dipasangi jabatan ini; akun yang lolos di jeda itu kehilangan
+   * jabatannya tanpa pernah ikut dihitung. Kunci ini bertabrakan dengan kunci
+   * yang diambil Postgres saat menyisipkan baris ber-foreign-key ke jabatan yang
+   * sama, jadi penyimpanan yang berbarengan menunggu — lalu gagal karena
+   * jabatannya memang sudah tidak ada, yang justru jawaban yang benar.
+   */
   async removeJabatan(id: string, actor: AuthenticatedUser) {
     this.assertAdmin(actor);
     const jabatan = await this.jabatanMilikWorkspace(id, actor);
-    if (jabatan._count.users > 0) {
-      throw new ConflictException(
-        `Jabatan "${jabatan.name}" masih dipegang ${jabatan._count.users} pengguna. ` +
-        'Nonaktifkan saja agar tidak muncul lagi di pilihan, atau pindahkan dulu pemegangnya.',
-      );
-    }
     return this.tulis(AuditAction.USER_UPDATED, 'JABATAN', actor, async (tx) => {
+      await tx.$queryRaw`SELECT id FROM jabatan WHERE id = ${id}::uuid FOR UPDATE`;
+      const pemegang = await tx.user.count({
+        where: { jabatanId: id, workspaceId: actor.workspaceId, accountType: AccountType.COMPANY, isActive: true },
+      });
+      if (pemegang > 0) {
+        throw new ConflictException(
+          `Jabatan "${jabatan.name}" masih dipegang ${pemegang} akun aktif. ` +
+          'Lepas dulu jabatan itu dari pemegangnya lewat tab Orang & akses — atau nonaktifkan/hapus akunnya — ' +
+          'atau nonaktifkan saja jabatan ini agar tidak muncul lagi di pilihan.',
+        );
+      }
       await tx.jabatan.delete({ where: { id } });
       return { id, deleted: true };
     });
@@ -405,7 +452,7 @@ export class OrganizationService {
   }
 
   private async jabatanMilikWorkspace(id: string, actor: AuthenticatedUser) {
-    const jabatan = await this.prisma.jabatan.findFirst({ where: { id, workspaceId: actor.workspaceId }, select: JABATAN_SELECT });
+    const jabatan = await this.prisma.jabatan.findFirst({ where: { id, workspaceId: actor.workspaceId }, select: jabatanSelect(actor.workspaceId) });
     if (!jabatan) throw new NotFoundException('Jabatan not found');
     return jabatan;
   }
