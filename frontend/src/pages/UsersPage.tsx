@@ -86,6 +86,7 @@ export function UsersPage() {
   const [formUnitKerjaId, setFormUnitKerjaId] = useState('')
   const [formRole, setFormRole] = useState<ApiRole>('PEGAWAI')
   const [formPassword, setFormPassword] = useState('')
+  const [formConfirmPassword, setFormConfirmPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const formErrorRef = useScrollToError<HTMLDivElement>(formError)
@@ -192,6 +193,14 @@ export function UsersPage() {
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
     if (!formName.trim() || !formUsername.trim() || !formEmployeeNumber.trim() || !formUnitKerjaId || !formJabatanId) return
+    if (formPassword.length < 12) {
+      setFormError(isId ? 'Password wajib diisi minimal 12 karakter.' : 'Password is required and must be at least 12 characters.')
+      return
+    }
+    if (formPassword !== formConfirmPassword) {
+      setFormError(isId ? 'Konfirmasi password tidak sama.' : 'Password confirmation does not match.')
+      return
+    }
     setIsSubmitting(true)
     setFormError(null)
     try {
@@ -205,7 +214,7 @@ export function UsersPage() {
         jabatanId: formJabatanId,
         role: formRole,
         unitKerjaId: formUnitKerjaId,
-        password: formPassword || undefined,
+        password: formPassword,
       }, token ?? undefined)
       setUsers((prev) => [newUser, ...prev])
       setShowForm(false)
@@ -216,6 +225,7 @@ export function UsersPage() {
       setFormJabatanId('')
       setFormRole('PEGAWAI')
       setFormPassword('')
+      setFormConfirmPassword('')
     } catch (err) {
       setFormError(errorMessage(err))
     } finally {
@@ -718,14 +728,21 @@ export function UsersPage() {
                 </div>
 
                 <div className="auth-field">
-                  <label htmlFor="user-password">Password (opsional)</label>
-                  <input id="user-password" type="password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder="Kosongkan untuk password default" />
+                  <label htmlFor="user-password">{isId ? 'Password (wajib)' : 'Password (required)'}</label>
+                  <input id="user-password" type="password" value={formPassword} onChange={(e) => { setFormPassword(e.target.value); setFormError(null) }} placeholder={isId ? 'Minimal 12 karakter' : 'At least 12 characters'} minLength={12} maxLength={128} autoComplete="new-password" required />
+                  {formPassword.length > 0 && formPassword.length < 12 && <span className="login-field-error">{isId ? 'Password minimal 12 karakter.' : 'Password must be at least 12 characters.'}</span>}
+                </div>
+
+                <div className="auth-field">
+                  <label htmlFor="user-confirm-password">{isId ? 'Konfirmasi password' : 'Confirm password'}</label>
+                  <input id="user-confirm-password" type="password" value={formConfirmPassword} onChange={(e) => { setFormConfirmPassword(e.target.value); setFormError(null) }} placeholder={isId ? 'Masukkan ulang password' : 'Re-enter password'} minLength={12} maxLength={128} autoComplete="new-password" required />
+                  {formConfirmPassword && formPassword !== formConfirmPassword && <span className="login-field-error">{isId ? 'Konfirmasi password tidak sama.' : 'Password confirmation does not match.'}</span>}
                 </div>
               </div>
 
               <div className="modal-actions">
                 <button type="button" className="secondary-button" onClick={() => setShowForm(false)}>{isId ? 'Batal' : 'Cancel'}</button>
-                <button type="submit" className="primary-button" disabled={isSubmitting || !formName.trim() || !formUsername.trim() || !formEmployeeNumber.trim() || !formUnitKerjaId || !formJabatanId}>
+                <button type="submit" className="primary-button" disabled={isSubmitting || !formName.trim() || !formUsername.trim() || !formEmployeeNumber.trim() || !formUnitKerjaId || !formJabatanId || formPassword.length < 12 || !formConfirmPassword || formPassword !== formConfirmPassword}>
                   {isSubmitting ? <><Loader2 size={15} className="spin" /> {isId ? 'Menambahkan…' : 'Adding…'}</> : <><Plus size={15} /> {isId ? 'Tambah' : 'Add'}</>}
                 </button>
               </div>
