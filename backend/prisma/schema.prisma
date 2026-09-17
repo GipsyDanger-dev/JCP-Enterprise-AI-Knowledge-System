@@ -585,7 +585,11 @@ model ProcessingJob {
 model Conversation {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @map("user_id") @db.Uuid
-  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  /// Cascade, bukan SetNull seperti Document dan Announcement. Riwayat tanya
+  /// jawab adalah data pribadi penanyanya, bukan catatan milik instansi —
+  /// kalau akunnya dihapus, justru inilah yang HARUS ikut hilang. Message dan
+  /// Citation menyusul lewat cascade-nya sendiri.
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String?
   messages  Message[]
   createdAt DateTime  @default(now()) @map("created_at")
@@ -660,7 +664,12 @@ model AuditLog {
 model DirectConversation {
   id            String          @id @default(uuid()) @db.Uuid
   employeeId    String          @map("employee_id") @db.Uuid
-  employee      User            @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  /// Cascade dengan alasan yang sama seperti Conversation. Perlu disadari:
+  /// percakapan ini berdua dengan admin, jadi menghapusnya ikut menghapus
+  /// salinan milik admin. Itu memang yang dituju — kalau alasan menghapus akun
+  /// adalah permintaan penghapusan data pribadi, isi percakapannya justru
+  /// bagian yang paling harus ikut hilang.
+  employee      User            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   lastMessage   String?         @map("last_message") @db.Text
   lastMessageAt DateTime?       @map("last_message_at")
   unreadCount   Int             @default(0) @map("unread_count")
