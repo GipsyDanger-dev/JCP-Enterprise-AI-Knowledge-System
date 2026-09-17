@@ -4,6 +4,7 @@ import { PageHeading } from '@/components/PageHeading'
 import { SourceCard } from '@/components/SourceCard'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
 import { getDocumentBlob, getDocumentChunks } from '@/api/documents'
+import type { DocumentChunk } from '@/api/documents'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
@@ -141,6 +142,16 @@ export function ChatPage() {
   const [sourcePreviewLoading, setSourcePreviewLoading] = useState(false)
   const [sourcePdfUrl, setSourcePdfUrl] = useState<string | null>(null)
   const [sourcePdfLoading, setSourcePdfLoading] = useState(false)
+  // Unduhan PDF-nya gagal. Dulu kegagalan ini ditelan diam-diam dan tampilannya
+  // jatuh ke cuplikan teks, persis seperti dokumen yang memang bukan PDF — jadi
+  // tidak ada cara membedakan "berkasnya tidak bisa diambil" dari "dokumen ini
+  // tidak punya penampil".
+  const [sourcePdfError, setSourcePdfError] = useState(false)
+  // Seluruh isi dokumen non-PDF. Yang dikutip AI hanya satu potongan; tanpa ini
+  // itulah satu-satunya yang bisa dilihat, dan sebuah .txt atau .docx tidak
+  // pernah bisa dibaca utuh sebagai bukti.
+  const [sourceChunks, setSourceChunks] = useState<DocumentChunk[] | null>(null)
+  const potonganDikutipRef = useRef<HTMLDivElement>(null)
   const [sourceExpanded, setSourceExpanded] = useState(false)
   // PDF menghitung view=FitH sekali saja, saat dimuat, jadi setelah jendelanya
   // berganti ukuran halamannya tetap selebar jendela yang lama dan iframe-nya
@@ -159,6 +170,8 @@ export function ChatPage() {
     if (!selectedSource) {
       setSourcePreviewText(null)
       setSourcePdfUrl(null)
+      setSourcePdfError(false)
+      setSourceChunks(null)
       setSelectedSourceQuestion(null)
       return
     }
@@ -167,7 +180,13 @@ export function ChatPage() {
     const isPdf = selectedSource.filename.toLowerCase().endsWith('.pdf')
 
     setSourcePdfUrl(null)
+    setSourcePdfError(false)
+    setSourceChunks(null)
     setSourcePreviewText(selectedSource.excerpt ?? null)
+    const bersihkan = () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
 
     if (isPdf) {
       setSourcePdfLoading(true)
@@ -176,30 +195,49 @@ export function ChatPage() {
           objectUrl = URL.createObjectURL(blob)
           if (!cancelled) setSourcePdfUrl(objectUrl)
         })
-        .catch(() => { if (!cancelled) setSourcePdfUrl(null) })
+        // Ditandai, bukan didiamkan: tanpa penanda ini kegagalan mengambil
+        // berkasnya tampil sama persis seperti dokumen yang memang tidak punya
+        // penampil, dan pembacanya mengira dokumennya yang kosong.
+        .catch(() => { if (!cancelled) { setSourcePdfUrl(null); setSourcePdfError(true) } })
         .finally(() => { if (!cancelled) setSourcePdfLoading(false) })
+
+      if (selectedSource.excerpt) return bersihkan
+      // PDF yang sitasinya tidak membawa cuplikan: ambil potongan yang dikutip
+      // saja, sebagai cadangan kalau berkasnya ternyata gagal diambil.
+      setSourcePreviewLoading(true)
+      getDocumentChunks(selectedSource.documentId, token ?? undefined)
+        .then((result) => {
+          if (!cancelled) {
+            setSourcePreviewText(result.chunks.find((chunk) => chunk.chunkId === selectedSource.chunkId)?.text ?? null)
+          }
+        })
+        .catch(() => { if (!cancelled) setSourcePreviewText(null) })
+        .finally(() => { if (!cancelled) setSourcePreviewLoading(false) })
+      return bersihkan
     }
 
-    if (selectedSource.excerpt) {
-      return () => {
-        cancelled = true
-        if (objectUrl) URL.revokeObjectURL(objectUrl)
-      }
-    }
+    // Bukan PDF: tidak ada berkas yang bisa ditampilkan apa adanya, jadi
+    // dokumennya disusun ulang dari seluruh potongan teksnya. Yang dikutip AI
+    // tetap ditandai supaya buktinya bisa ditemukan tanpa membaca semuanya.
     setSourcePreviewLoading(true)
     getDocumentChunks(selectedSource.documentId, token ?? undefined)
       .then((result) => {
-        if (!cancelled) {
+        if (cancelled) return
+        setSourceChunks(result.chunks)
+        if (!selectedSource.excerpt) {
           setSourcePreviewText(result.chunks.find((chunk) => chunk.chunkId === selectedSource.chunkId)?.text ?? null)
         }
       })
-      .catch(() => { if (!cancelled) setSourcePreviewText(null) })
+      .catch(() => { if (!cancelled) setSourceChunks(null) })
       .finally(() => { if (!cancelled) setSourcePreviewLoading(false) })
-    return () => {
-      cancelled = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
+    return bersihkan
   }, [selectedSource, token])
+
+  // Gulirkan ke potongan yang dikutip begitu dokumennya selesai disusun.
+  useEffect(() => {
+    if (!sourceChunks?.length) return
+    potonganDikutipRef.current?.scrollIntoView({ block: 'center' })
+  }, [sourceChunks])
 
   const evidencePreview = sourcePreviewText ? formatEvidencePreview(sourcePreviewText, selectedSourceQuestion) : null
 
@@ -296,7 +334,7 @@ export function ChatPage() {
       </form>
       {selectedSource && (
         <div className={`source-preview-backdrop ${sourceExpanded ? 'is-expanded' : ''}`} role="presentation" onClick={() => { setSourceExpanded(false); setSelectedSource(null) }}>
-          <section className={`source-preview ${sourceExpanded ? 'is-expanded' : ''} ${pdfBeku ? 'is-resizing' : ''}`} role="dialog" aria-modal="true" aria-label="Source preview" onClick={(event) => event.stopPropagation()}>
+          <section className={`source-preview ${sourceExpanded ? 'is-expanded' : ''} ${pdfBeku ? 'is-resizing' : ''} ${sourcePdfSrc ? '' : 'is-text'}`} role="dialog" aria-modal="true" aria-label="Source preview" onClick={(event) => event.stopPropagation()}>
             <header>
               <span><FileText size={18} /> {sourceExpanded ? documentLabel(selectedSource) : (isId ? 'Sumber jawaban' : 'Answer source')}</span>
               <div className="source-preview-actions">
@@ -320,6 +358,13 @@ export function ChatPage() {
               </div>
             </div>
             {sourcePdfLoading && <div className="source-preview-loading">{isId ? 'Memuat PDF asli...' : 'Loading original PDF...'}</div>}
+            {sourcePdfError && (
+              <div className="source-preview-error" role="status">
+                {isId
+                  ? 'Berkas PDF aslinya tidak bisa dimuat. Yang ditampilkan di bawah hanya bagian yang dikutip.'
+                  : 'The original PDF could not be loaded. Only the cited passage is shown below.'}
+              </div>
+            )}
             {sourcePdfSrc ? (
               <div className={`source-preview-pdf ${pdfBeku ? 'is-frozen' : ''}`} ref={pdfKotakRef}>
                 <iframe
@@ -329,8 +374,29 @@ export function ChatPage() {
                   src={sourcePdfSrc}
                 />
               </div>
+            ) : sourceChunks && sourceChunks.length > 0 ? (
+              /* Dokumen non-PDF disusun ulang dari potongan teksnya. Potongan
+                 yang dikutip AI ditandai dan digulirkan ke tengah, supaya
+                 buktinya tetap mudah ditemukan di dokumen yang panjang. */
+              <div className="source-preview-text" ref={pdfKotakRef}>
+                {sourceChunks.map((chunk) => {
+                  const dikutip = chunk.chunkId === selectedSource.chunkId
+                  return (
+                    <div
+                      key={chunk.chunkId}
+                      ref={dikutip ? potonganDikutipRef : undefined}
+                      className={`source-chunk ${dikutip ? 'is-cited' : ''}`}
+                    >
+                      {(chunk.sectionTitle || chunk.pageNumber !== null) && (
+                        <small>{[chunk.sectionTitle || null, chunk.pageNumber !== null ? `${isId ? 'Halaman' : 'Page'} ${chunk.pageNumber}` : null].filter(Boolean).join(' · ')}</small>
+                      )}
+                      <p>{chunk.text}</p>
+                    </div>
+                  )
+                })}
+              </div>
             ) : (
-              <blockquote>{sourcePreviewLoading ? (isId ? 'Memuat cuplikan...' : 'Loading excerpt...') : evidencePreview || (isId ? 'Cuplikan tidak tersedia untuk sumber ini.' : 'No excerpt is available for this source.')}</blockquote>
+              <blockquote>{sourcePreviewLoading ? (isId ? 'Memuat isi dokumen...' : 'Loading document...') : evidencePreview || (isId ? 'Cuplikan tidak tersedia untuk sumber ini.' : 'No excerpt is available for this source.')}</blockquote>
             )}
           </section>
         </div>

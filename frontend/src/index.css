@@ -1720,6 +1720,18 @@ button { cursor: pointer; }
 .source-preview-title small { display: block; margin-top: 5px; color: var(--text-muted); font-size: var(--fs-xs); }
 .source-preview blockquote { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 18px 0 0; border-left: 3px solid var(--brand-500); padding: 10px 14px; color: var(--text-body); font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 .source-preview-loading { margin-top: 18px; color: var(--text-muted); font-size: var(--fs-sm); }
+.source-preview-error { flex: 0 0 auto; margin-top: 18px; border: 1px solid var(--border); border-left: 3px solid #d4a03c; border-radius: var(--radius-sm); padding: 9px 12px; color: var(--text-body); font-size: var(--fs-sm); background: var(--bg-subtle, transparent); }
+/* Tanpa PDF di dalamnya tidak ada yang menuntut tinggi tetap, dan kotak
+   setinggi 820px untuk cuplikan satu baris terbaca seperti gagal memuat. */
+.source-preview.is-text { height: auto; max-height: min(820px, calc(100dvh - 96px)); }
+.source-preview.is-text.is-expanded { height: 100dvh; max-height: 100dvh; }
+/* Dokumen non-PDF disusun ulang dari potongan teksnya. */
+.source-preview-text { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 18px; padding-right: 6px; }
+.source-chunk { border-left: 3px solid transparent; padding: 6px 14px; }
+.source-chunk small { display: block; margin-bottom: 4px; color: var(--text-muted); font-size: var(--fs-xs); }
+.source-chunk p { margin: 0; color: var(--text-body); font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.source-chunk.is-cited { border-left-color: var(--brand-500); background: rgb(234 88 12 / 7%); border-radius: var(--radius-sm); }
+[data-theme="dark"] .source-chunk.is-cited { background: rgb(234 88 12 / 14%); }
 .source-preview-pdf { display: flex; flex: 1 1 auto; min-height: 0; margin-top: 18px; transition: margin-top var(--ease-panel); }
 /* Selama jendelanya bergerak, PDF dikunci pada ukuran terakhirnya dan cuma
    dipotong oleh bingkai yang berubah. Ikut melebar setiap frame berarti
