@@ -602,6 +602,16 @@ export function UsersPage() {
                       {unitKerjaList.map((unit) => (
                         <option key={unit.id} value={unit.id}>{unit.name}</option>
                       ))}
+                      {/* Alasannya sama dengan jabatan nonaktif di bawah, dan
+                          akibatnya di sini lebih parah: tanpa opsi ini select-nya
+                          jatuh ke placeholder kosong, dan karena `required`,
+                          seluruh form ditolak browser — nama dan role pun ikut
+                          tidak bisa disunting sampai unitnya diganti. */}
+                      {editingUser?.unitKerja && !unitKerjaList.some((unit) => unit.id === editingUser.unitKerja?.id) && (
+                        <option value={editingUser.unitKerja.id}>
+                          {editingUser.unitKerja.name}{isId ? ' (nonaktif)' : ' (inactive)'}
+                        </option>
+                      )}
                     </select>
                     <ChevronDown size={15} className="select-icon" />
                   </div>

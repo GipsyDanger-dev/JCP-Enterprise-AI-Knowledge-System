@@ -22,15 +22,8 @@ import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import { hashPassword, verifyPassword } from './password.util';
 import { BillingService } from '../billing/billing.service';
 import { seedJabatanDanRoleLabel } from '../../prisma/organization-defaults';
+import { JABATAN_PERMISSION_SELECT, wewenangJabatan } from './jabatan.utils';
 
-/** Kolom jabatan yang boleh ikut ke klien: namanya dan centang wewenangnya. */
-const JABATAN_PERMISSION_SELECT = {
-  id: true,
-  name: true,
-  canManageAnnouncements: true,
-  canViewAnnouncementReaders: true,
-  canUploadDocuments: true,
-} as const;
 
 @Injectable()
 export class AuthService {
@@ -414,7 +407,7 @@ export class AuthService {
    * kolom di bawah ditulis tangan sehingga hasilnya dibuang lagi di sini, dan
    * AuthProvider yang sudah membacanya selalu menerima undefined.
    */
-  private safeProfile(user: User & { jabatan?: JabatanPermissions | null }) {
+  private safeProfile(user: User & { jabatan?: (JabatanPermissions & { isActive: boolean }) | null }) {
     return {
       workspaceId: user.workspaceId,
       isPlatformOwner: user.isPlatformOwner,
@@ -431,7 +424,9 @@ export class AuthService {
       accountType: user.accountType,
       photoUrl: user.photoUrl,
       jabatanId: user.jabatanId,
-      jabatan: user.jabatan ?? null,
+      // Jabatan yang dinonaktifkan tidak lagi membawa wewenang apa pun; lihat
+      // wewenangJabatan. `jobTitle` di atas tetap menampilkan namanya.
+      jabatan: wewenangJabatan(user.jabatan),
     };
   }
 
