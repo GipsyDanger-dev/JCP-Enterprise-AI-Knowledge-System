@@ -117,6 +117,11 @@ export class DocumentsService {
           unitKerjaId,
           status: DocumentStatus.QUEUED,
           uploadedById: actor.sub,
+          // Salinan identitas pengunggah, ditulis sekali di sini. Tautan ke
+          // akunnya boleh putus kemudian; keterangan siapa yang menaikkan
+          // dokumen ini tidak boleh ikut hilang bersamanya.
+          uploadedByName: actor.displayName ?? actor.username,
+          uploadedByUsername: actor.username,
         },
       });
       await transaction.documentVersion.create({
@@ -318,6 +323,10 @@ export class DocumentsService {
         uploadedBy: {
           select: { id: true, displayName: true },
         },
+        // Ikut dikirim supaya pengunggahnya tetap bisa disebut setelah akunnya
+        // dihapus, saat relasi uploadedBy di atas sudah kosong.
+        uploadedByName: true,
+        uploadedByUsername: true,
         versions: {
           orderBy: { versionNumber: 'desc' },
           take: 1,

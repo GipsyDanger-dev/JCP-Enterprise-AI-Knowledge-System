@@ -318,8 +318,21 @@ model Document {
   // Pencarian vektor buruk untuk pertanyaan bernomor, jadi ini dicari lewat kolom.
   regulationNumber String?           @map("regulation_number")
   regulationYear   Int?              @map("regulation_year")
-  uploadedById     String            @map("uploaded_by_id") @db.Uuid
-  uploadedBy       User              @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  /// Pengunggahnya, dan salinan namanya.
+  ///
+  /// Relasinya sengaja SetNull, bukan Restrict: arsip ini milik instansi, bukan
+  /// milik orang yang kebetulan menaikkannya, jadi akunnya harus boleh dihapus
+  /// tanpa menyandera dokumennya. Yang tidak boleh hilang adalah keterangan
+  /// siapa yang menaikkan — itu disimpan sebagai teks yang berdiri sendiri.
+  ///
+  /// uploadedById tetap dipakai sebagai kunci akses (lihat document-visibility):
+  /// pemegang izin unggah lewat jabatan hanya boleh mengurus unggahannya
+  /// sendiri. Nilai NULL tidak pernah cocok dengan id aktor mana pun, jadi
+  /// dokumen yang pengunggahnya sudah dihapus mengecil haknya, tidak melebar.
+  uploadedById     String?           @map("uploaded_by_id") @db.Uuid
+  uploadedBy       User?             @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedByName     String          @default("") @map("uploaded_by_name")
+  uploadedByUsername String?         @map("uploaded_by_username")
   versions         DocumentVersion[]
   deletedAt        DateTime?         @map("deleted_at")
   createdAt        DateTime          @default(now()) @map("created_at")

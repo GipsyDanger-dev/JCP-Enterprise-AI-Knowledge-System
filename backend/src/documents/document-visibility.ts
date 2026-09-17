@@ -159,10 +159,13 @@ export function canTargetUnit(actor: AuthenticatedUser, unitKerjaId: string | nu
  */
 export function canManageDocument(
   actor: AuthenticatedUser,
-  document: { unitKerjaId: string | null; uploadedById: string },
+  document: { unitKerjaId: string | null; uploadedById: string | null },
 ): boolean {
   if (!canTargetUnit(actor, document.unitKerjaId)) return false;
   if (actor.isAdmin || actor.accountType === 'PERSONAL' || actor.role === UserRole.ADMIN_UNIT) return true;
+  // NULL berarti akun pengunggahnya sudah dihapus. Perbandingan ini otomatis
+  // bernilai salah, jadi dokumen yatim jatuh ke tangan admin dan admin unit
+  // saja -- haknya mengecil, tidak pernah melebar.
   return document.uploadedById === actor.sub;
 }
 

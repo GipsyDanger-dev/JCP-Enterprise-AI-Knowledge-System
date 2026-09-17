@@ -229,7 +229,13 @@ export interface ApiDocument {
   uploadedBy?: {
     id: string
     displayName: string
-  }
+  } | null
+  /**
+   * Salinan identitas pengunggah di baris dokumennya. Tetap terisi setelah
+   * akunnya dihapus, saat `uploadedBy` di atas sudah kosong.
+   */
+  uploadedByName?: string
+  uploadedByUsername?: string | null
   /** Tersedia pada GET /documents. */
   latestVersion?: ApiDocumentVersion | null
   /** Tersedia pada POST /documents. */
