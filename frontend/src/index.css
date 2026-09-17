@@ -1329,6 +1329,7 @@ button { cursor: pointer; }
 /* ============ Activity log ============ */
 .activity-log-list { display: grid; gap: 4px; }
 .activity-log-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.activity-deleted-actor { font-style: normal; font-size: 0.85em; color: var(--text-dim); }
 .activity-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
 .activity-dot.upload { background: var(--brand-600); }
 .activity-dot.index { background: #25705a; }

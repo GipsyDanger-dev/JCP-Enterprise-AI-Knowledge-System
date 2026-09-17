@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AccountType, AuditAction, AuditActorType, Prisma, UserRole } from '@prisma/client';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AccountType, AuditAction, Prisma, UserRole } from '@prisma/client';
+import { AuditLogsService, pelakuAktor } from '../audit-logs/audit-logs.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import {
@@ -473,9 +473,7 @@ export class OrganizationService {
       return await this.prisma.$transaction(async (tx) => {
         const hasil = await jalankan(tx);
         await this.auditLogs.record(tx, {
-          actorType: AuditActorType.USER,
-          actorUserId: actor.sub,
-          workspaceId: actor.workspaceId,
+          ...pelakuAktor(actor),
           action,
           targetType,
           targetId: (hasil as { id?: string }).id,

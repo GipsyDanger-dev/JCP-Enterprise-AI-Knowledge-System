@@ -72,14 +72,22 @@ export function ActivityPage() {
           {entries.map((entry) => {
             const label = ACTION_LABELS[entry.action] ?? { id: entry.action, en: entry.action }
             const Icon = ACTION_ICONS[entry.action] ?? Settings
-            const userName = entry.actorUser?.displayName ?? (entry.actorType === 'WORKER' ? 'System' : 'User')
+            // Akun pelaku boleh dihapus, dan begitu itu terjadi `actorUser`
+            // kosong. Salinan namanya dipakai supaya barisnya tidak berubah
+            // jadi "User" tanpa keterangan — jejak yang tak bisa menyebut
+            // siapa pelakunya sama saja dengan tidak ada jejak.
+            const namaTersimpan = entry.actorDisplayName ?? entry.actorUsername ?? null
+            const userName = entry.actorUser?.displayName
+              ?? namaTersimpan
+              ?? (entry.actorType === 'WORKER' ? 'System' : 'User')
+            const akunTerhapus = !entry.actorUser && namaTersimpan !== null
             return (
               <div key={entry.id} className="activity-log-item">
                 <span className={`activity-dot ${entry.action.includes('DOCUMENT') ? 'upload' : entry.action.includes('USER') ? 'user' : entry.action.includes('PROCESSING') ? 'index' : 'query'}`}>
                   <Icon size={14} />
                 </span>
                 <div>
-                  <p>{isId ? label.id : label.en} — <strong>{userName}</strong></p>
+                  <p>{isId ? label.id : label.en} — <strong>{userName}</strong>{akunTerhapus && <em className="activity-deleted-actor"> ({isId ? 'akun dihapus' : 'account deleted'})</em>}</p>
                   <div className="activity-meta">
                     <small>{entry.targetType}</small>
                     <small>{formatTime(entry.createdAt)}</small>

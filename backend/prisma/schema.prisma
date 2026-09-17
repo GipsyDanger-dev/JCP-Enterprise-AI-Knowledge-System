@@ -613,6 +613,15 @@ model AuditLog {
   actorType   AuditActorType @map("actor_type")
   actorUserId String?        @map("actor_user_id") @db.Uuid
   actorUser   User?          @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  /// Salinan identitas pelaku, ditulis sekali saat kejadiannya dicatat.
+  ///
+  /// actorUserId memakai SetNull supaya akun bisa dihapus, tetapi begitu itu
+  /// terjadi relasi actorUser ikut kosong dan barisnya kehilangan satu-satunya
+  /// keterangan siapa pelakunya. Jejak audit yang tidak bisa menyebut nama
+  /// tidak ada gunanya, jadi namanya disimpan sebagai teks yang tidak ikut
+  /// terhapus.
+  actorUsername    String? @map("actor_username")
+  actorDisplayName String? @map("actor_display_name")
   workspaceId String?        @map("workspace_id") @db.Uuid
   workspace   Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   action      AuditAction

@@ -8,14 +8,13 @@ import {
 } from '@nestjs/common';
 import {
   AuditAction,
-  AuditActorType,
   DocumentStatus,
   ProcessingJobStatus,
   Prisma,
 } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditLogsService, pelakuAktor } from '../audit-logs/audit-logs.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { DOCUMENT_STORAGE, DocumentStorage } from './document-storage.interface';
@@ -144,8 +143,7 @@ export class DocumentsService {
         },
       });
       await this.auditLogs.record(transaction, {
-        actorType: AuditActorType.USER,
-        actorUserId: actor.sub,
+        ...pelakuAktor(actor),
         action: AuditAction.DOCUMENT_UPLOADED,
         targetType: 'DOCUMENT',
         targetId: documentId,
@@ -283,8 +281,7 @@ export class DocumentsService {
         },
       });
       await this.auditLogs.record(transaction, {
-        actorType: AuditActorType.USER,
-        actorUserId: actor.sub,
+        ...pelakuAktor(actor),
         action: AuditAction.DOCUMENT_UPDATED,
         targetType: 'DOCUMENT',
         targetId: id,
@@ -513,8 +510,7 @@ export class DocumentsService {
         data: { status: DocumentStatus.DELETED, deletedAt },
       });
       await this.auditLogs.record(transaction, {
-        actorType: AuditActorType.USER,
-        actorUserId: actor.sub,
+        ...pelakuAktor(actor),
         action: AuditAction.DOCUMENT_DELETED,
         targetType: 'DOCUMENT',
         targetId: id,

@@ -13,8 +13,8 @@ import {
 } from '@nestjs/common';
 import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString, Length, Matches } from 'class-validator';
-import { AuditAction, AuditActorType, Prisma, UserRole } from '@prisma/client';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditAction, Prisma, UserRole } from '@prisma/client';
+import { AuditLogsService, pelakuAktor } from '../audit-logs/audit-logs.service';
 import { PrismaService } from '../database/prisma.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -124,8 +124,7 @@ export class WorkspacesController {
         await tx.user.update({ where: { id: workspace.users[0].id }, data: { jabatanId: jabatan.id } });
       }
       await this.auditLogs.record(tx, {
-        actorType: AuditActorType.USER,
-        actorUserId: actor.sub,
+        ...pelakuAktor(actor),
         action: AuditAction.USER_CREATED,
         targetType: 'WORKSPACE',
         targetId: workspace.id,
@@ -200,8 +199,7 @@ export class WorkspacesController {
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.user.update({ where: { id: userId }, data, select: WORKSPACE_MEMBER_SELECT });
       await this.auditLogs.record(tx, {
-        actorType: AuditActorType.USER,
-        actorUserId: actor.sub,
+        ...pelakuAktor(actor),
         action: AuditAction.USER_UPDATED,
         targetType: 'USER',
         targetId: userId,

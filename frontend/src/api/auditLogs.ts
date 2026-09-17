@@ -5,6 +5,12 @@ export interface AuditLogEntry {
   actorType: string
   actorUserId: string
   actorUser?: { id: string; displayName: string; username?: string | null; role: string }
+  /**
+   * Salinan nama pelaku yang ikut tersimpan di baris audit-nya. Tetap ada
+   * setelah akunnya dihapus, saat `actorUser` sudah kosong.
+   */
+  actorUsername?: string | null
+  actorDisplayName?: string | null
   action: string
   targetType: string
   targetId: string

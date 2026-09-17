@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AccountType, AuditAction, AuditActorType, Prisma } from '@prisma/client';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AccountType, AuditAction, Prisma } from '@prisma/client';
+import { AuditLogsService, pelakuAktor } from '../audit-logs/audit-logs.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { hashPassword } from '../auth/password.util';
 import { isAdminRole } from '../auth/role.utils';
@@ -139,8 +139,7 @@ export class UsersService {
           select: SAFE_USER_SELECT,
         });
         await this.auditLogs.record(transaction, {
-          actorType: AuditActorType.USER,
-          actorUserId: actor.sub,
+          ...pelakuAktor(actor),
           action: AuditAction.USER_CREATED,
           targetType: 'USER',
           targetId: user.id,
@@ -205,8 +204,7 @@ export class UsersService {
         select: SAFE_USER_SELECT,
       });
       await this.auditLogs.record(transaction, {
-        actorType: AuditActorType.USER,
-        actorUserId: actor.sub,
+        ...pelakuAktor(actor),
         action: AuditAction.USER_UPDATED,
         targetType: 'USER',
         targetId: id,
@@ -241,8 +239,7 @@ export class UsersService {
         data: { isActive: false },
       });
       await this.auditLogs.record(transaction, {
-        actorType: AuditActorType.USER,
-        actorUserId: actor.sub,
+        ...pelakuAktor(actor),
         action: AuditAction.USER_UPDATED,
         targetType: 'USER',
         targetId: id,
