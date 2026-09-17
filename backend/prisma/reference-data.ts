@@ -124,6 +124,13 @@ export interface JabatanSeed {
   name: string;
   /** Boleh menerbitkan, menyunting, mengarsipkan, dan menghapus pengumuman. */
   canManageAnnouncements?: boolean;
+  /**
+   * Boleh mengunggah dokumen untuk unit kerjanya sendiri. Sengaja tidak
+   * dinyalakan untuk satu jabatan pun di daftar bawaan: menyalakannya di seed
+   * akan memberi hak tulis kepada orang yang sudah memegang jabatan itu tanpa
+   * ada yang pernah memutuskannya. Admin yang mencentangnya per instansi.
+   */
+  canUploadDocuments?: boolean;
   /** Boleh melihat siapa saja yang sudah dan belum membaca pengumuman. */
   canViewAnnouncementReaders?: boolean;
 }

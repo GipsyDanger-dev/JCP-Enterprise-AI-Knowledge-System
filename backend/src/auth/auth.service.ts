@@ -29,6 +29,7 @@ const JABATAN_PERMISSION_SELECT = {
   name: true,
   canManageAnnouncements: true,
   canViewAnnouncementReaders: true,
+  canUploadDocuments: true,
 } as const;
 
 @Injectable()
@@ -407,9 +408,10 @@ export class AuthService {
    * Profil yang boleh dikirim ke klien.
    *
    * `jabatan` ikut, bukan hanya namanya di `jobTitle`: frontend memakai centang
-   * wewenangnya untuk memutuskan tombol mana yang muncul. Kedua pemanggilnya
-   * sudah memuatnya lewat JABATAN_PERMISSION_SELECT, tetapi daftar kolom di
-   * bawah ditulis tangan sehingga hasilnya dibuang lagi di sini, dan
+   * wewenangnya untuk memutuskan tombol mana yang muncul — mis. tombol unggah
+   * dokumen pada pemegang jabatan yang dicentang boleh mengunggah. Kedua
+   * pemanggilnya sudah memuatnya lewat JABATAN_PERMISSION_SELECT, tetapi daftar
+   * kolom di bawah ditulis tangan sehingga hasilnya dibuang lagi di sini, dan
    * AuthProvider yang sudah membacanya selalu menerima undefined.
    */
   private safeProfile(user: User & { jabatan?: JabatanPermissions | null }) {

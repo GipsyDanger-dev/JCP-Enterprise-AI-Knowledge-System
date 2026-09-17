@@ -208,9 +208,10 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
               type="checkbox"
               checked={isSuperAdmin ? restrictToUnit : true}
               onChange={(event) => setRestrictToUnit(event.target.checked)}
-              // Admin unit tidak bisa melepasnya: server tetap menandai
-              // dokumennya dengan unitnya sendiri, jadi centang yang bisa
-              // dilepas hanya akan berbohong soal apa yang terjadi.
+              // Selain super admin, tidak ada yang bisa melepasnya — baik admin
+              // unit maupun pemegang izin unggah lewat jabatan. Server tetap
+              // menandai dokumennya dengan unit si pengunggah, jadi centang yang
+              // bisa dilepas hanya akan berbohong soal apa yang terjadi.
               disabled={uploading || !isSuperAdmin}
             />
             <span>

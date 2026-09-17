@@ -14,6 +14,8 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  *  - Admin unit melihat seluruh isi unitnya sendiri dengan keleluasaan yang
  *    sama, termasuk yang belum selesai diproses dan rancangan. Di luar unitnya
  *    ia tunduk pada aturan pegawai.
+ *  - Jabatan yang dicentang "boleh unggah" melihat unggahannya sendiri apa pun
+ *    statusnya, dan selebihnya tunduk pada aturan pegawai.
  *  - Pegawai biasa hanya melihat dokumen yang sudah selesai diproses (READY).
  *  - Rancangan tidak pernah terlihat oleh pegawai biasa. Ini bukan soal
  *    kerahasiaan tapi soal benar/salah: menjawab pakai draft yang angkanya
@@ -40,7 +42,7 @@ export function documentVisibilityWhere(actor: AuthenticatedUser): Prisma.Docume
    * tak terlihat, sehingga wewenang menyuntingnya tidak ada gunanya.
    *
    * Dokumen TANPA penanda unit sengaja tidak ikut dibuka meski belum READY:
-   * itu milik seluruh organisasi, dan canManageForUnit memang tidak
+   * itu milik seluruh organisasi, dan canTargetUnit memang tidak
    * mengizinkannya mengelola dokumen semacam itu. Membukanya di sini hanya akan
    * memperlihatkan rancangan tingkat organisasi kepada orang yang tidak boleh
    * menyentuhnya.
@@ -52,6 +54,15 @@ export function documentVisibilityWhere(actor: AuthenticatedUser): Prisma.Docume
    */
   if (actor.role === UserRole.ADMIN_UNIT && actor.unitKerjaId) {
     return { ...dasar, OR: [{ unitKerjaId: actor.unitKerjaId }, aturanPegawai(actor)] };
+  }
+
+  // Pemegang izin unggah lewat jabatan melihat apa yang ia unggah sendiri,
+  // apa pun statusnya — dokumen baru selalu QUEUED, jadi tanpa ini unggahannya
+  // menghilang tepat setelah dikirim dan ia tidak bisa membereskan kekeliruan
+  // yang justru hanya ia sendiri yang boleh perbaiki. Hanya miliknya: selebihnya
+  // ia tetap pegawai biasa.
+  if (pengunggahLewatJabatan(actor)) {
+    return { ...dasar, OR: [{ uploadedById: actor.sub }, aturanPegawai(actor)] };
   }
 
   return { ...dasar, ...aturanPegawai(actor) };
@@ -108,22 +119,57 @@ export function allowedCategoryFilter(actor: AuthenticatedUser): Prisma.Document
 }
 
 /**
- * Apakah aktor boleh mengelola (unggah/ubah/hapus) dokumen pada unit kerja ini.
+ * Pemegang izin unggah lewat jabatan, mis. seorang Ketua yang di mata
+ * pengelolaan dokumen tetap PEGAWAI biasa.
  *
- * Gagal tertutup: ADMIN_UNIT yang belum ditempatkan di unit kerja mana pun
- * tidak bisa mengelola apa pun, bukan malah bisa mengelola semuanya.
+ * Wajib punya unit kerja. Tanpa itu satu-satunya dokumen yang bisa ia buat
+ * adalah dokumen tanpa penanda — yang terbuka untuk SELURUH pegawai — dan
+ * menerbitkan yang seperti itu adalah keputusan tingkat organisasi, bukan
+ * sesuatu yang menempel pada nomenklatur jabatan.
  */
-export function canManageForUnit(actor: AuthenticatedUser, unitKerjaId: string | null | undefined): boolean {
+function pengunggahLewatJabatan(actor: AuthenticatedUser): boolean {
+  return Boolean(actor.jabatan?.canUploadDocuments) && Boolean(actor.unitKerjaId);
+}
+
+/**
+ * Bolehkah aktor menaruh dokumen pada unit kerja ini — saat mengunggah baru,
+ * maupun saat memindahkan yang sudah ada.
+ *
+ * Gagal tertutup: yang belum ditempatkan di unit kerja mana pun tidak bisa
+ * menaruh apa pun, bukan malah bisa menaruh di mana saja.
+ */
+export function canTargetUnit(actor: AuthenticatedUser, unitKerjaId: string | null | undefined): boolean {
   if (actor.accountType === 'PERSONAL') return !unitKerjaId;
   if (actor.isAdmin) return true;
-  if (actor.role !== UserRole.ADMIN_UNIT) return false;
   if (!actor.unitKerjaId) return false;
+  if (actor.role !== UserRole.ADMIN_UNIT && !pengunggahLewatJabatan(actor)) return false;
   // Tanpa unit tujuan berarti dokumen untuk semua orang — itu keputusan
-  // tingkat organisasi, bukan wewenang admin satu unit.
+  // tingkat organisasi, bukan wewenang satu unit.
   return unitKerjaId === actor.unitKerjaId;
+}
+
+/**
+ * Bolehkah aktor mengubah atau menghapus dokumen yang SUDAH ada.
+ *
+ * Berbeda dari canTargetUnit karena izin lewat jabatan sengaja lebih sempit
+ * daripada ADMIN_UNIT: pemegangnya boleh membereskan apa yang ia unggah
+ * sendiri — salah berkas, salah judul — tetapi tidak boleh menyentuh arsip
+ * yang dinaikkan orang lain. Centang berlabel "boleh unggah" tidak semestinya
+ * diam-diam memberi kuasa menghapus seluruh dokumen unitnya.
+ */
+export function canManageDocument(
+  actor: AuthenticatedUser,
+  document: { unitKerjaId: string | null; uploadedById: string },
+): boolean {
+  if (!canTargetUnit(actor, document.unitKerjaId)) return false;
+  if (actor.isAdmin || actor.accountType === 'PERSONAL' || actor.role === UserRole.ADMIN_UNIT) return true;
+  return document.uploadedById === actor.sub;
 }
 
 /** Aktor yang boleh mengunggah dokumen sama sekali. */
 export function canUploadDocuments(actor: AuthenticatedUser): boolean {
-  return actor.accountType === 'PERSONAL' || actor.isAdmin || (actor.role === UserRole.ADMIN_UNIT && Boolean(actor.unitKerjaId));
+  return actor.accountType === 'PERSONAL'
+    || actor.isAdmin
+    || (actor.role === UserRole.ADMIN_UNIT && Boolean(actor.unitKerjaId))
+    || pengunggahLewatJabatan(actor);
 }

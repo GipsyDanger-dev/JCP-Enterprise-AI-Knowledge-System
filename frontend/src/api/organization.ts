@@ -28,6 +28,12 @@ export interface OrgJabatan {
   id: string
   name: string
   canManageAnnouncements: boolean
+  /**
+   * Boleh mengunggah dokumen untuk unit kerjanya sendiri, lalu mengubah dan
+   * menghapus apa yang ia unggah. Tidak berlaku bagi pemegangnya yang belum
+   * ditempatkan di unit kerja mana pun.
+   */
+  canUploadDocuments: boolean
   canViewAnnouncementReaders: boolean
   isActive: boolean
   sortOrder: number
@@ -42,7 +48,7 @@ export interface OrganizationOverview {
 
 export type JabatanInput = Partial<Pick<
   OrgJabatan,
-  'name' | 'canManageAnnouncements' | 'canViewAnnouncementReaders' | 'isActive' | 'sortOrder'
+  'name' | 'canManageAnnouncements' | 'canViewAnnouncementReaders' | 'canUploadDocuments' | 'isActive' | 'sortOrder'
 >>
 
 export const getOrganization = (token?: string) =>

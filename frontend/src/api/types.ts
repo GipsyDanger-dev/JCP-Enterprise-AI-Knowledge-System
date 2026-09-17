@@ -25,6 +25,8 @@ export interface ApiJabatan {
   name: string
   canManageAnnouncements: boolean
   canViewAnnouncementReaders: boolean
+  /** Boleh mengunggah dokumen untuk unit kerjanya, dan membereskan unggahannya sendiri. */
+  canUploadDocuments: boolean
 }
 
 /**

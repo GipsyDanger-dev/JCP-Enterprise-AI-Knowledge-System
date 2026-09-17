@@ -26,7 +26,8 @@ import { UpdateDocumentAccessDto } from './dto/update-document-access.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import {
   allowedCategoryFilter,
-  canManageForUnit,
+  canManageDocument,
+  canTargetUnit,
   canUploadDocuments,
   documentVisibilityWhere,
 } from './document-visibility';
@@ -61,7 +62,7 @@ export class DocumentsService {
       ? input.unitKerjaId ?? null
       : input.unitKerjaId ?? actor.unitKerjaId ?? null;
 
-    if (!canManageForUnit(actor, unitKerjaId)) {
+    if (!canTargetUnit(actor, unitKerjaId)) {
       throw new ForbiddenException('Anda hanya dapat mengunggah dokumen untuk unit kerja sendiri');
     }
 
@@ -231,15 +232,15 @@ export class DocumentsService {
   async updateAccess(id: string, input: UpdateDocumentAccessDto, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, ...documentVisibilityWhere(actor) },
-      select: { id: true, categoryId: true, unitKerjaId: true, collection: true },
+      select: { id: true, categoryId: true, unitKerjaId: true, collection: true, uploadedById: true },
     });
     if (!document) throw new NotFoundException('Document not found');
-    if (!canManageForUnit(actor, document.unitKerjaId)) {
-      throw new ForbiddenException('Dokumen ini di luar wewenang unit kerja Anda');
+    if (!canManageDocument(actor, document)) {
+      throw new ForbiddenException('Dokumen ini di luar wewenang Anda');
     }
 
     const nextUnitKerjaId = input.unitKerjaId === undefined ? document.unitKerjaId : input.unitKerjaId;
-    if (!canManageForUnit(actor, nextUnitKerjaId)) {
+    if (!canTargetUnit(actor, nextUnitKerjaId)) {
       throw new ForbiddenException('Anda hanya dapat menandai dokumen untuk unit kerja sendiri');
     }
     if (nextUnitKerjaId && nextUnitKerjaId !== document.unitKerjaId) {
@@ -350,9 +351,9 @@ export class DocumentsService {
   }
 
   async update(id: string, input: UpdateDocumentDto, actor: AuthenticatedUser) {
-    const document = await this.prisma.document.findFirst({ where: { id, ...documentVisibilityWhere(actor) }, select: { id: true, unitKerjaId: true } });
+    const document = await this.prisma.document.findFirst({ where: { id, ...documentVisibilityWhere(actor) }, select: { id: true, unitKerjaId: true, uploadedById: true } });
     if (!document) throw new NotFoundException('Document not found');
-    if (!canManageForUnit(actor, document.unitKerjaId)) throw new ForbiddenException('Insufficient permissions');
+    if (!canManageDocument(actor, document)) throw new ForbiddenException('Insufficient permissions');
     if (input.title === undefined && input.collection === undefined) throw new BadRequestException('No fields supplied');
     const category = input.collection === undefined ? null : await this.prisma.documentCategory.findFirst({ where: { workspaceId: actor.workspaceId, key: categoryKey(input.collection) }, select: { id: true, name: true } });
     if (input.collection !== undefined && !category) throw new BadRequestException('Category not found in this workspace');
@@ -473,11 +474,11 @@ export class DocumentsService {
   async remove(id: string, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, ...documentVisibilityWhere(actor) },
-      select: { id: true, unitKerjaId: true },
+      select: { id: true, unitKerjaId: true, uploadedById: true },
     });
     if (!document) throw new NotFoundException('Document not found');
-    if (!canManageForUnit(actor, document.unitKerjaId)) {
-      throw new ForbiddenException('Dokumen ini di luar wewenang unit kerja Anda');
+    if (!canManageDocument(actor, document)) {
+      throw new ForbiddenException('Dokumen ini di luar wewenang Anda');
     }
 
     const deletedAt = new Date();

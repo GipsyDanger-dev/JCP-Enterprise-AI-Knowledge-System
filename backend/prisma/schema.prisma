@@ -380,6 +380,13 @@ model Jabatan {
   canManageAnnouncements     Boolean   @default(false) @map("can_manage_announcements")
   /// Boleh melihat siapa saja yang sudah dan belum membaca pengumuman.
   canViewAnnouncementReaders Boolean   @default(false) @map("can_view_announcement_readers")
+  /// Boleh mengunggah dokumen untuk unit kerjanya sendiri, lalu mengubah dan
+  /// menghapus apa yang ia unggah. TIDAK memberi kuasa atas dokumen unggahan
+  /// orang lain — itu wewenang ADMIN_UNIT. Tanpa unit kerja, izin ini tidak
+  /// berlaku sama sekali: dokumen tanpa penanda unit terbuka untuk seluruh
+  /// pegawai, dan menerbitkan yang seperti itu adalah keputusan tingkat
+  /// organisasi.
+  canUploadDocuments         Boolean   @default(false) @map("can_upload_documents")
   // Menonaktifkan, bukan menghapus: jabatan yang masih dipakai pegawai tidak
   // boleh hilang begitu saja, karena wewenangnya ikut hilang diam-diam.
   isActive                   Boolean   @default(true) @map("is_active")

@@ -25,6 +25,7 @@ export async function seedJabatanDanRoleLabel(db: Db, workspaceId: string): Prom
         name: jabatan.name,
         sortOrder: index + 1,
         canManageAnnouncements: jabatan.canManageAnnouncements ?? false,
+        canUploadDocuments: jabatan.canUploadDocuments ?? false,
         canViewAnnouncementReaders: jabatan.canViewAnnouncementReaders ?? false,
       },
     });

@@ -54,6 +54,11 @@ export class CreateJabatanDto {
   @IsBoolean()
   canViewAnnouncementReaders?: boolean;
 
+  @ApiPropertyOptional({ description: 'Boleh mengunggah dokumen untuk unit kerjanya sendiri, dan membereskan unggahannya sendiri.' })
+  @IsOptional()
+  @IsBoolean()
+  canUploadDocuments?: boolean;
+
   @ApiPropertyOptional({ description: 'Urutan tampil di dropdown.' })
   @IsOptional()
   @IsInt()
@@ -82,6 +87,11 @@ export class UpdateJabatanDto {
   @IsOptional()
   @IsBoolean()
   canViewAnnouncementReaders?: boolean;
+
+  @ApiPropertyOptional({ description: 'Boleh mengunggah dokumen untuk unit kerjanya sendiri, dan membereskan unggahannya sendiri.' })
+  @IsOptional()
+  @IsBoolean()
+  canUploadDocuments?: boolean;
 
   @ApiPropertyOptional({ description: 'Urutan tampil di dropdown.' })
   @IsOptional()
