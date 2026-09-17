@@ -85,4 +85,20 @@ export class UsersController {
   ) {
     return this.usersService.remove(id, actor);
   }
+
+  // Rute terpisah, bukan sebuah parameter pada DELETE di atas. Menghapus
+  // permanen tidak bisa dibatalkan, jadi memanggilnya harus merupakan keputusan
+  // tersendiri -- bukan sesuatu yang bisa terjadi karena satu tanda benar salah
+  // terkirim ke rute yang sama.
+  @Delete(':id/permanent')
+  @ApiOperation({ summary: 'Permanently delete a user account and its personal data' })
+  @ApiOkResponse({ description: 'User deleted' })
+  @ApiForbiddenResponse({ description: 'Only a SUPER_ADMIN can delete; platform owner cannot be deleted' })
+  @ApiConflictResponse({ description: 'Cannot delete your own account or another super admin' })
+  purge(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.usersService.purge(id, actor);
+  }
 }

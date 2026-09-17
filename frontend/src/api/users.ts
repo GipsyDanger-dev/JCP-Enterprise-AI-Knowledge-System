@@ -24,3 +24,14 @@ export function changePassword(id: string, newPassword: string, token?: string):
 export function deleteUser(id: string, token?: string): Promise<void> {
   return request<void>(`/users/${id}`, { method: 'DELETE', headers: authHeaders(token) })
 }
+
+/**
+ * Hapus akun beserta data pribadinya secara permanen. Tidak bisa dibatalkan.
+ *
+ * Dokumen dan pengumumannya tetap tinggal — keduanya arsip instansi — sedangkan
+ * riwayat percakapannya ikut terhapus. Rutenya sengaja terpisah dari
+ * `deleteUser` supaya memanggilnya selalu merupakan keputusan tersendiri.
+ */
+export function purgeUser(id: string, token?: string): Promise<{ id: string; deleted: boolean }> {
+  return request<{ id: string; deleted: boolean }>(`/users/${id}/permanent`, { method: 'DELETE', headers: authHeaders(token) })
+}

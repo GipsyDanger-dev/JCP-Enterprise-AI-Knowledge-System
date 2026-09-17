@@ -235,6 +235,10 @@ enum AuditAction {
   AUTH_LOGOUT
   USER_CREATED
   USER_UPDATED
+  /// Penghapusan permanen, bukan penonaktifan. Sengaja dibedakan dari
+  /// USER_UPDATED: yang satu mengubah sesuatu, yang satu menghapus akun dan
+  /// tidak bisa dibatalkan.
+  USER_DELETED
   DOCUMENT_UPLOADED
   DOCUMENT_UPDATED
   DOCUMENT_DELETED

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Camera, Check, ChevronDown, Loader2, Pencil, Plus, Search, UserX, X } from 'lucide-react'
+import { Camera, Check, ChevronDown, Loader2, Pencil, Plus, Search, Trash2, UserX, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { errorMessage } from '@/api/client'
-import { changePassword, createUser, deleteUser, getUserReferenceData, listUsers, updateUser } from '@/api/users'
+import { changePassword, createUser, deleteUser, getUserReferenceData, listUsers, purgeUser, updateUser } from '@/api/users'
 import { normalizeRole, userInitials, userRoleLabel } from '@/utils/users'
 import { prepareProfilePhoto } from '@/utils/profilePhoto'
 import { OrganizationManager } from '@/components/OrganizationManager'
@@ -63,6 +63,10 @@ export function UsersPage() {
   const { tanya, dialog: dialogKonfirmasi } = useConfirm()
   const { language } = useWorkspace()
   const isId = language === 'id'
+  // Menonaktifkan boleh dilakukan admin unit juga; menghapus permanen tidak
+  // bisa dibatalkan, jadi hanya pemegang wewenang tertinggi. Backend yang
+  // menegakkannya — ini cuma supaya tombolnya tidak menawarkan yang mustahil.
+  const pelakuSuperAdmin = currentUser ? normalizeRole(currentUser.role) === 'SUPER_ADMIN' : false
   const [users, setUsers] = useState<ApiUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -247,6 +251,30 @@ export function UsersPage() {
     try {
       await deleteUser(user.id, token ?? undefined)
       setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, isActive: false } : u))
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  const handlePurge = async (user: ApiUser) => {
+    const setuju = await tanya({
+      title: isId ? 'Hapus akun permanen' : 'Permanently delete account',
+      body: isId
+        ? <>Akun <strong>{user.displayName}</strong> dihapus beserta seluruh riwayat percakapannya. Dokumen dan pengumuman yang pernah ia unggah tetap tersimpan atas namanya. <strong>Tindakan ini tidak bisa dibatalkan.</strong></>
+        : <>The account <strong>{user.displayName}</strong> and all of its conversation history will be deleted. Documents and announcements it published stay, still under its name. <strong>This cannot be undone.</strong></>,
+      confirmLabel: isId ? 'Hapus permanen' : 'Delete permanently',
+      cancelLabel: isId ? 'Batal' : 'Cancel',
+      tone: 'danger',
+      // Diketik ulang, bukan sekadar diklik: tidak ada tombol urung setelahnya.
+      confirmPhrase: user.username,
+      confirmPhraseLabel: isId
+        ? `Ketik "${user.username}" untuk memastikan`
+        : `Type "${user.username}" to confirm`,
+    })
+    if (!setuju) return
+    try {
+      await purgeUser(user.id, token ?? undefined)
+      setUsers((prev) => prev.filter((u) => u.id !== user.id))
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -445,6 +473,18 @@ export function UsersPage() {
                   : pemilikPlatform
                     ? (isId ? 'Akun pemilik platform tidak bisa dinonaktifkan' : 'The platform owner account cannot be deactivated')
                     : null
+                // Hapus permanen lebih sempit daripada menonaktifkan, dan
+                // alasannya beda-beda. Backend menolak keempatnya; di sini
+                // tombolnya dimatikan supaya alasannya terbaca sebelum diklik.
+                const alasanHapusTerkunci = !pelakuSuperAdmin
+                  ? (isId ? 'Hanya super admin yang bisa menghapus akun' : 'Only a super admin can delete an account')
+                  : diriSendiri
+                    ? (isId ? 'Tidak bisa menghapus akun sendiri' : 'You cannot delete your own account')
+                    : pemilikPlatform
+                      ? (isId ? 'Akun pemilik platform tidak bisa dihapus' : 'The platform owner account cannot be deleted')
+                      : peran === 'SUPER_ADMIN'
+                        ? (isId ? 'Turunkan dulu rolenya sebelum akun super admin bisa dihapus' : 'Lower the role first before a super admin can be deleted')
+                        : null
                 return (
                 <tr key={user.id}>
                   <td>
@@ -483,6 +523,9 @@ export function UsersPage() {
                       </button>
                       <button className="icon-button" disabled={alasanTerkunci !== null} title={alasanTerkunci ?? (isId ? `Nonaktifkan ${user.displayName}` : `Deactivate ${user.displayName}`)} onClick={() => handleDelete(user)}>
                         <UserX size={15} />
+                      </button>
+                      <button className="icon-button" disabled={alasanHapusTerkunci !== null} title={alasanHapusTerkunci ?? (isId ? `Hapus ${user.displayName} permanen` : `Permanently delete ${user.displayName}`)} onClick={() => handlePurge(user)}>
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </td>

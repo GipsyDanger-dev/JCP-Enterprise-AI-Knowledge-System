@@ -249,6 +249,62 @@ export class UsersService {
 
     return { id, isActive: false };
   }
+  /**
+   * Hapus akun beserta jejaknya secara permanen. Tidak bisa dibatalkan.
+   *
+   * Berbeda dari `remove` di atas, yang hanya menonaktifkan dan masih bisa
+   * ditarik kembali. Keduanya sengaja hidup berdampingan: menonaktifkan adalah
+   * jawaban untuk pegawai yang pindah atau pensiun, sedangkan ini untuk akun
+   * yang salah dibuat dan untuk permintaan penghapusan data pribadi.
+   *
+   * Yang tertinggal dan yang ikut hilang ditentukan di tingkat database:
+   * dokumen dan pengumuman dilepas dengan SET NULL karena keduanya catatan
+   * milik instansi, sementara riwayat percakapan ikut terhapus karena itu data
+   * pribadi pemiliknya. Jejak auditnya utuh, dan tetap menyebut namanya.
+   */
+  async purge(id: string, actor: AuthenticatedUser) {
+    await this.assertOrganizationAdmin(actor);
+    // Lebih sempit daripada menonaktifkan: yang itu boleh dilakukan admin unit,
+    // yang ini tidak bisa dibatalkan, jadi dibatasi pemegang wewenang tertinggi.
+    // isAdminRole, bukan perbandingan dengan SUPER_ADMIN saja: role warisan
+    // ADMIN adalah super admin yang sama wewenangnya, dan normalizeRole di
+    // frontend memang menyamakan keduanya. Membandingkan satu nilai saja
+    // membuat tombolnya muncul untuk akun ADMIN lalu ditolak saat diklik.
+    if (!isAdminRole(actor.role)) {
+      throw new ForbiddenException('Only a super admin can permanently delete an account');
+    }
+    const user = await this.prisma.user.findFirst({
+      where: { id, workspaceId: actor.workspaceId, accountType: AccountType.COMPANY },
+      select: { id: true, username: true, displayName: true, role: true, isPlatformOwner: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.isPlatformOwner) throw new ForbiddenException('Cannot delete the platform owner');
+    if (id === actor.sub) throw new ConflictException('Cannot delete your own account');
+    // Super admin adalah pelaku di hampir seluruh jejak organisasinya — ia yang
+    // membuat tiap akun dan mengubah tiap wewenang. Menghapusnya membuat riwayat
+    // itu hanya bernama tanpa akun yang bisa ditelusuri. Kalau memang harus
+    // dihapus, turunkan dulu rolenya: dua langkah, dua baris audit.
+    if (isAdminRole(user.role)) {
+      throw new ConflictException('A super admin cannot be deleted; lower the role first');
+    }
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.user.delete({ where: { id } });
+      // Dicatat setelah barisnya hilang, dan sengaja membawa nama serta username
+      // di metadata: targetId menunjuk ke akun yang sudah tidak ada, jadi tanpa
+      // ini jejaknya tidak bisa menyebut siapa yang dihapus.
+      await this.auditLogs.record(transaction, {
+        ...pelakuAktor(actor),
+        action: AuditAction.USER_DELETED,
+        targetType: 'USER',
+        targetId: id,
+        metadata: { username: user.username, displayName: user.displayName, role: user.role },
+      });
+    });
+
+    return { id, deleted: true };
+  }
+
   private async assertOrganizationAdmin(actor: AuthenticatedUser, unitId?: string | null) {
     if (!actor.isAdmin || actor.accountType !== AccountType.COMPANY) throw new ForbiddenException('Organization admin required');
     if (unitId && !await this.prisma.unitKerja.findFirst({ where: { id: unitId, workspaceId: actor.workspaceId, isActive: true }, select: { id: true } })) {

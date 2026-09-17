@@ -1329,6 +1329,9 @@ button { cursor: pointer; }
 /* ============ Activity log ============ */
 .activity-log-list { display: grid; gap: 4px; }
 .activity-log-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.confirm-phrase { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.confirm-phrase span { font-size: 0.85rem; color: var(--text-dim); }
+.confirm-phrase input { padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); color: inherit; font-family: inherit; }
 .activity-deleted-actor { font-style: normal; font-size: 0.85em; color: var(--text-dim); }
 .activity-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
 .activity-dot.upload { background: var(--brand-600); }

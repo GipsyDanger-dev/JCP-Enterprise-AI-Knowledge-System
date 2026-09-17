@@ -16,6 +16,14 @@ export interface ConfirmRequest {
   cancelLabel: string
   /** 'danger' untuk tindakan yang mencabut sesuatu; selain itu tombol biasa. */
   tone?: 'danger' | 'primary'
+  /**
+   * Kalau diisi, tombol aksinya baru hidup setelah teks ini diketik ulang
+   * persis. Dipakai untuk yang tidak bisa dibatalkan: satu klik terlalu murah
+   * untuk tindakan yang tidak punya tombol urung.
+   */
+  confirmPhrase?: string
+  /** Label di atas kotak ketiknya, mis. "Ketik nama akunnya untuk memastikan". */
+  confirmPhraseLabel?: string
 }
 
 /**
@@ -55,6 +63,10 @@ export function useConfirm() {
 
 function ConfirmDialog({ request, onAnswer }: { request: ConfirmRequest; onAnswer: (setuju: boolean) => void }) {
   const titleId = useId()
+  const phraseId = useId()
+  const [ketikan, setKetikan] = useState('')
+  // Tanpa frasa, tombolnya hidup seperti biasa.
+  const bolehLanjut = !request.confirmPhrase || ketikan.trim() === request.confirmPhrase
 
   // Esc membatalkan, seperti dialog bawaan peramban yang digantikan.
   useEffect(() => {
@@ -82,6 +94,20 @@ function ConfirmDialog({ request, onAnswer }: { request: ConfirmRequest; onAnswe
         </div>
         <div className="modal-body">
           <p className="modal-copy">{request.body}</p>
+          {request.confirmPhrase && (
+            <label className="confirm-phrase" htmlFor={phraseId}>
+              <span>{request.confirmPhraseLabel ?? request.confirmPhrase}</span>
+              <input
+                id={phraseId}
+                type="text"
+                value={ketikan}
+                autoFocus
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(event) => setKetikan(event.target.value)}
+              />
+            </label>
+          )}
         </div>
         <div className="modal-actions">
           <button type="button" className="secondary-button" onClick={() => onAnswer(false)}>
@@ -91,7 +117,8 @@ function ConfirmDialog({ request, onAnswer }: { request: ConfirmRequest; onAnswe
             <button
               type="button"
               className={request.tone === 'primary' ? 'primary-button' : 'danger-button'}
-              autoFocus
+              autoFocus={!request.confirmPhrase}
+              disabled={!bolehLanjut}
               onClick={() => onAnswer(true)}
             >
               {request.confirmLabel}
