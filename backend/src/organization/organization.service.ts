@@ -288,7 +288,7 @@ export class OrganizationService {
       `Unit kerja "${unit.name}" belum bisa dihapus: ${penghalang.join(', ')}. ` +
       (terhapus > 0
         ? 'Penanda pada dokumen yang sudah dihapus tidak bisa dilepas dari antarmuka, jadi unit ini hanya bisa dinonaktifkan agar tidak muncul lagi di pilihan.'
-        : 'Kosongkan dulu isinya — pindahkan penggunanya lewat tab Orang & akses, dan lepas penanda unitnya lewat Dokumen → Atur akses — atau nonaktifkan saja unit ini agar tidak muncul lagi di pilihan.'),
+        : 'Kosongkan dulu isinya — pindahkan penggunanya lewat tab Pengguna, dan lepas penanda unitnya lewat Dokumen → Atur akses — atau nonaktifkan saja unit ini agar tidak muncul lagi di pilihan.'),
     );
   }
 
@@ -372,7 +372,7 @@ export class OrganizationService {
       if (pemegang > 0) {
         throw new ConflictException(
           `Jabatan "${jabatan.name}" masih dipegang ${pemegang} akun aktif. ` +
-          'Lepas dulu jabatan itu dari pemegangnya lewat tab Orang & akses — atau nonaktifkan/hapus akunnya — ' +
+          'Lepas dulu jabatan itu dari pemegangnya lewat tab Pengguna — atau nonaktifkan/hapus akunnya — ' +
           'atau nonaktifkan saja jabatan ini agar tidak muncul lagi di pilihan.',
         );
       }

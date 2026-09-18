@@ -147,8 +147,8 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
       const setuju = await tanya({
         title: isId ? 'Nonaktifkan unit kerja' : 'Deactivate work unit',
         body: isId
-          ? <><strong>{unit.name}</strong> tidak akan muncul lagi saat memilih unit untuk akun atau dokumen baru. {unit.userCount} akun yang sudah terdaftar di sini <strong>tetap punya akses yang sama</strong> — untuk memindahkan mereka, pakai tab Orang &amp; akses.</>
-          : <><strong>{unit.name}</strong> will no longer appear when choosing a unit for new accounts or documents. The {unit.userCount} {unit.userCount === 1 ? 'account' : 'accounts'} already in it <strong>{unit.userCount === 1 ? 'keeps' : 'keep'} the same access</strong> — to move {unit.userCount === 1 ? 'it' : 'them'}, use the People &amp; access tab.</>,
+          ? <><strong>{unit.name}</strong> tidak akan muncul lagi saat memilih unit untuk akun atau dokumen baru. {unit.userCount} akun yang sudah terdaftar di sini <strong>tetap punya akses yang sama</strong> — untuk memindahkan mereka, pakai tab Pengguna.</>
+          : <><strong>{unit.name}</strong> will no longer appear when choosing a unit for new accounts or documents. The {unit.userCount} {unit.userCount === 1 ? 'account' : 'accounts'} already in it <strong>{unit.userCount === 1 ? 'keeps' : 'keep'} the same access</strong> — to move {unit.userCount === 1 ? 'it' : 'them'}, use the Users tab.</>,
         confirmLabel: isId ? 'Nonaktifkan' : 'Deactivate',
         cancelLabel: isId ? 'Batal' : 'Cancel',
         tone: 'primary',
@@ -200,10 +200,10 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
         body: isId
           ? <><strong>{unit.name}</strong> masih dipakai — {penghalang.join(', ')}. {buntu
               ? 'Penanda pada dokumen yang sudah dihapus tidak bisa dilepas dari antarmuka, jadi unit ini hanya bisa dinonaktifkan agar tidak muncul lagi di pilihan.'
-              : 'Kosongkan dulu isinya: pindahkan penggunanya lewat tab Orang & akses, lalu lepas penanda unitnya lewat Dokumen → Atur akses.'}</>
+              : 'Kosongkan dulu isinya: pindahkan penggunanya lewat tab Pengguna, lalu lepas penanda unitnya lewat Dokumen → Atur akses.'}</>
           : <><strong>{unit.name}</strong> is still in use — {penghalang.join(', ')}. {buntu
               ? 'Tags on deleted documents cannot be cleared from any screen, so this unit can only be deactivated to hide it from the pickers.'
-              : 'Empty it first: move its users from the People & access tab, then clear the unit tag under Documents → Document access.'}</>,
+              : 'Empty it first: move its users from the Users tab, then clear the unit tag under Documents → Document access.'}</>,
         confirmLabel: bisaDinonaktifkan ? (isId ? 'Nonaktifkan saja' : 'Deactivate instead') : undefined,
         cancelLabel: isId ? 'Tutup' : 'Close',
         tone: 'primary',
@@ -461,8 +461,8 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
       const setuju = await tanya({
         title: isId ? 'Belum bisa dihapus' : 'Cannot be deleted yet',
         body: isId
-          ? <><strong>{jabatan.name}</strong> masih dipegang {jabatan.userCount} akun aktif, dan wewenangnya ikut hilang kalau jabatan ini dihapus. Lepas dulu jabatannya lewat tab Orang & akses — atau nonaktifkan/hapus akun pemegangnya — baru jabatan ini bisa dihapus permanen.</>
-          : <><strong>{jabatan.name}</strong> is still held by {jabatan.userCount} active accounts, and deleting it would strip their permissions. Clear the job title from them under the People & access tab — or deactivate/delete those accounts — before this can be deleted for good.</>,
+          ? <><strong>{jabatan.name}</strong> masih dipegang {jabatan.userCount} akun aktif, dan wewenangnya ikut hilang kalau jabatan ini dihapus. Lepas dulu jabatannya lewat tab Pengguna — atau nonaktifkan/hapus akun pemegangnya — baru jabatan ini bisa dihapus permanen.</>
+          : <><strong>{jabatan.name}</strong> is still held by {jabatan.userCount} active accounts, and deleting it would strip their permissions. Clear the job title from them under the Users tab — or deactivate/delete those accounts — before this can be deleted for good.</>,
         confirmLabel: bisaDinonaktifkan ? (isId ? 'Nonaktifkan saja' : 'Deactivate instead') : undefined,
         cancelLabel: isId ? 'Tutup' : 'Close',
         tone: 'primary',
