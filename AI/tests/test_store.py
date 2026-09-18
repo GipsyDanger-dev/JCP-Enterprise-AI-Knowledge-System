@@ -275,6 +275,25 @@ class PgVectorStoreTests(unittest.TestCase):
         self.assertTrue(result["grounded"])
         self.assertEqual(result["citations"][0]["document_version_id"], "version-1")
 
+    def test_ask_reuses_inventory_for_llm_prompt(self):
+        chunk = {
+            "chunk_id": "chunk-1", "document_id": "doc-1",
+            "document_version_id": "version-1", "filename": "sop.txt",
+            "version": 1, "page_number": 1, "section_title": "SOP",
+            "text": "Biaya hotel maksimal Rp900.000.",
+        }
+        scope = AccessScope.unrestricted()
+        inventory = [{"filename": "sop.txt", "title": "SOP", "chunks": 1}]
+        with patch_deps(), mock.patch("store.EMBEDDINGS_ENABLED", True):
+            db = PgVectorStore("postgresql://u:p@h/db")
+            with mock.patch.object(db, "document_metadata", return_value=inventory) as metadata, \
+                 mock.patch("store.embed_texts", return_value=[[1.0, 0.0]]), \
+                 mock.patch.object(PgVectorStore, "search", return_value=[(0.71, chunk)]), \
+                 mock.patch("store.generate_answer", return_value=chunk["text"]):
+                result = db.ask("biaya hotel", use_llm=True, scope=scope)
+        metadata.assert_called_once_with(scope=scope)
+        self.assertTrue(result["grounded"])
+
     def test_ask_without_embeddings_uses_tfidf_and_keeps_personal_scope(self):
         expected = {"answer": "hasil", "grounded": True, "citations": []}
         with patch_deps(), mock.patch("store.EMBEDDINGS_ENABLED", False):

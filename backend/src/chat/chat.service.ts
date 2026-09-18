@@ -83,11 +83,13 @@ export class ChatService {
   ) {
     const conversation = await this.resolveConversation(question, actor, conversationId);
     const isFollowUp = isFollowUpQuestion(question);
-    const contextChunkIds = isFollowUp ? await this.getContextChunkIds(conversation.id) : [];
-    const conversationTopic = isFollowUp
-      ? await this.getConversationTopic(conversation.id)
-      : undefined;
-    const access = await this.accessScope(actor);
+    // These reads do not depend on each other. Run them together so the chat
+    // request does not wait for three database round trips in sequence.
+    const [contextChunkIds, conversationTopic, access] = await Promise.all([
+      isFollowUp ? this.getContextChunkIds(conversation.id) : Promise.resolve([]),
+      isFollowUp ? this.getConversationTopic(conversation.id) : Promise.resolve(undefined),
+      this.accessScope(actor),
+    ]);
 
     await this.prisma.message.create({
       data: {

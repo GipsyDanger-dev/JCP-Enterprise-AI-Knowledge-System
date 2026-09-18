@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.request
 from typing import Any
 
@@ -108,10 +109,12 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
     # Tanpa ini sama sekali, satu 429/503 sesaat dari provider langsung menjadi
     # kegagalan yang dilihat pengguna, padahal panggilan berikutnya biasanya
     # berhasil.
+    started = time.perf_counter()
     body = read_with_retry(
         request, operation="chat", timeout=CHAT_TIMEOUT,
         max_attempts=CHAT_MAX_ATTEMPTS, retry_budget=CHAT_RETRY_BUDGET,
     )
+    print(f"[AI] chat completion completed in {(time.perf_counter() - started) * 1000:.0f}ms")
 
     failure = None
     content = ""

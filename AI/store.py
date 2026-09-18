@@ -15,6 +15,7 @@ removes its chunks when that version is deleted.
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -491,7 +492,8 @@ class PgVectorStore:
                              filters: dict[str, Any] | None = None,
                              *, scope: AccessScope,
                              workspace_type: str = "COMPANY",
-                             lexical_query: str | None = None) -> dict[str, Any]:
+                             lexical_query: str | None = None,
+                             documents: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """Turn retrieved chunks into the answer payload.
 
         Deliberately left outside the retrieval ``try`` blocks: a ProviderError
@@ -499,12 +501,18 @@ class PgVectorStore:
         is not in the documents". It must reach http_api so the user is told the
         AI service is unavailable instead of being wrongly told nothing matched.
         """
+        # The named-document check in ``ask`` already loaded this inventory for
+        # the common path. Reuse that exact, access-filtered snapshot in the
+        # prompt instead of issuing the same metadata query a second time.
+        document_inventory = documents if documents is not None else (
+            self.document_metadata(scope=scope) if use_llm else None
+        )
         answer = (
             generate_answer(
                 query, matches, model=model, api_key=api_key,
                 # Sifat berkas (halaman, ukuran, tanggal) tidak ada di dalam
                 # teks dokumen, jadi ikut dikirim sebagai konteks.
-                documents=self.document_metadata(scope=scope),
+                documents=document_inventory,
                 allow_clarify=allow_clarify,
                 workspace_type=workspace_type,
             )
@@ -651,14 +659,16 @@ class PgVectorStore:
         #
         # Hanya berlaku bila pemanggil tidak menyaring sendiri: penyaring yang
         # datang dari permintaan adalah keputusan yang lebih tahu konteks.
+        started = time.perf_counter()
+        documents: list[dict[str, Any]] | None = None
         if filters is None:
             # Pertanyaan mentah diperiksa lebih dulu; label topik percakapan
             # baru dipakai bila pertanyaannya sendiri tidak menyebut nama apa
             # pun — sebutan eksplisit harus selalu mengalahkan sisa konteks.
-            inventory = self.document_metadata(scope=scope)
-            target = find_named_document(lexical_query or query, inventory)
+            documents = self.document_metadata(scope=scope)
+            target = find_named_document(lexical_query or query, documents)
             if target is None and lexical_query:
-                target = find_named_document(query, inventory)
+                target = find_named_document(query, documents)
             if target is not None:
                 filters = {"filename": target["filename"]}
                 # Dokumennya sudah pasti, jadi kemiripan tidak lagi layak
@@ -682,16 +692,20 @@ class PgVectorStore:
             # ada pengguna yang sedang menunggu jawaban, jadi satu ulangan cepat
             # sudah cukup untuk menyelamatkan blip sesaat tanpa membuatnya
             # menatap layar kosong.
+            embedding_started = time.perf_counter()
             query_vector = embed_texts(
                 [query], model=self.model, api_key=api_key,
                 max_attempts=2, timeout=QUERY_EMBED_TIMEOUT,
                 retry_budget=QUERY_EMBED_RETRY_BUDGET,
             )[0]
+            embedding_ms = (time.perf_counter() - embedding_started) * 1000
+            search_started = time.perf_counter()
             retrieved_matches = [
                 (score, chunk)
                 for score, chunk in self.search(query_vector, top_k, filters=filters, scope=scope)
                 if score >= minimum_score
             ]
+            search_ms = (time.perf_counter() - search_started) * 1000
             seen = {chunk["chunk_id"] for _, chunk in context_matches}
             matches = context_matches + [
                 match for match in retrieved_matches if match[1]["chunk_id"] not in seen
@@ -709,12 +723,20 @@ class PgVectorStore:
             # menilainya sendiri lewat `clarify_quota_met`, memakai ukuran yang
             # sama dengan jalur vektor.
             return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters, context_chunk_ids=context_chunk_ids, workspace_type=workspace_type, scope=scope, lexical_query=lexical_query)
-        return self._answer_from_matches(
+        answer_started = time.perf_counter()
+        result = self._answer_from_matches(
             query, matches, use_llm=use_llm, model=model, api_key=api_key,
             allow_clarify=allow_clarify and clarify_quota_met(retrieved_matches, top_k),
             filters=filters, workspace_type=workspace_type, scope=scope,
-            lexical_query=lexical_query,
+            lexical_query=lexical_query, documents=documents,
         )
+        print(
+            "[AI] ask timing "
+            f"embedding={embedding_ms:.0f}ms search={search_ms:.0f}ms "
+            f"answer={((time.perf_counter() - answer_started) * 1000):.0f}ms "
+            f"total={((time.perf_counter() - started) * 1000):.0f}ms"
+        )
+        return result
 
 
 def ingest_file_to_pg(
