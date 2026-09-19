@@ -195,7 +195,9 @@ export class UsersService {
         : { disconnect: true };
     }
     if (input.isAdmin !== undefined) data.isAdmin = input.isAdmin;
-    if (input.photoUrl !== undefined) data.photoUrl = input.photoUrl;
+    // null maupun string kosong sama-sama berarti "hapus fotonya", supaya
+    // kolomnya tidak pernah menyimpan foto kosong yang tetap dianggap ada.
+    if (input.photoUrl !== undefined) data.photoUrl = input.photoUrl || null;
 
     return this.prisma.$transaction(async (transaction) => {
       const updated = await transaction.user.update({

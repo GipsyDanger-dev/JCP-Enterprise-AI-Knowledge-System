@@ -347,7 +347,9 @@ export function UsersPage() {
         role: editRole,
         unitKerjaId: editUnitKerjaId || undefined,
         isAdmin: editRole === 'SUPER_ADMIN',
-        photoUrl: editPhoto || undefined,
+        // null berarti "hapus fotonya". Dengan undefined, tombol hapus foto
+        // tidak pernah sampai ke server: kolomnya cuma dilewati apa adanya.
+        photoUrl: editPhoto || null,
       }, token ?? undefined)
       setUsers((prev) => prev.map((u) => u.id === updated.id ? updated : u))
       if (editPassword.trim()) {

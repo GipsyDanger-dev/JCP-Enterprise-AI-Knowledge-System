@@ -47,11 +47,16 @@ export class UpdateUserDto {
   @IsOptional()
   isAdmin?: boolean;
 
-  @ApiPropertyOptional({ example: 'https://example.com/photo.jpg', maxLength: 220000 })
+  @ApiPropertyOptional({
+    example: 'https://example.com/photo.jpg',
+    maxLength: 220000,
+    nullable: true,
+    description: 'Kirim null atau string kosong untuk menghapus foto profilnya.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(220000)
-  photoUrl?: string;
+  photoUrl?: string | null;
 
   @ApiPropertyOptional({
     description: 'Baris jabatan penentu wewenang pengumuman dan bacaan wajib. Bila diisi, jobTitle diambil dari namanya.',

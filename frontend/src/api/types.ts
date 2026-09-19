@@ -182,7 +182,8 @@ export interface UpdateUserRequest {
   role?: ApiRole
   unitKerjaId?: string
   isAdmin?: boolean
-  photoUrl?: string
+  /** null menghapus foto profilnya. */
+  photoUrl?: string | null
 }
 
 export type ApiDocumentStatus =
