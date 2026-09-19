@@ -23,6 +23,13 @@ def citation_from_chunk(chunk: dict[str, Any]) -> dict[str, Any]:
         citation["excerpt"] = text[:2400]
     if "document_version_id" in chunk:
         citation["document_version_id"] = chunk["document_version_id"]
+    # Status keberlakuan ikut supaya antarmuka bisa memberi peringatan pada
+    # kartu buktinya. Backend tetap membacanya ulang dari databasenya sendiri
+    # sebelum dikirim ke klien -- nilai di sini hanya pantulan saat retrieval,
+    # dan status bisa berubah sesudah jawabannya tersimpan.
+    legal_status = str(chunk.get("legal_status") or "").strip()
+    if legal_status:
+        citation["legal_status"] = legal_status
     # Judul ikut supaya kartu bukti menyebut nama yang sama dengan daftar
     # dokumen. `filename` tetap dikirim sebagai identitas teknisnya.
     title = str(chunk.get("title") or "").strip()

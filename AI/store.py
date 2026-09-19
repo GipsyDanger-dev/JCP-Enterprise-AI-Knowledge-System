@@ -413,7 +413,8 @@ class PgVectorStore:
         sql = f"""
             SELECT c.chunk_id, d.id, dv.id, dv.original_filename,
                    dv.version_number, c.page_number, c.section_title, c.text,
-                   1 - (c.embedding <=> %s::vector) AS score, d.title
+                   1 - (c.embedding <=> %s::vector) AS score, d.title,
+                   d.legal_status
             FROM chunks AS c
             JOIN document_versions AS dv ON dv.id = c.document_version_id
             JOIN documents AS d ON d.id = dv.document_id
@@ -445,6 +446,10 @@ class PgVectorStore:
                 "page_number": row[5],
                 "section_title": row[6] or "",
                 "text": row[7],
+                # Status keberlakuan ikut sampai ke sitasi: peraturan yang sudah
+                # dicabut tetap boleh dikutip, tetapi tidak boleh terbaca
+                # seolah-olah masih berlaku.
+                "legal_status": row[10],
             }
             results.append((float(row[8]), chunk))
         return results
@@ -461,7 +466,8 @@ class PgVectorStore:
         access_conditions, access_params = scope.conditions()
         sql = f"""
             SELECT c.chunk_id, d.id, dv.id, dv.original_filename,
-                   dv.version_number, c.page_number, c.section_title, c.text, d.title
+                   dv.version_number, c.page_number, c.section_title, c.text, d.title,
+                   d.legal_status
             FROM chunks AS c
             JOIN document_versions AS dv ON dv.id = c.document_version_id
             JOIN documents AS d ON d.id = dv.document_id
@@ -481,6 +487,7 @@ class PgVectorStore:
                 "page_number": row[5],
                 "section_title": row[6] or "",
                 "text": row[7],
+                "legal_status": row[9],
             }
             for row in rows
         }
@@ -604,7 +611,8 @@ class PgVectorStore:
                         document_params.append(f"%{filename}%")
                     cur.execute(
                         "SELECT c.chunk_id, c.document_version_id, d.id, dv.original_filename, "
-                        "dv.version_number, c.page_number, c.section_title, c.text, d.title "
+                        "dv.version_number, c.page_number, c.section_title, c.text, d.title, "
+                        "d.legal_status "
                         "FROM chunks c "
                         "JOIN document_versions dv ON dv.id = c.document_version_id "
                         "JOIN documents d ON d.id = dv.document_id "
@@ -621,7 +629,7 @@ class PgVectorStore:
                     "document_id": str(row[2]),
                     "filename": row[3], "title": row[8], "version": row[4],
                     "page_number": row[5], "section_title": row[6] or "",
-                    "text": row[7],
+                    "text": row[7], "legal_status": row[9],
                 })
             tfidf = TfidfRetriever(chunks)
             search_query = lexical_query or query

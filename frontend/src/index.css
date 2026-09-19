@@ -1131,6 +1131,59 @@ button { cursor: pointer; }
    penanda terbuka untuk semua pegawai, jadi sengaja tidak diberi label apa pun
    — hanya yang dibatasi yang perlu menjelaskan dirinya. */
 /*
+ * Peringatan bahwa jawaban bersandar pada peraturan yang sudah diubah atau
+ * dicabut. Diletakkan di atas jawabannya, bukan di bawah: peringatan yang baru
+ * terbaca setelah orang selesai mempercayai jawabannya sudah terlambat.
+ *
+ * Memakai token --warning, yang punya nilai sendiri di tema gelap.
+ */
+.legal-status-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--warning);
+  border-radius: 10px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: 13px;
+}
+
+.legal-status-notice strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.legal-status-notice ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.legal-status-notice li + li {
+  margin-top: 2px;
+}
+
+/* Penanda di kartu bukti: menunjukkan kutipan MANA yang statusnya bermasalah,
+   karena satu jawaban bisa mencampur sumber yang berlaku dan yang dicabut. */
+.source-legal-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--warning);
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: 10px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.source-legal-badge.dicabut {
+  text-decoration: line-through;
+}
+
+/*
  * Penanda status keberlakuan, satu kolom tersendiri di daftar dokumen.
  *
  * Ditampilkan untuk SEMUA dokumen, termasuk yang berlaku: pertanyaannya adalah

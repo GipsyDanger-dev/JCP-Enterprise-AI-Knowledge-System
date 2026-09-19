@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { MessageRole } from '@prisma/client';
+import { LegalStatus, MessageRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { aiServiceHeaders, aiServiceUrl } from '../config/env.util';
@@ -60,6 +60,15 @@ export interface ChatCitation {
   sectionTitle: string | null;
   chunkId: string;
   excerpt?: string;
+  /**
+   * Status keberlakuan dokumen sumbernya SAAT INI, bukan saat jawaban dibuat.
+   *
+   * Dibaca ulang dari database backend tiap kali sitasi dikirim — juga untuk
+   * riwayat lama. Peraturan yang dicabut bulan depan membuat jawaban bulan lalu
+   * ikut menyesatkan, jadi menyimpan statusnya sebagai potret akan salah persis
+   * pada kasus yang paling perlu diperingatkan.
+   */
+  legalStatus: LegalStatus;
 }
 
 const QUICK_SUGGESTIONS = [
@@ -129,8 +138,7 @@ export class ChatService {
       }
 
       const result = (await response.json()) as AiAskResult;
-      const citations = this.toClientCitations(result.citations ?? []);
-      await this.assertCitationsAccessible(citations, actor);
+      const citations = await this.verifiedCitations(result.citations ?? [], actor);
       await this.persistAssistantMessage(conversation.id, result.answer, citations);
 
       return {
@@ -187,15 +195,33 @@ export class ChatService {
     };
   }
 
-  private async assertCitationsAccessible(citations: ChatCitation[], actor: AuthenticatedUser) {
-    if (!citations.length) return;
+  /**
+   * Sitasi dari AI yang sudah dipastikan boleh dilihat aktor, beserta status
+   * keberlakuan dokumennya.
+   *
+   * Statusnya dibaca dari database backend, bukan diambil dari balasan AI:
+   * kolomnya milik Prisma, dan satu-satunya nilai yang benar adalah yang ada di
+   * sini saat sitasinya dikirim. Sekalian: pemeriksaan akses memang sudah
+   * menanyakan baris yang sama, jadi tidak ada query tambahan.
+   */
+  private async verifiedCitations(raw: AiCitation[], actor: AuthenticatedUser): Promise<ChatCitation[]> {
+    const citations = this.toClientCitations(raw);
+    if (!citations.length) return citations;
     const chunks = await this.prisma.documentChunk.findMany({
       where: { chunkId: { in: citations.map((item) => item.chunkId) }, documentVersion: { document: documentVisibilityWhere(actor) } },
-      select: { chunkId: true, documentVersionId: true, documentVersion: { select: { documentId: true } } },
+      select: {
+        chunkId: true,
+        documentVersionId: true,
+        documentVersion: { select: { documentId: true, document: { select: { legalStatus: true } } } },
+      },
     });
-    if (citations.some((item) => !chunks.some((chunk) => chunk.chunkId === item.chunkId && chunk.documentVersionId === item.documentVersionId && chunk.documentVersion.documentId === item.documentId))) {
-      throw new Error('AI citation is outside the permitted documents');
-    }
+    return citations.map((item) => {
+      const chunk = chunks.find((row) => row.chunkId === item.chunkId
+        && row.documentVersionId === item.documentVersionId
+        && row.documentVersion.documentId === item.documentId);
+      if (!chunk) throw new Error('AI citation is outside the permitted documents');
+      return { ...item, legalStatus: chunk.documentVersion.document.legalStatus };
+    });
   }
 
   private async resolveConversation(
@@ -255,6 +281,11 @@ export class ChatService {
       .slice(0, 400);
   }
 
+  /**
+   * Bentuk mentah dari AI service menjadi bentuk klien. `legalStatus` diisi
+   * sementara dengan BERLAKU dan ditimpa verifiedCitations dari database —
+   * tidak ada jalur lain yang mengirim sitasi ke klien tanpa melewati sana.
+   */
   private toClientCitations(citations: AiCitation[]): ChatCitation[] {
     return citations.map((citation) => ({
       documentId: citation.document_id,
@@ -266,6 +297,7 @@ export class ChatService {
       sectionTitle: citation.section_title ?? null,
       chunkId: citation.chunk_id,
       excerpt: citation.excerpt,
+      legalStatus: LegalStatus.BERLAKU,
     }));
   }
 

@@ -110,7 +110,7 @@ class PgVectorStoreTests(unittest.TestCase):
     def test_search_returns_scored_chunks(self):
         row = (
             "chunk-1", "doc-1", "version-1", "sop.txt", 1,
-            1, "SOP", "Biaya hotel.", 0.71, "SOP Perjalanan Dinas",
+            1, "SOP", "Biaya hotel.", 0.71, "SOP Perjalanan Dinas", "DICABUT",
         )
         with patch_deps(cursor=FakeCursor(rows=[row])):
             db = PgVectorStore("postgresql://u:p@h/db")
@@ -126,6 +126,9 @@ class PgVectorStoreTests(unittest.TestCase):
         # dilihat pengguna, dan keduanya berpisah setelah dokumen diganti nama.
         self.assertEqual(chunk["title"], "SOP Perjalanan Dinas")
         self.assertEqual(chunk["section_title"], "SOP")
+        # Status keberlakuan ikut sampai ke chunk: peraturan yang sudah dicabut
+        # tetap dikutip, tetapi jawabannya harus menyebutkan statusnya.
+        self.assertEqual(chunk["legal_status"], "DICABUT")
 
     # ---------- batas akses ----------
 

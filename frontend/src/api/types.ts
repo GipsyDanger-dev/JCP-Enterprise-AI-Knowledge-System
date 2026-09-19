@@ -291,6 +291,15 @@ export interface Citation {
   sectionTitle: string | null
   chunkId: string
   excerpt?: string
+  /**
+   * Status keberlakuan dokumen sumbernya SAAT INI. Dibaca ulang backend setiap
+   * kali sitasi dikirim, termasuk untuk riwayat lama — jawaban bulan lalu ikut
+   * diberi peringatan kalau peraturannya dicabut minggu ini.
+   *
+   * Opsional: balasan yang tersimpan sebelum kolom ini ada tidak memuatnya.
+   * Yang tidak menyebut status dianggap berlaku.
+   */
+  legalStatus?: ApiLegalStatus
 }
 
 export interface ChatQueryRequest {

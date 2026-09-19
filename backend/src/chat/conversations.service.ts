@@ -94,7 +94,7 @@ export class ConversationsService {
                     id: true,
                     versionNumber: true,
                     originalFilename: true,
-                    document: { select: { id: true, title: true } },
+                    document: { select: { id: true, title: true, legalStatus: true } },
                   },
                 },
               },
@@ -118,6 +118,10 @@ export class ConversationsService {
           // sudah diganti nama tidak muncul dengan nama lamanya.
           title: documentVersion.document.title,
           version: documentVersion.versionNumber,
+          // Status keberlakuan TERKINI, bukan yang berlaku saat jawaban dibuat.
+          // Peraturan yang dicabut hari ini membuat jawaban bulan lalu ikut
+          // menyesatkan, dan justru riwayat itulah yang masih dibaca orang.
+          legalStatus: documentVersion.document.legalStatus,
         })),
       })),
     };

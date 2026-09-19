@@ -25,6 +25,10 @@ SYSTEM_PROMPT = (
     "Daftar berkas yang tersimpan juga termasuk konteks resmi: pakai untuk "
     "pertanyaan tentang jumlah halaman, ukuran berkas, atau tanggal unggah, dan "
     "salin angkanya persis tanpa membulatkan atau menambah kata perkiraan. "
+    "Sebagian blok konteks diberi penanda STATUS, misalnya SUDAH DICABUT atau "
+    "SUDAH DIUBAH. Blok seperti itu tetap boleh dipakai menjawab, tetapi "
+    "statusnya WAJIB disebut dalam jawaban, dan isinya tidak boleh disajikan "
+    "seolah masih berlaku. "
     "Jawab dalam Bahasa Indonesia, ringkas, jelas, dan langsung. Jangan membuat "
     "citation atau referensi baru; sumber dikelola oleh aplikasi."
 )
@@ -127,6 +131,30 @@ def format_inventory(documents: list[dict[str, Any]]) -> str:
     return "\n".join(baris)
 
 
+#: Status keberlakuan yang perlu disebutkan model. BERLAKU tidak ikut: menandai
+#: keadaan normal hanya membuat setiap blok konteks berisik, dan yang menyimpang
+#: justru jadi tidak menonjol.
+_STATUS_PERINGATAN = {
+    "DICABUT": "SUDAH DICABUT, tidak berlaku lagi",
+    "DIUBAH": "SUDAH DIUBAH, sebagian ketentuannya tidak berlaku lagi",
+    "RANCANGAN": "MASIH RANCANGAN, belum ditetapkan",
+}
+
+
+def status_penanda(chunk: dict[str, Any]) -> str:
+    """Penanda status keberlakuan untuk kepala blok konteks.
+
+    Peraturan yang sudah dicabut tetap boleh dikutip -- pengguna berhak tahu
+    bunyi aturan lamanya -- tetapi model tidak boleh menyajikannya seolah masih
+    berlaku. Peringatan yang pasti terlihat pengguna tetap disusun antarmuka
+    dari sitasinya; penanda ini hanya menjaga prosa model tidak bertentangan
+    dengan peringatan itu.
+    """
+    status = str(chunk.get("legal_status") or "").strip().upper()
+    catatan = _STATUS_PERINGATAN.get(status)
+    return f" | STATUS: {catatan}" if catatan else ""
+
+
 def build_messages(
     query: str,
     matches: list[tuple[float, dict[str, Any]]],
@@ -136,7 +164,7 @@ def build_messages(
 ) -> list[dict[str, str]]:
     context = "\n\n".join(
         f"[DOKUMEN: {display_name(chunk)} | HALAMAN: {chunk.get('page_number') or '-'} | "
-        f"SECTION: {chunk.get('section_title') or '-'}]\n{chunk['text']}"
+        f"SECTION: {chunk.get('section_title') or '-'}{status_penanda(chunk)}]\n{chunk['text']}"
         for _, chunk in matches
     )
     workspace_label = "personal milik pengguna" if workspace_type == "PERSONAL" else "perusahaan"

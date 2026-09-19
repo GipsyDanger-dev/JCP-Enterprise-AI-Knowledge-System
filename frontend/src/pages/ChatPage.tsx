@@ -8,9 +8,68 @@ import type { DocumentChunk } from '@/api/documents'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { quickQuestions } from '@/types/domain'
+import { legalStatusLabel } from '@/utils/legalStatus'
 import type { ChatMessage } from '@/context/workspaceContextValue'
 
 type Citation = ChatMessage['citations'][number]
+
+/**
+ * Status yang membuat sebuah kutipan perlu diperingatkan.
+ *
+ * RANCANGAN tidak masuk: dokumen berstatus itu tidak pernah sampai ke jawaban
+ * sama sekali, disaring jauh sebelum di sini. Yang tersisa justru dua yang
+ * TETAP dikutip — dan karena tetap dikutip, statusnya harus terbaca.
+ */
+const STATUS_PERLU_PERINGATAN = new Set(['DIUBAH', 'DICABUT'])
+
+const perluPeringatan = (citation: Citation) =>
+  STATUS_PERLU_PERINGATAN.has(citation.legalStatus ?? 'BERLAKU')
+
+/**
+ * Peringatan bahwa jawaban di atasnya bersandar pada peraturan yang sudah tidak
+ * utuh berlaku.
+ *
+ * Disusun antarmuka dari sitasinya, bukan diminta dari model: model diberi tahu
+ * statusnya dan biasanya menyebutkannya, tapi "biasanya" tidak cukup untuk hal
+ * yang menentukan apakah pembacanya salah menerapkan aturan. Ini selalu muncul.
+ *
+ * Statusnya juga selalu yang terkini — backend membacanya ulang setiap kali,
+ * jadi jawaban lama di riwayat ikut berubah peringatannya begitu peraturannya
+ * dicabut.
+ */
+function LegalStatusNotice({ citations, isId }: { citations: Citation[]; isId: boolean }) {
+  const bermasalah = citations.filter(perluPeringatan)
+  if (bermasalah.length === 0) return null
+
+  // Satu dokumen bisa menyumbang beberapa kutipan; yang disebut cukup namanya
+  // sekali, kalau tidak peringatannya jadi daftar berulang.
+  const perDokumen = new Map<string, { nama: string; status: string }>()
+  for (const citation of bermasalah) {
+    if (perDokumen.has(citation.documentId)) continue
+    perDokumen.set(citation.documentId, {
+      nama: citation.title || citation.filename,
+      status: legalStatusLabel(citation.legalStatus ?? 'BERLAKU', isId).toLowerCase(),
+    })
+  }
+
+  return (
+    <div className="legal-status-notice" role="status">
+      <AlertTriangle size={16} />
+      <div>
+        <strong>{isId ? 'Perhatikan status sumbernya' : 'Mind the source status'}</strong>
+        <ul>
+          {[...perDokumen.values()].map((dokumen) => (
+            <li key={dokumen.nama}>
+              {isId
+                ? <>Dokumen <b>{dokumen.nama}</b> sudah <b>{dokumen.status}</b>, jadi isinya belum tentu masih berlaku.</>
+                : <>Document <b>{dokumen.nama}</b> is <b>{dokumen.status}</b>, so its content may no longer apply.</>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
 
 const COMMON_QUERY_WORDS = new Set(['yang', 'dengan', 'untuk', 'dalam', 'tentang', 'pada', 'dari', 'atau', 'dan', 'saya', 'kami', 'bisa', 'bagaimana', 'berapa', 'apakah', 'tolong', 'dokumen', 'perusahaan'])
 const NO_ANSWER_TEXT = 'Informasi tidak ditemukan pada dokumen yang tersedia.'
@@ -71,6 +130,7 @@ function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: {
       {msg.answer && (
         <div className="assistant-message">
           <div className="answer-label"><Sparkles size={16} /> Enterprise AI</div>
+          <LegalStatusNotice citations={msg.citations} isId={isId} />
           <div className="answer-copy">{renderAnswer(msg.answer)}</div>
           {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} onSelect={onSuggestion} />}
           {msg.citations.length > 0 && (
@@ -81,6 +141,9 @@ function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: {
                   <SourceCard
                     key={`${c.documentId}-${c.chunkId}-${i}`}
                     title={documentLabel(c)}
+                    badge={perluPeringatan(c)
+                      ? <span className={`source-legal-badge ${(c.legalStatus ?? '').toLowerCase()}`}>{legalStatusLabel(c.legalStatus ?? 'BERLAKU', isId)}</span>
+                      : undefined}
                     detail={[c.sectionTitle, c.pageNumber ? `Page ${c.pageNumber}` : null, c.version].filter(Boolean).join(' · ')}
                     excerpt={c.excerpt}
                     trailing={<ArrowUpRight size={15} />}

@@ -13,18 +13,20 @@ interface SourceCardProps {
   title: string
   detail: string
   excerpt?: string
+  /** Penanda kecil di samping judul, mis. status keberlakuan dokumennya. */
+  badge?: ReactNode
   trailing?: ReactNode
   onOpen?: () => void
 }
 
-export function SourceCard({ title, detail, excerpt, trailing, onOpen }: SourceCardProps) {
+export function SourceCard({ title, detail, excerpt, badge, trailing, onOpen }: SourceCardProps) {
   return (
     <button type="button" className="source-card" onClick={onOpen} title="Preview source">
       <div>
         <div className="source-card-header">
           <FileText size={17} />
           <span>
-            <strong>{title}</strong>
+            <strong>{title}{badge}</strong>
             <small>{detail}</small>
           </span>
         </div>
