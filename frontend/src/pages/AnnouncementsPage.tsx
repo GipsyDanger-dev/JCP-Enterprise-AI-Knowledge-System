@@ -16,7 +16,7 @@ import { errorMessage } from '@/api/client'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
-import { fileToAttachment, isImageFile } from '@/utils/files'
+import { imageFileToCompressedDataUrl, isImageFile } from '@/utils/files'
 
 const formatPublishedAt = (value: string, isId: boolean) => new Date(value).toLocaleDateString(isId ? 'id-ID' : 'en-US', {
   day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -72,8 +72,10 @@ function AnnouncementForm({ heading, submitLabel, submitIcon, initial, saving, i
       return
     }
     try {
-      const attachment = await fileToAttachment(file)
-      setImageDataUrl(attachment.dataUrl)
+      // Dikecilkan dulu, tidak disimpan seukuran aslinya: gambar pengumuman
+      // ikut terkirim sebagai base64 di dalam daftarnya, jadi satu foto kamera
+      // memperlambat halaman ini bagi seluruh pegawai, setiap kali dibuka.
+      setImageDataUrl(await imageFileToCompressedDataUrl(file))
       setImageName(file.name)
       setImageError(null)
     } catch (err) {
