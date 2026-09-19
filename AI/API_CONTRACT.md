@@ -167,6 +167,11 @@ embed                 : true | false (default true)
 model                 : embedding model opsional
 ```
 
+Parser AI masih bisa membaca MD, tetapi Backend tidak pernah meneruskannya:
+unggahan lewat aplikasi dibatasi PDF/DOCX/TXT di `document-file.validator.ts`.
+MD hanya bisa masuk lewat `POST /ingest` dengan `input_dir`, jalur batch yang
+dipakai saat pengembangan.
+
 Response `200`:
 
 ```json

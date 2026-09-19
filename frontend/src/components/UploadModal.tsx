@@ -77,10 +77,10 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     if (!selected) return
 
     const extension = selected.name.split('.').pop()?.toLowerCase()
-    const allowed = ['pdf', 'docx', 'txt', 'md']
+    const allowed = ['pdf', 'docx', 'txt']
     if (!extension || !allowed.includes(extension)) {
       setFile(null)
-      setError(isId ? 'Hanya file PDF, DOCX, TXT, dan MD yang didukung.' : 'Only PDF, DOCX, TXT, and MD files are supported.')
+      setError(isId ? 'Hanya file PDF, DOCX, dan TXT yang didukung.' : 'Only PDF, DOCX, and TXT files are supported.')
       return
     }
     if (selected.size > MAX_FILE_SIZE) {
@@ -137,7 +137,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
         </div>
 
         <div className="modal-body">
-          <div className="upload-file-area" onClick={() => !uploading && fileRef.current?.click()}>              <input ref={fileRef} type="file" accept=".pdf,.docx,.txt,.md" onChange={handleFileChange} style={{ display: 'none' }} />
+          <div className="upload-file-area" onClick={() => !uploading && fileRef.current?.click()}>              <input ref={fileRef} type="file" accept=".pdf,.docx,.txt" onChange={handleFileChange} style={{ display: 'none' }} />
           {file ? (
             <div className="upload-file-selected">
               <span className="upload-file-icon"><FileText size={20} /></span>
@@ -151,7 +151,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
             <div className="upload-file-empty">
               <Upload size={24} />
               <p>{isId ? 'Klik untuk memilih file' : 'Click to select file'}</p>
-              <small>{isId ? 'PDF, DOCX, TXT, atau MD, maks 10MB' : 'PDF, DOCX, TXT, or MD, max 10 MB'}</small>
+              <small>{isId ? 'PDF, DOCX, atau TXT, maks 10MB' : 'PDF, DOCX, or TXT, max 10 MB'}</small>
             </div>
           )}
         </div>

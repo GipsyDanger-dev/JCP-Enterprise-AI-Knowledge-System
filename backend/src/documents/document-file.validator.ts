@@ -35,10 +35,9 @@ export function validateDocumentFile(file?: UploadedDocumentFile): UploadedDocum
   const isDocx =
     extension === '.docx' && DOCX_MIME_TYPES.has(file.mimetype) && hasZipSignature(file.buffer);
   const isTxt = extension === '.txt' && TXT_MIME_TYPES.has(file.mimetype);
-  const isMd = extension === '.md' && TXT_MIME_TYPES.has(file.mimetype);
 
-  if (!isPdf && !isDocx && !isTxt && !isMd) {
-    throw new BadRequestException('Only valid PDF, DOCX, TXT, or MD files are allowed');
+  if (!isPdf && !isDocx && !isTxt) {
+    throw new BadRequestException('Only valid PDF, DOCX, or TXT files are allowed');
   }
 
   return { ...file, originalname: filename };
