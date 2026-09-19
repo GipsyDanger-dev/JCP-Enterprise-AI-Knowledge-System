@@ -404,6 +404,7 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
     if (jabatan.isActive && jabatan.userCount > 0) {
       const wewenang = [
         jabatan.canUploadDocuments ? (isId ? 'mengunggah dokumen' : 'uploading documents') : null,
+        jabatan.canManageLegalStatus ? (isId ? 'mengubah status keberlakuan dokumen' : 'changing document legal status') : null,
         jabatan.canManageAnnouncements ? (isId ? 'menerbitkan pengumuman' : 'publishing announcements') : null,
         jabatan.canViewAnnouncementReaders ? (isId ? 'melihat daftar pembaca pengumuman' : 'viewing announcement readers') : null,
       ].filter((item): item is string => item !== null)
@@ -538,6 +539,7 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
               <th className="org-check-col">{isId ? 'Kelola pengumuman' : 'Manage announcements'}</th>
               <th className="org-check-col">{isId ? 'Lihat pembaca' : 'View readers'}</th>
               <th className="org-check-col">{isId ? 'Unggah dokumen' : 'Upload documents'}</th>
+              <th className="org-check-col">{isId ? 'Ubah status keberlakuan' : 'Change legal status'}</th>
               <th>{isId ? 'Pemegang' : 'Holders'}</th>
               <th>Status</th>
               <th />
@@ -580,6 +582,11 @@ function JabatanSection({ items, isId, token, onError, onChanged }: SectionProps
                   checked={jabatan.canUploadDocuments}
                   disabled={busy === jabatan.id}
                   onChange={(value) => ubah(jabatan, { canUploadDocuments: value })}
+                />
+                <PermissionCell
+                  checked={jabatan.canManageLegalStatus}
+                  disabled={busy === jabatan.id}
+                  onChange={(value) => ubah(jabatan, { canManageLegalStatus: value })}
                 />
                 <td>
                   {isId ? `${jabatan.userCount} pengguna` : `${jabatan.userCount} users`}

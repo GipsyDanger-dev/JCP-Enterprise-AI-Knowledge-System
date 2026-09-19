@@ -37,6 +37,9 @@ export function toDomainDocument(document: ApiDocument): DocumentItem {
     chunks: version?.chunkCount ?? null,
     categoryId: document.category?.id ?? null,
     unitKerja: document.unitKerja ? { id: document.unitKerja.id, name: document.unitKerja.name } : null,
+    // Endpoint lama belum tentu mengirimkannya; yang tidak menyebut status
+    // dianggap berlaku, sama seperti bawaan kolomnya di database.
+    legalStatus: document.legalStatus ?? 'BERLAKU',
     uploadedById: document.uploadedBy?.id ?? null,
   }
 }

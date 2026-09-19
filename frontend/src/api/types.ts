@@ -27,6 +27,11 @@ export interface ApiJabatan {
   canViewAnnouncementReaders: boolean
   /** Boleh mengunggah dokumen untuk unit kerjanya, dan membereskan unggahannya sendiri. */
   canUploadDocuments: boolean
+  /**
+   * Boleh mengubah status keberlakuan dokumen yang bisa ia lihat — tanpa ikut
+   * berkuasa atas kategori maupun penanda unitnya.
+   */
+  canManageLegalStatus: boolean
 }
 
 /**
@@ -216,6 +221,14 @@ export interface ApiProcessingJob {
   updatedAt?: string
 }
 
+/**
+ * Status keberlakuan sebuah dokumen hukum.
+ *
+ * RANCANGAN bukan sekadar label: dokumen berstatus itu disembunyikan dari
+ * pegawai biasa dan tidak pernah dikutip AI, karena angkanya belum final.
+ */
+export type ApiLegalStatus = 'BERLAKU' | 'RANCANGAN' | 'DIUBAH' | 'DICABUT'
+
 export interface ApiDocument {
   division?: string | null
   id: string
@@ -225,6 +238,8 @@ export interface ApiDocument {
   /** Bila terisi, dokumen ini hanya untuk unit kerja tersebut. */
   unitKerja?: ApiUnitKerja | null
   status: ApiDocumentStatus
+  /** Status keberlakuan. Tidak selalu dikirim endpoint lama; anggap BERLAKU bila kosong. */
+  legalStatus?: ApiLegalStatus
   createdAt?: string
   updatedAt?: string
   uploadedBy?: {

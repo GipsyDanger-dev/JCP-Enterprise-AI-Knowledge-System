@@ -254,6 +254,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             collection: document.collection || item.collection,
             categoryId: document.category === undefined ? item.categoryId : document.category?.id ?? null,
             unitKerja: document.unitKerja === undefined ? item.unitKerja : document.unitKerja ? { id: document.unitKerja.id, name: document.unitKerja.name } : null,
+            legalStatus: document.legalStatus ?? item.legalStatus,
           }
         : item
     )))

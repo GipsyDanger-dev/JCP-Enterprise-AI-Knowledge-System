@@ -1130,6 +1130,58 @@ button { cursor: pointer; }
 /* Penanda pada baris dokumen: terkunci untuk satu unit kerja. Dokumen tanpa
    penanda terbuka untuk semua pegawai, jadi sengaja tidak diberi label apa pun
    — hanya yang dibatasi yang perlu menjelaskan dirinya. */
+/*
+ * Penanda status keberlakuan, satu kolom tersendiri di daftar dokumen.
+ *
+ * Ditampilkan untuk SEMUA dokumen, termasuk yang berlaku: pertanyaannya adalah
+ * "dokumen ini masih berlaku atau tidak", dan kolom yang kosong untuk sebagian
+ * baris tidak menjawabnya — pembaca tidak bisa membedakan "berlaku" dari
+ * "statusnya belum sempat diisi".
+ *
+ * Seluruh warnanya memakai token tema, yang sudah punya nilai sendiri di tema
+ * gelap, jadi tidak perlu aturan [data-theme="dark"] tersendiri.
+ */
+.doc-legal-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Berlaku dibuat paling tenang: itu keadaan normal, dan kalau ikut mencolok
+   maka yang menyimpang justru tidak lagi menonjol. */
+.doc-legal-badge.berlaku {
+  border-color: var(--border, #e5e5e5);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+/* Rancangan satu-satunya yang mengubah siapa boleh membaca, jadi diberi warna
+   peringatan. */
+.doc-legal-badge.rancangan {
+  border-color: var(--warning);
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+/* Diubah dan dicabut tidak menyembunyikan apa pun — penanda arsip belaka. */
+.doc-legal-badge.diubah {
+  border-color: var(--border, #e5e5e5);
+  background: var(--surface-muted, #f5f5f4);
+  color: var(--text-secondary, #6b6b6b);
+}
+
+.doc-legal-badge.dicabut {
+  border-color: var(--border, #e5e5e5);
+  background: var(--surface-muted, #f5f5f4);
+  color: var(--text-muted, #8b8b8b);
+  text-decoration: line-through;
+}
+
 .doc-unit-chip {
   display: inline-flex;
   align-items: center;

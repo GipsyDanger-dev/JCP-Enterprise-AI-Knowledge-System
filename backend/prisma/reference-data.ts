@@ -131,6 +131,13 @@ export interface JabatanSeed {
    * ada yang pernah memutuskannya. Admin yang mencentangnya per instansi.
    */
   canUploadDocuments?: boolean;
+  /**
+   * Boleh mengubah status keberlakuan dokumen. Alasan yang sama dengan
+   * canUploadDocuments untuk tidak dinyalakan di seed, dan satu lagi: ini
+   * wewenang bagian hukum, yang nomenklatur jabatannya berbeda-beda tiap
+   * instansi — tidak ada tebakan yang benar untuk semua.
+   */
+  canManageLegalStatus?: boolean;
   /** Boleh melihat siapa saja yang sudah dan belum membaca pengumuman. */
   canViewAnnouncementReaders?: boolean;
 }

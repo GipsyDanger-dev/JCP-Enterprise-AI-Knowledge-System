@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import type { ApiLegalStatus } from '@/api/types'
 import {
   FolderOpen,
   LayoutDashboard,
@@ -31,6 +32,12 @@ export interface DocumentItem {
    * keadaan sekarang tanpa memuat ulang dokumennya satu per satu.
    */
   unitKerja: { id: string; name: string } | null
+  /**
+   * Status keberlakuan. Dibawa sampai UI supaya rancangan bisa diberi penanda
+   * yang terlihat — dokumen yang belum final tidak boleh tampak sama dengan
+   * peraturan yang sudah berlaku.
+   */
+  legalStatus: ApiLegalStatus
   /**
    * Pengunggahnya. Dipakai untuk memutuskan tombol ubah/hapus: pemegang izin
    * unggah lewat jabatan hanya boleh membereskan apa yang ia naikkan sendiri.

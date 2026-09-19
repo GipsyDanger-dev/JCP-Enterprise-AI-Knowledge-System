@@ -9,6 +9,7 @@ import {
 import {
   AuditAction,
   DocumentStatus,
+  LegalStatus,
   ProcessingJobStatus,
   Prisma,
 } from '@prisma/client';
@@ -22,10 +23,12 @@ import { UploadedDocumentFile, validateDocumentFile } from './document-file.vali
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
 import { UpdateDocumentAccessDto } from './dto/update-document-access.dto';
+import { UpdateDocumentLegalStatusDto } from './dto/update-document-legal-status.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import {
   allowedCategoryFilter,
   canManageDocument,
+  canManageLegalStatus,
   canTargetUnit,
   canUploadDocuments,
   documentVisibilityWhere,
@@ -33,6 +36,22 @@ import {
 
 const normalizeCategoryName = (value: string) => value.trim().replace(/\s+/g, ' ');
 const categoryKey = (value: string) => normalizeCategoryName(value).toLocaleLowerCase('id-ID');
+
+/**
+ * Bentuk ringkas satu dokumen, dibalas oleh endpoint yang mengubah sebagian
+ * kolomnya. Satu definisi dipakai bersama supaya `applyDocumentAccess` di klien
+ * tidak perlu menebak field mana yang ikut pada endpoint yang mana.
+ */
+const DOCUMENT_SUMMARY_SELECT = {
+  id: true,
+  title: true,
+  collection: true,
+  status: true,
+  legalStatus: true,
+  updatedAt: true,
+  category: { select: { id: true, name: true } },
+  unitKerja: { select: { id: true, code: true, name: true } },
+} satisfies Prisma.DocumentSelect;
 
 @Injectable()
 export class DocumentsService {
@@ -115,6 +134,12 @@ export class DocumentsService {
           collection,
           categoryId: category?.id ?? null,
           unitKerjaId,
+          // Tanpa pilihan dari pengunggah, dokumen berstatus BERLAKU — sama
+          // seperti bawaan kolomnya. Yang ditutup di sini adalah kebalikannya:
+          // rancangan peraturan dulu tidak punya cara masuk sebagai RANCANGAN,
+          // jadi draft apa pun langsung terlihat seluruh pegawai dan ikut
+          // dikutip AI.
+          legalStatus: input.legalStatus ?? LegalStatus.BERLAKU,
           status: DocumentStatus.QUEUED,
           uploadedById: actor.sub,
           // Salinan identitas pengunggah, ditulis sekali di sini. Tautan ke
@@ -168,6 +193,7 @@ export class DocumentsService {
       collection,
       categoryId: category?.id ?? null,
       unitKerjaId,
+      legalStatus: input.legalStatus ?? LegalStatus.BERLAKU,
       status: DocumentStatus.QUEUED,
       version: {
         id: documentVersionId,
@@ -235,7 +261,7 @@ export class DocumentsService {
   async updateAccess(id: string, input: UpdateDocumentAccessDto, actor: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, ...documentVisibilityWhere(actor) },
-      select: { id: true, categoryId: true, unitKerjaId: true, collection: true, uploadedById: true },
+      select: { id: true, categoryId: true, unitKerjaId: true, collection: true, legalStatus: true, uploadedById: true },
     });
     if (!document) throw new NotFoundException('Document not found');
     if (!canManageDocument(actor, document)) {
@@ -275,15 +301,7 @@ export class DocumentsService {
           // kategori barunya setelah dipindahkan.
           collection: category?.name ?? document.collection,
         },
-        select: {
-          id: true,
-          title: true,
-          collection: true,
-          status: true,
-          updatedAt: true,
-          category: { select: { id: true, name: true } },
-          unitKerja: { select: { id: true, code: true, name: true } },
-        },
+        select: DOCUMENT_SUMMARY_SELECT,
       });
       await this.auditLogs.record(transaction, {
         ...pelakuAktor(actor),
@@ -301,6 +319,58 @@ export class DocumentsService {
     });
 
     return updated;
+  }
+
+  /**
+   * Ubah status keberlakuan sebuah dokumen.
+   *
+   * Berdiri sendiri, bukan bagian dari updateAccess, karena wewenangnya lain:
+   * pemegang centang jabatan `canManageLegalStatus` boleh menyentuh status
+   * dokumen mana pun yang bisa ia lihat, tetapi tidak boleh memindahkan
+   * kategori maupun penanda unitnya.
+   *
+   * `documentVisibilityWhere` tetap dipakai untuk mencari barisnya, jadi
+   * centang itu tidak pernah menjadi jalan menyentuh — atau sekadar memastikan
+   * keberadaan — dokumen unit lain.
+   */
+  async updateLegalStatus(id: string, input: UpdateDocumentLegalStatusDto, actor: AuthenticatedUser) {
+    const document = await this.prisma.document.findFirst({
+      where: { id, ...documentVisibilityWhere(actor) },
+      select: { id: true, unitKerjaId: true, legalStatus: true, uploadedById: true },
+    });
+    if (!document) throw new NotFoundException('Document not found');
+    if (!canManageLegalStatus(actor, document)) {
+      throw new ForbiddenException('Anda tidak diberi wewenang mengubah status keberlakuan dokumen');
+    }
+    if (document.legalStatus === input.legalStatus) {
+      // Tidak ada yang berubah; menulis baris audit untuk ini hanya membuat
+      // riwayatnya penuh kejadian kosong.
+      return this.findOneSummary(id);
+    }
+
+    return this.prisma.$transaction(async (transaction) => {
+      const result = await transaction.document.update({
+        where: { id },
+        data: { legalStatus: input.legalStatus },
+        select: DOCUMENT_SUMMARY_SELECT,
+      });
+      await this.auditLogs.record(transaction, {
+        ...pelakuAktor(actor),
+        action: AuditAction.DOCUMENT_UPDATED,
+        targetType: 'DOCUMENT',
+        targetId: id,
+        metadata: {
+          legalStatusBefore: document.legalStatus,
+          legalStatusAfter: result.legalStatus,
+        },
+      });
+      return result;
+    });
+  }
+
+  /** Bentuk ringkas yang sama dengan balasan updateLegalStatus, untuk jalur tanpa perubahan. */
+  private findOneSummary(id: string) {
+    return this.prisma.document.findUniqueOrThrow({ where: { id }, select: DOCUMENT_SUMMARY_SELECT });
   }
 
   async findAll(actor: AuthenticatedUser) {

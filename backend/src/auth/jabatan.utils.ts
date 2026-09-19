@@ -13,6 +13,7 @@ export const JABATAN_PERMISSION_SELECT = {
   canManageAnnouncements: true,
   canViewAnnouncementReaders: true,
   canUploadDocuments: true,
+  canManageLegalStatus: true,
 } as const;
 
 /**

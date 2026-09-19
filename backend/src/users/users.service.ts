@@ -28,6 +28,7 @@ const SAFE_USER_SELECT = {
       canManageAnnouncements: true,
       canViewAnnouncementReaders: true,
       canUploadDocuments: true,
+      canManageLegalStatus: true,
     },
   },
   displayName: true,

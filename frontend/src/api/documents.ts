@@ -2,6 +2,7 @@ import { API_BASE_URL, authHeaders, request } from './client'
 import type {
   ApiDocument,
   ApiDocumentCategory,
+  ApiLegalStatus,
   DeleteDocumentResponse,
   DocumentStatusResponse,
 } from './types'
@@ -16,6 +17,8 @@ export interface UploadDocumentOptions {
   categoryId?: string
   /** Opsional: batasi hanya untuk satu unit kerja. Hanya mempersempit akses. */
   unitKerjaId?: string
+  /** Tanpa nilai, server menyimpannya sebagai BERLAKU. */
+  legalStatus?: ApiLegalStatus
 }
 
 export function uploadDocument(file: File, token?: string, options: UploadDocumentOptions = {}): Promise<ApiDocument> {
@@ -24,6 +27,7 @@ export function uploadDocument(file: File, token?: string, options: UploadDocume
   if (options.title?.trim()) form.append('title', options.title.trim())
   if (options.categoryId) form.append('categoryId', options.categoryId)
   if (options.unitKerjaId) form.append('unitKerjaId', options.unitKerjaId)
+  if (options.legalStatus) form.append('legalStatus', options.legalStatus)
   return request<ApiDocument>('/documents', { method: 'POST', body: form, headers: authHeaders(token) })
 }
 
@@ -42,6 +46,21 @@ export function updateDocumentAccess(id: string, input: DocumentAccessInput, tok
   return request<ApiDocument>(`/documents/${id}/access`, {
     method: 'PATCH',
     body: input,
+    headers: authHeaders(token),
+  })
+}
+
+/**
+ * Ubah status keberlakuan sebuah dokumen.
+ *
+ * Endpoint tersendiri, bukan bagian dari updateDocumentAccess, karena
+ * wewenangnya berbeda: jabatan yang dicentang "boleh ubah status keberlakuan"
+ * berhak di sini tanpa berhak memindahkan kategori maupun penanda unit.
+ */
+export function updateDocumentLegalStatus(id: string, legalStatus: ApiLegalStatus, token?: string): Promise<ApiDocument> {
+  return request<ApiDocument>(`/documents/${id}/legal-status`, {
+    method: 'PATCH',
+    body: { legalStatus },
     headers: authHeaders(token),
   })
 }

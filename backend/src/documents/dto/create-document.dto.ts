@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { LegalStatus } from '@prisma/client';
+import { IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class CreateDocumentDto {
   @ApiPropertyOptional({ description: 'Defaults to the uploaded filename' })
@@ -32,4 +33,15 @@ export class CreateDocumentDto {
   @IsOptional()
   @IsUUID('4')
   unitKerjaId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Status keberlakuan dokumen. Tanpa nilai, dokumen tersimpan BERLAKU. ' +
+      'RANCANGAN disembunyikan dari pegawai dan tidak pernah dikutip AI.',
+    enum: LegalStatus,
+    default: LegalStatus.BERLAKU,
+  })
+  @IsOptional()
+  @IsEnum(LegalStatus)
+  legalStatus?: LegalStatus;
 }

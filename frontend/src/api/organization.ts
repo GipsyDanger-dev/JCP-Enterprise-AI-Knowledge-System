@@ -34,6 +34,12 @@ export interface OrgJabatan {
    * ditempatkan di unit kerja mana pun.
    */
   canUploadDocuments: boolean
+  /**
+   * Boleh menetapkan sebuah peraturan sudah dicabut, diubah, atau masih
+   * rancangan. Sengaja terpisah dari canUploadDocuments: itu pekerjaan bagian
+   * hukum, bukan pekerjaan orang yang menaikkan berkasnya.
+   */
+  canManageLegalStatus: boolean
   canViewAnnouncementReaders: boolean
   isActive: boolean
   sortOrder: number
@@ -59,7 +65,8 @@ export interface OrganizationOverview {
 
 export type JabatanInput = Partial<Pick<
   OrgJabatan,
-  'name' | 'canManageAnnouncements' | 'canViewAnnouncementReaders' | 'canUploadDocuments' | 'isActive' | 'sortOrder'
+  'name' | 'canManageAnnouncements' | 'canViewAnnouncementReaders' | 'canUploadDocuments'
+  | 'canManageLegalStatus' | 'isActive' | 'sortOrder'
 >>
 
 export const getOrganization = (token?: string) =>

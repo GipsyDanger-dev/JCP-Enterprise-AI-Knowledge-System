@@ -59,6 +59,11 @@ export class CreateJabatanDto {
   @IsBoolean()
   canUploadDocuments?: boolean;
 
+  @ApiPropertyOptional({ description: 'Boleh mengubah status keberlakuan dokumen yang bisa ia lihat, tanpa berkuasa atas kategori dan penanda unitnya.' })
+  @IsOptional()
+  @IsBoolean()
+  canManageLegalStatus?: boolean;
+
   @ApiPropertyOptional({ description: 'Urutan tampil di dropdown.' })
   @IsOptional()
   @IsInt()
@@ -92,6 +97,11 @@ export class UpdateJabatanDto {
   @IsOptional()
   @IsBoolean()
   canUploadDocuments?: boolean;
+
+  @ApiPropertyOptional({ description: 'Boleh mengubah status keberlakuan dokumen yang bisa ia lihat, tanpa berkuasa atas kategori dan penanda unitnya.' })
+  @IsOptional()
+  @IsBoolean()
+  canManageLegalStatus?: boolean;
 
   @ApiPropertyOptional({ description: 'Urutan tampil di dropdown.' })
   @IsOptional()

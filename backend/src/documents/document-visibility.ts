@@ -169,6 +169,30 @@ export function canManageDocument(
   return document.uploadedById === actor.sub;
 }
 
+/**
+ * Bolehkah aktor mengubah status keberlakuan sebuah dokumen.
+ *
+ * Lebih longgar daripada canManageDocument dan sengaja demikian: menetapkan
+ * sebuah peraturan sudah dicabut atau diubah adalah pekerjaan bagian hukum,
+ * yang biasanya bukan orang yang menaikkan berkasnya dan bukan pula admin unit
+ * pemiliknya. Karena itu ada centang jabatan tersendiri, dan pemegangnya boleh
+ * menyentuh status dokumen mana pun yang bisa ia lihat.
+ *
+ * Yang TIDAK ikut melonggar adalah kategori dan penanda unit: keduanya tetap
+ * milik canManageDocument. Centang ini hanya memberi kuasa atas satu kolom.
+ *
+ * Batas "yang bisa ia lihat" tetap ditegakkan terpisah lewat
+ * documentVisibilityWhere saat barisnya dicari — tanpa itu, centang ini jadi
+ * jalan mengintip keberadaan dokumen unit lain.
+ */
+export function canManageLegalStatus(
+  actor: AuthenticatedUser,
+  document: { unitKerjaId: string | null; uploadedById: string | null },
+): boolean {
+  if (actor.accountType === 'PERSONAL') return canManageDocument(actor, document);
+  return Boolean(actor.jabatan?.canManageLegalStatus) || canManageDocument(actor, document);
+}
+
 /** Aktor yang boleh mengunggah dokumen sama sekali. */
 export function canUploadDocuments(actor: AuthenticatedUser): boolean {
   return actor.accountType === 'PERSONAL'

@@ -404,6 +404,12 @@ model Jabatan {
   /// pegawai, dan menerbitkan yang seperti itu adalah keputusan tingkat
   /// organisasi.
   canUploadDocuments         Boolean   @default(false) @map("can_upload_documents")
+  /// Boleh mengubah status keberlakuan dokumen (BERLAKU / RANCANGAN / DIUBAH /
+  /// DICABUT) pada dokumen yang bisa ia lihat, tanpa ikut berkuasa atas kategori
+  /// maupun penanda unitnya. Dipisah dari canUploadDocuments karena menetapkan
+  /// sebuah peraturan sudah dicabut adalah pekerjaan bagian hukum, bukan
+  /// pekerjaan orang yang menaikkan berkasnya.
+  canManageLegalStatus       Boolean   @default(false) @map("can_manage_legal_status")
   // Menonaktifkan, bukan menghapus: jabatan yang masih dipakai pegawai tidak
   // boleh hilang begitu saja, karena wewenangnya ikut hilang diam-diam.
   isActive                   Boolean   @default(true) @map("is_active")

@@ -27,6 +27,7 @@ export async function seedJabatanDanRoleLabel(db: Db, workspaceId: string): Prom
         canManageAnnouncements: jabatan.canManageAnnouncements ?? false,
         canUploadDocuments: jabatan.canUploadDocuments ?? false,
         canViewAnnouncementReaders: jabatan.canViewAnnouncementReaders ?? false,
+        canManageLegalStatus: jabatan.canManageLegalStatus ?? false,
       },
     });
   }

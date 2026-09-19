@@ -40,6 +40,7 @@ import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
 import { UpdateDocumentAccessDto } from './dto/update-document-access.dto';
+import { UpdateDocumentLegalStatusDto } from './dto/update-document-legal-status.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 
 @ApiTags('documents')
@@ -117,6 +118,22 @@ export class DocumentsController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.documentsService.updateAccess(id, input, actor);
+  }
+
+  // Endpoint tersendiri, bukan field tambahan di :id/access, karena wewenangnya
+  // berbeda: jabatan yang dicentang "boleh ubah status keberlakuan" berhak di
+  // sini tanpa berhak atas kategori dan penanda unit di atas.
+  @Patch(':id/legal-status')
+  @ApiOperation({ summary: 'Ubah status keberlakuan sebuah dokumen' })
+  @ApiOkResponse({ description: 'Status keberlakuan tersimpan' })
+  @ApiNotFoundResponse({ description: 'Dokumen tidak ada, atau tidak boleh diakses aktor ini' })
+  @ApiForbiddenResponse({ description: 'Jabatan aktor tidak diberi wewenang atas status keberlakuan' })
+  updateLegalStatus(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() input: UpdateDocumentLegalStatusDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.documentsService.updateLegalStatus(id, input, actor);
   }
 
   // Pengunggah perlu memantau proses dokumennya sendiri, jadi bukan hanya

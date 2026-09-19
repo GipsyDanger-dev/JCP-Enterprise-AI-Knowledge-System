@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowUpRight, Building2, ChevronDown, Download, FileText, FolderLock, FolderOpen, Pencil, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { ArrowUpRight, Building2, ChevronDown, Download, FileText, FolderLock, FolderOpen, Pencil, Scale, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { DataTable } from '@/components/DataTable'
 import { UploadModal } from '@/components/UploadModal'
 import { DocumentAccessModal } from '@/components/DocumentAccessModal'
-import { downloadDocument, getDocumentBlob, getDocumentChunks, listDocumentCategories, updateDocument, updateDocumentAccess, type DocumentChunk } from '@/api/documents'
+import { downloadDocument, getDocumentBlob, getDocumentChunks, listDocumentCategories, updateDocument, updateDocumentAccess, updateDocumentLegalStatus, type DocumentChunk } from '@/api/documents'
+import { LEGAL_STATUSES, legalStatusHint, legalStatusLabel } from '@/utils/legalStatus'
+import type { ApiLegalStatus } from '@/api/types'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useScrollToError } from '@/hooks/useScrollToError'
@@ -226,6 +228,36 @@ export function DocumentsPage() {
 
   const canUpload = isPersonal || role === 'admin' || ((isUnitAdmin || jabatanBolehUnggah) && Boolean(ownUnitId))
 
+  /**
+   * Boleh mengubah status keberlakuan dokumen ini.
+   *
+   * Lebih longgar daripada bolehUrus, mencerminkan canManageLegalStatus di
+   * backend: pemegang centang jabatannya boleh menyentuh status dokumen mana
+   * pun yang tampil untuknya, meski kategori dan penanda unitnya bukan urusannya.
+   */
+  const bolehUbahStatus = (document: DocumentItem) =>
+    (user?.jabatan?.canManageLegalStatus ?? false) || bolehUrus(document)
+
+  const bukaDialogStatus = (document: DocumentItem) => {
+    setStatusValue(document.legalStatus)
+    setStatusError(null)
+    setStatusDoc(document)
+  }
+
+  const simpanStatus = async () => {
+    if (!statusDoc || !token || statusSaving) return
+    setStatusSaving(true)
+    setStatusError(null)
+    try {
+      applyDocumentAccess(await updateDocumentLegalStatus(statusDoc.id, statusValue, token))
+      setStatusDoc(null)
+    } catch (error) {
+      setStatusError(error instanceof Error ? error.message : (isId ? 'Status gagal disimpan.' : 'The status could not be saved.'))
+    } finally {
+      setStatusSaving(false)
+    }
+  }
+
   /** Boleh mengubah nama, mengatur akses, atau menghapus dokumen ini. */
   const bolehUrus = (document: DocumentItem) => {
     if (!bolehUntukUnit(document.unitKerja?.id ?? null)) return false
@@ -261,6 +293,12 @@ export function DocumentsPage() {
   const [accessCategoryId, setAccessCategoryId] = useState('')
   const [accessRestrict, setAccessRestrict] = useState(false)
   const [accessUnitId, setAccessUnitId] = useState('')
+  // Dialog status keberlakuan berdiri sendiri: wewenangnya beda dari dialog
+  // akses, jadi ada orang yang boleh membuka yang satu tapi tidak yang lain.
+  const [statusDoc, setStatusDoc] = useState<DocumentItem | null>(null)
+  const [statusValue, setStatusValue] = useState<ApiLegalStatus>('BERLAKU')
+  const [statusSaving, setStatusSaving] = useState(false)
+  const [statusError, setStatusError] = useState<string | null>(null)
   const [accessSaving, setAccessSaving] = useState(false)
   const [accessError, setAccessError] = useState<string | null>(null)
   const accessErrorRef = useScrollToError<HTMLDivElement>(accessError)
@@ -415,9 +453,9 @@ export function DocumentsPage() {
       </div>
       <DataTable>
         <table>
-          <thead><tr><th>{isId ? 'Dokumen' : 'Document'}</th><th>{isId ? 'Koleksi' : 'Collection'}</th><th>{isId ? 'Diperbarui' : 'Updated'}</th><th>Status</th><th>Chunks</th><th aria-label={isId ? 'Aksi' : 'Actions'} /></tr></thead>
+          <thead><tr><th>{isId ? 'Dokumen' : 'Document'}</th><th>{isId ? 'Koleksi' : 'Collection'}</th><th>{isId ? 'Diperbarui' : 'Updated'}</th><th>{isId ? 'Keberlakuan' : 'Legal status'}</th><th>{isId ? 'Pemrosesan' : 'Processing'}</th><th>Chunks</th><th aria-label={isId ? 'Aksi' : 'Actions'} /></tr></thead>
           <tbody>{filtered.length === 0 ? (
-            <tr><td colSpan={6} className="empty-row">Tidak ada dokumen ditemukan.</td></tr>
+            <tr><td colSpan={7} className="empty-row">Tidak ada dokumen ditemukan.</td></tr>
           ) : filtered.map((document) => (
             <tr key={document.id} className="clickable-row" onClick={() => setSelectedDoc(document)}>
               <td><div className="document-name"><span><FileText size={18} /></span><strong>{document.name}</strong></div></td>
@@ -430,9 +468,18 @@ export function DocumentsPage() {
                 )}
               </td>
               <td>{document.updatedAt}</td>
+              {/* Keberlakuan dan pemrosesan adalah dua hal berbeda dan keduanya
+                  disebut "status" di tempat lain, jadi kolomnya diberi judul
+                  yang tegas — dokumen bisa saja READY tapi sudah DICABUT. */}
+              <td>
+                <span className={`doc-legal-badge ${document.legalStatus.toLowerCase()}`} title={legalStatusHint(document.legalStatus, isId)}>
+                  {legalStatusLabel(document.legalStatus, isId)}
+                </span>
+              </td>
               <td><StatusBadge status={document.status} /></td>
               <td>{document.chunks ?? '—'}</td>
               <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                {bolehUbahStatus(document) && <button className="icon-button" title={isId ? 'Ubah status keberlakuan' : 'Change legal status'} onClick={(event) => { event.stopPropagation(); bukaDialogStatus(document) }}><Scale size={15} /></button>}
                 {bolehUrus(document) && <button className="icon-button" title={isId ? 'Ubah nama dokumen' : 'Rename document'} onClick={(event) => { event.stopPropagation(); setRenameDoc(document); setRenameTitle(document.name); setRenameError(null) }}><Pencil size={15} /></button>}
                 <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>
                 {isPersonal ? <button className="icon-button danger" title={isId ? 'Hapus dokumen' : 'Delete document'} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button> : bolehUrus(document)
@@ -483,6 +530,58 @@ export function DocumentsPage() {
         </div>
       </div>}
       <DocumentAccessModal open={showDocumentAccess} onClose={() => setShowDocumentAccess(false)} />
+
+      {/* Status keberlakuan: dialog tersendiri karena wewenangnya juga
+          tersendiri — jabatan yang dicentang boleh membukanya tanpa boleh
+          menyentuh kategori dan penanda unit di dialog akses. */}
+      {statusDoc && (
+        <div className="modal-overlay" onClick={() => !statusSaving && setStatusDoc(null)}>
+          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>{isId ? 'Status keberlakuan' : 'Legal status'}</h2>
+                <p className="modal-copy">{statusDoc.name}</p>
+              </div>
+              <button className="icon-button" onClick={() => setStatusDoc(null)} disabled={statusSaving}><X size={18} /></button>
+            </div>
+            <div className="modal-body">
+              <div className="upload-field">
+                <label htmlFor="legal-status-select"><Scale size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Status dokumen ini' : 'This document’s status'}</label>
+                <div className="select-wrapper">
+                  <select
+                    id="legal-status-select"
+                    value={statusValue}
+                    onChange={(event) => setStatusValue(event.target.value as ApiLegalStatus)}
+                    disabled={statusSaving}
+                  >
+                    {LEGAL_STATUSES.map((status) => (
+                      <option key={status} value={status}>{legalStatusLabel(status, isId)}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="field-hint">{legalStatusHint(statusValue, isId)}</p>
+              </div>
+              {/* Peringatan hanya muncul untuk perubahan yang benar-benar
+                  menyembunyikan dokumen; memperingatkan setiap pilihan hanya
+                  mengajari orang mengabaikan peringatan. */}
+              {statusValue === 'RANCANGAN' && statusDoc.legalStatus !== 'RANCANGAN' && (
+                <div className="inline-alert" role="status">
+                  {isId
+                    ? 'Setelah disimpan, dokumen ini hilang dari daftar pegawai dan Asisten AI berhenti mengutipnya.'
+                    : 'Once saved, this document disappears from the employee list and the AI assistant stops citing it.'}
+                </div>
+              )}
+              {statusError && <div className="upload-error-msg" role="alert">{statusError}</div>}
+            </div>
+            <div className="modal-actions">
+              <button className="secondary-button" onClick={() => setStatusDoc(null)} disabled={statusSaving}>{isId ? 'Batal' : 'Cancel'}</button>
+              <button className="primary-button" onClick={simpanStatus} disabled={statusSaving || statusValue === statusDoc.legalStatus}>
+                {statusSaving ? (isId ? 'Menyimpan…' : 'Saving…') : (isId ? 'Simpan' : 'Save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Atur akses: kategori sebagai penanda subjek, penanda unit sebagai
           satu-satunya pembatas siapa yang boleh membaca dan menanyakannya. */}

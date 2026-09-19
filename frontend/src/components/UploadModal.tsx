@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Building2, FileText, FolderOpen, LoaderCircle, Plus, Upload, X } from 'lucide-react'
+import { Building2, FileText, FolderOpen, LoaderCircle, Plus, Scale, Upload, X } from 'lucide-react'
 import { createDocumentCategory, listDocumentCategories, uploadDocument } from '@/api/documents'
 import { getUserReferenceData } from '@/api/users'
 import { errorMessage } from '@/api/client'
-import type { ApiDocument, ApiDocumentCategory, ApiUnitKerja } from '@/api/types'
+import type { ApiDocument, ApiDocumentCategory, ApiLegalStatus, ApiUnitKerja } from '@/api/types'
+import { LEGAL_STATUSES, legalStatusHint, legalStatusLabel } from '@/utils/legalStatus'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useScrollToError } from '@/hooks/useScrollToError'
@@ -38,6 +39,11 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   // ini: dokumennya selalu bertanda unitnya sendiri (ditegakkan server).
   const [restrictToUnit, setRestrictToUnit] = useState(false)
   const [unitKerjaId, setUnitKerjaId] = useState('')
+  // Bawaannya BERLAKU, sama seperti kolomnya di database. Yang penting di sini
+  // adalah RANCANGAN punya jalan masuk sama sekali: sebelumnya naskah yang
+  // belum ditetapkan tetap tersimpan sebagai berlaku, langsung terbaca seluruh
+  // pegawai dan ikut dikutip AI.
+  const [legalStatus, setLegalStatus] = useState<ApiLegalStatus>('BERLAKU')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const errorRef = useScrollToError<HTMLDivElement>(error)
@@ -104,10 +110,14 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
         // kerjanya sendiri, sehingga nilai dari klien tidak bisa dipakai
         // menandai dokumen atas nama unit lain.
         unitKerjaId: isSuperAdmin ? (restrictToUnit ? unitKerjaId || undefined : undefined) : undefined,
+        // Akun pribadi tidak punya pilihan ini: dokumennya hanya terlihat
+        // olehnya sendiri, jadi status keberlakuan tidak menentukan apa pun.
+        legalStatus: user?.accountType === 'PERSONAL' ? undefined : legalStatus,
       })
       setFile(null)
       setTitle('')
       setCategoryId('')
+      setLegalStatus('BERLAKU')
       onUploaded(document)
       onClose()
     } catch (err) {
@@ -124,6 +134,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     setCategoryId('')
     setRestrictToUnit(false)
     setUnitKerjaId('')
+    setLegalStatus('BERLAKU')
     setError(null)
     onClose()
   }
@@ -166,6 +177,23 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
             disabled={uploading}
           />
         </div>
+
+        {user?.accountType !== 'PERSONAL' && <div className="upload-field">
+          <label htmlFor="upload-legal-status"><Scale size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Status keberlakuan' : 'Legal status'}</label>
+          <div className="select-wrapper">
+            <select
+              id="upload-legal-status"
+              value={legalStatus}
+              onChange={(event) => setLegalStatus(event.target.value as ApiLegalStatus)}
+              disabled={uploading}
+            >
+              {LEGAL_STATUSES.map((status) => (
+                <option key={status} value={status}>{legalStatusLabel(status, isId)}</option>
+              ))}
+            </select>
+          </div>
+          <p className="field-hint">{legalStatusHint(legalStatus, isId)}</p>
+        </div>}
 
         <div className="upload-field">
           <label><FolderOpen size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Kategori' : 'Category'}</label>

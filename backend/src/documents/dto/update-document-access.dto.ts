@@ -4,6 +4,9 @@ import { IsOptional, IsUUID, ValidateIf } from 'class-validator';
 /**
  * Perubahan kategori dan penanda unit kerja sebuah dokumen.
  *
+ * Status keberlakuan TIDAK di sini: wewenangnya berbeda dan punya endpoint
+ * sendiri, PATCH /documents/:id/legal-status.
+ *
  * Bedanya `undefined` dan `null` disengaja dan dipakai service:
  *  - field tidak dikirim (`undefined`) berarti nilainya tidak diubah;
  *  - field dikirim bernilai `null` berarti dilepas — kategori dikosongkan,
@@ -11,6 +14,7 @@ import { IsOptional, IsUUID, ValidateIf } from 'class-validator';
  *
  * Tanpa pembedaan ini, "jangan sentuh kategorinya" dan "hapus kategorinya"
  * akan terlihat sama di server.
+
  */
 export class UpdateDocumentAccessDto {
   @ApiPropertyOptional({
@@ -34,4 +38,5 @@ export class UpdateDocumentAccessDto {
   @ValidateIf((_, value) => value !== null)
   @IsUUID('4')
   unitKerjaId?: string | null;
+
 }
