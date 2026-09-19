@@ -10,7 +10,11 @@ const ANNOUNCEMENT_SELECT = {
   id: true,
   title: true,
   body: true,
-  imageDataUrl: true,
+  // imageDataUrl sengaja TIDAK ada di sini. Gambar pengumuman adalah data URL
+  // base64 yang bisa mencapai megabytes; ikut di daftar berarti seluruhnya
+  // terkirim ulang setiap kali halaman dibuka, dan tidak bisa di-cache browser
+  // karena terkubur di dalam JSON. Yang dikirim hanya penandanya, gambarnya
+  // diambil terpisah lewat GET /announcements/:id/image.
   isActive: true,
   publishedAt: true,
   createdAt: true,
@@ -42,6 +46,9 @@ const READER_SELECT = {
 
 /** Sudah membaca dan seluruh sasarannya, untuk satu pengumuman. */
 type ReadStats = { readCount: number; total: number };
+
+/** Potongan awal data URL, mis. "data:image/webp;base64," */
+const IMAGE_DATA_URL_PREFIX = /^data:(image\/(?:avif|gif|jpeg|png|webp));base64,/;
 
 @Injectable()
 export class AnnouncementsService {
@@ -102,15 +109,31 @@ export class AnnouncementsService {
    * bagi pegawai biasa angka itu tidak berguna dan hanya membocorkan seberapa
    * ramai rekannya membuka pengumuman.
    */
-  private toResponse<T>(row: T, stats: ReadStats | null) {
-    return { ...row, readCount: stats?.readCount ?? null, audienceTotal: stats?.total ?? null };
+  private toResponse<T>(row: T, stats: ReadStats | null, hasImage: boolean) {
+    return { ...row, hasImage, readCount: stats?.readCount ?? null, audienceTotal: stats?.total ?? null };
+  }
+
+  /**
+   * Pengumuman mana saja yang punya gambar, tanpa membaca gambarnya.
+   *
+   * `IS NOT NULL` hanya menyentuh penunjuk kolomnya, jadi baris sebesar apa pun
+   * tidak ikut terbaca — inilah yang membuat daftar tetap ringan sementara
+   * antarmuka tetap tahu kartu mana yang perlu memuat gambar.
+   */
+  private async idsWithImage(where: { workspaceId: string; id?: string }) {
+    const rows = await this.prisma.announcement.findMany({
+      where: { ...where, imageDataUrl: { not: null } },
+      select: { id: true },
+    });
+    return new Set(rows.map((row) => row.id));
   }
 
   /** Satu pengumuman beserta hitungan bacanya, untuk balasan create dan update. */
   private async toSingleResponse<T extends { id: string; createdBy: { id: string } | null }>(row: T, actor: AuthenticatedUser) {
-    if (!this.canViewReaders(actor)) return this.toResponse(row, null);
+    const withImage = await this.idsWithImage({ workspaceId: actor.workspaceId, id: row.id });
+    if (!this.canViewReaders(actor)) return this.toResponse(row, null, withImage.has(row.id));
     const stats = await this.readStats(actor.workspaceId, [{ id: row.id, createdById: row.createdBy?.id ?? null }]);
-    return this.toResponse(row, stats.get(row.id) ?? null);
+    return this.toResponse(row, stats.get(row.id) ?? null, withImage.has(row.id));
   }
 
   /**
@@ -181,10 +204,58 @@ export class AnnouncementsService {
       select: ANNOUNCEMENT_SELECT,
       orderBy: [{ isActive: 'desc' }, { publishedAt: 'desc' }],
     });
-    const stats = canSeeReaders
-      ? await this.readStats(actor.workspaceId, items.map((item) => ({ id: item.id, createdById: item.createdBy?.id ?? null })))
-      : null;
-    return items.map((item) => this.toResponse(item, stats?.get(item.id) ?? null));
+    const [stats, withImage] = await Promise.all([
+      canSeeReaders
+        ? this.readStats(actor.workspaceId, items.map((item) => ({ id: item.id, createdById: item.createdBy?.id ?? null })))
+        : null,
+      this.idsWithImage({ workspaceId: actor.workspaceId }),
+    ]);
+    return items.map((item) => this.toResponse(item, stats?.get(item.id) ?? null, withImage.has(item.id)));
+  }
+
+  /**
+   * Gambar satu pengumuman sebagai biner, bukan sebagai teks base64.
+   *
+   * Dipisah dari daftarnya supaya bisa di-cache browser: kunjungan kedua cukup
+   * dijawab 304 dan tidak ada satu byte gambar pun yang turun ulang. Selama
+   * gambar masih ikut di dalam JSON daftar, penghematan itu mustahil — isi JSON
+   * tidak punya validator tersendiri.
+   *
+   * ETag disusun dari `updatedAt`, yang berubah setiap pengumumannya disunting.
+   * Pemeriksaannya sengaja dilakukan SEBELUM kolom gambarnya dibaca, jadi
+   * jawaban 304 tidak pernah menyentuh baris besarnya.
+   */
+  async image(id: string, actor: AuthenticatedUser, ifNoneMatch?: string) {
+    // Pegawai hanya boleh mengambil gambar pengumuman yang masih berlaku —
+    // batas yang sama persis dengan daftarnya. Tanpa ini, mengarsipkan sebuah
+    // pengumuman menyembunyikan teksnya tetapi gambarnya tetap bisa diambil
+    // siapa pun yang pernah melihat idnya.
+    const where = {
+      id,
+      workspaceId: actor.workspaceId,
+      ...(this.canPublish(actor) ? {} : { isActive: true }),
+    };
+    const head = await this.prisma.announcement.findFirst({
+      where,
+      select: { id: true, updatedAt: true },
+    });
+    if (!head) throw new NotFoundException('Announcement not found');
+
+    const etag = `"${head.id}-${head.updatedAt.getTime()}"`;
+    if (ifNoneMatch && ifNoneMatch.split(',').some((value) => value.trim() === etag)) {
+      return { etag, notModified: true as const };
+    }
+
+    const row = await this.prisma.announcement.findFirst({ where, select: { imageDataUrl: true } });
+    if (!row?.imageDataUrl) throw new NotFoundException('Announcement has no image');
+    const match = IMAGE_DATA_URL_PREFIX.exec(row.imageDataUrl);
+    if (!match) throw new NotFoundException('Announcement has no image');
+    return {
+      etag,
+      notModified: false as const,
+      mimeType: match[1],
+      content: Buffer.from(row.imageDataUrl.slice(match[0].length), 'base64'),
+    };
   }
 
   async create(input: CreateAnnouncementDto, actor: AuthenticatedUser) {

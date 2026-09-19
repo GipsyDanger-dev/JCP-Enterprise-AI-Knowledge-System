@@ -1,10 +1,15 @@
-import { authHeaders, request } from './client'
+import { API_BASE_URL, authHeaders, request } from './client'
 
 export interface Announcement {
   id: string
   title: string
   body: string
-  imageDataUrl: string | null
+  /**
+   * Gambarnya tidak ikut di daftar — hanya penandanya. Isinya diambil terpisah
+   * lewat getAnnouncementImageBlob supaya bisa di-cache browser; dulu seluruh
+   * base64-nya ikut di JSON ini dan terunduh ulang setiap halaman dibuka.
+   */
+  hasImage: boolean
   isActive: boolean
   publishedAt: string
   createdAt: string
@@ -48,8 +53,40 @@ export interface AnnouncementReadReport {
 }
 
 export const listAnnouncements = (token?: string) => request<Announcement[]>('/announcements', { headers: authHeaders(token) })
-export const createAnnouncement = (input: Pick<Announcement, 'title' | 'body' | 'imageDataUrl'>, token?: string) => request<Announcement>('/announcements', { method: 'POST', body: input, headers: authHeaders(token) })
-export const updateAnnouncement = (id: string, input: Partial<Pick<Announcement, 'title' | 'body' | 'imageDataUrl' | 'isActive'>>, token?: string) => request<Announcement>(`/announcements/${id}`, { method: 'PATCH', body: input, headers: authHeaders(token) })
+
+/** Isian yang dikirim saat menerbitkan atau menyunting. */
+export interface AnnouncementInput {
+  title: string
+  body: string
+  /**
+   * Data URL gambar barunya, atau null untuk membuang gambar yang ada.
+   *
+   * Tidak disertakan sama sekali berarti gambarnya dibiarkan apa adanya — itu
+   * yang membuat penyuntingan teks tidak perlu mengunggah ulang gambar yang
+   * tidak berubah, dan sejak gambarnya tidak lagi ikut di daftar, klien memang
+   * tidak lagi memegang salinannya untuk dikirim balik.
+   */
+  imageDataUrl?: string | null
+}
+
+export const createAnnouncement = (input: AnnouncementInput, token?: string) => request<Announcement>('/announcements', { method: 'POST', body: input, headers: authHeaders(token) })
+export const updateAnnouncement = (id: string, input: Partial<AnnouncementInput> & { isActive?: boolean }, token?: string) => request<Announcement>(`/announcements/${id}`, { method: 'PATCH', body: input, headers: authHeaders(token) })
+
+/**
+ * Gambar satu pengumuman sebagai blob.
+ *
+ * Lewat fetch, bukan langsung dipasang di src <img>: endpointnya butuh header
+ * Authorization, dan <img> tidak pernah mengirimkannya. Jawaban 304 dari cache
+ * browser tetap berlaku di jalur ini, jadi kunjungan kedua tidak mengunduh
+ * apa pun.
+ */
+export async function getAnnouncementImageBlob(id: string, token?: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/announcements/${id}/image`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!response.ok) throw new Error('Unable to load announcement image')
+  return response.blob()
+}
 /** Hapus permanen; bukti bacanya ikut terhapus. Untuk sekadar menyembunyikan, pakai updateAnnouncement({ isActive: false }). */
 export const deleteAnnouncement = (id: string, token?: string) => request<{ id: string; deleted: boolean }>(`/announcements/${id}`, { method: 'DELETE', headers: authHeaders(token) })
 export const getAnnouncementUnreadCount = (token?: string) => request<{ count: number; latestTitle: string | null }>('/announcements/unread', { headers: authHeaders(token) })

@@ -4,6 +4,7 @@ import { Archive, Check, CheckCheck, ImagePlus, Loader2, Megaphone, Pencil, Plus
 import {
   createAnnouncement,
   deleteAnnouncement,
+  getAnnouncementImageBlob,
   getAnnouncementPermissions,
   getAnnouncementReaders,
   listAnnouncements,
@@ -26,6 +27,93 @@ const formatReadAt = (value: string, isId: boolean) => new Date(value).toLocaleD
   day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
 })
 
+/**
+ * URL objek untuk gambar sebuah pengumuman.
+ *
+ * Gambarnya tidak lagi ikut di daftar, jadi harus diambil sendiri — dan lewat
+ * fetch, bukan langsung di `src`, karena endpointnya menuntut header
+ * Authorization yang tidak pernah dikirim `<img>`.
+ *
+ * `updatedAt` ikut jadi kebergantungan supaya gambar yang baru diganti benar-
+ * benar dimuat ulang; alamatnya tetap sama, jadi tanpa itu yang tampil masih
+ * gambar lama. Object URL dicabut saat berganti atau saat komponennya lepas:
+ * selama belum dicabut, blob-nya ditahan di memori, dan satu halaman bisa
+ * memuat belasan gambar sekaligus.
+ */
+function useAnnouncementImage(id: string | null, updatedAt: string | null, token?: string) {
+  const [url, setUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!id) {
+      setUrl(null)
+      return
+    }
+    let cancelled = false
+    let objectUrl: string | null = null
+    getAnnouncementImageBlob(id, token)
+      .then((blob) => {
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setUrl(objectUrl)
+      })
+      // Gambar yang gagal dimuat tidak diberi pesan galat tersendiri: teks
+      // pengumumannya sudah tampil, dan kartu tanpa gambar lebih baik daripada
+      // kartu yang penuh peringatan.
+      .catch(() => { if (!cancelled) setUrl(null) })
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      // Dikosongkan juga, bukan sekadar dicabut: alamat yang sudah dicabut
+      // masih tersimpan di state, dan membiarkannya berarti gambar yang baru
+      // diganti sempat tampil sebagai gambar rusak sampai muatan barunya tiba.
+      setUrl(null)
+    }
+  }, [id, updatedAt, token])
+
+  return url
+}
+
+/**
+ * Memuat gambar satu pengumuman lalu menyerahkannya ke isi kartunya.
+ *
+ * Berupa komponen, bukan pemanggilan hook langsung di dalam map: hook tidak
+ * boleh dipanggil di dalam perulangan, sementara tiap kartu perlu memuat
+ * gambarnya sendiri-sendiri.
+ */
+function WithAnnouncementImage({ announcement, token, children }: {
+  announcement: Announcement
+  token?: string
+  children: (imageUrl: string | null) => ReactNode
+}) {
+  const imageUrl = useAnnouncementImage(
+    announcement.hasImage ? announcement.id : null,
+    announcement.updatedAt,
+    token,
+  )
+  return <>{children(imageUrl)}</>
+}
+
+/** Tampilan gambar ukuran penuh. Memuat gambarnya sendiri, bukan meminjam milik kartu. */
+function AnnouncementLightbox({ announcement, token, isId, onClose }: {
+  announcement: Announcement
+  token?: string
+  isId: boolean
+  onClose: () => void
+}) {
+  // Permintaan kedua untuk gambar yang sama praktis gratis: jawabannya sudah
+  // ada di cache browser dan berhenti di 304.
+  const imageUrl = useAnnouncementImage(announcement.id, announcement.updatedAt, token)
+  if (!imageUrl) return null
+  return (
+    <div className="announcement-lightbox" role="dialog" aria-modal="true" aria-label={announcement.title} onClick={onClose}>
+      <button type="button" className="announcement-lightbox-close" aria-label={isId ? 'Tutup' : 'Close'} onClick={onClose}><X size={20} /></button>
+      {/* Klik pada gambarnya sendiri tidak menutup: menggeser atau menyorot
+          bagian gambar tidak boleh berakhir menutup tampilannya. */}
+      <img src={imageUrl} alt={isId ? `Gambar untuk pengumuman ${announcement.title}` : `Image for announcement ${announcement.title}`} onClick={(event) => event.stopPropagation()} />
+    </div>
+  )
+}
+
 /** Satu baris pegawai di laporan baca. */
 function ReaderRow({ person, isId }: { person: AnnouncementReader; isId: boolean }) {
   return (
@@ -45,23 +133,40 @@ function ReaderRow({ person, isId }: { person: AnnouncementReader; isId: boolean
  * Nilai awal disalin ke state sendiri: menyunting sebuah pengumuman tidak boleh
  * mengubah tampilan kartunya sebelum perubahan itu benar-benar tersimpan.
  */
-function AnnouncementForm({ heading, submitLabel, submitIcon, initial, saving, isId, inline, onSubmit, onCancel }: {
+function AnnouncementForm({ heading, submitLabel, submitIcon, initial, existingImageUrl, saving, isId, inline, onSubmit, onCancel }: {
   heading: string
   submitLabel: string
   submitIcon: ReactNode
-  initial?: { title: string; body: string; imageDataUrl: string | null }
+  initial?: { title: string; body: string; hasImage: boolean }
+  /** Gambar yang sudah tersimpan, sudah dimuat pemanggilnya. Null bila tidak ada. */
+  existingImageUrl?: string | null
   saving: boolean
   isId: boolean
   inline?: boolean
-  onSubmit: (values: { title: string; body: string; imageDataUrl: string | null }) => void
+  onSubmit: (values: { title: string; body: string; imageDataUrl?: string | null }) => void
   onCancel: () => void
 }) {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [body, setBody] = useState(initial?.body ?? '')
-  const [imageDataUrl, setImageDataUrl] = useState(initial?.imageDataUrl ?? null)
+  /**
+   * Tiga keadaan, bukan dua:
+   *  - `undefined` — gambarnya tidak disentuh, jadi tidak ikut dikirim;
+   *  - `null` — gambarnya dibuang;
+   *  - data URL — gambarnya diganti.
+   *
+   * Dibedakan karena klien tidak lagi memegang salinan gambar yang tersimpan.
+   * Tanpa keadaan "tidak disentuh", menyunting judul saja akan mengirim
+   * `imageDataUrl: null` dan diam-diam menghapus gambarnya.
+   */
+  const [imageChange, setImageChange] = useState<string | null | undefined>(undefined)
   const [imageName, setImageName] = useState('')
   const [imageError, setImageError] = useState<string | null>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  // Yang ditampilkan: gambar baru bila ada, kalau tidak gambar tersimpan —
+  // kecuali sudah ditandai dibuang.
+  const previewUrl = typeof imageChange === 'string'
+    ? imageChange
+    : imageChange === null ? null : existingImageUrl ?? null
 
   const selectImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -75,7 +180,7 @@ function AnnouncementForm({ heading, submitLabel, submitIcon, initial, saving, i
       // Dikecilkan dulu, tidak disimpan seukuran aslinya: gambar pengumuman
       // ikut terkirim sebagai base64 di dalam daftarnya, jadi satu foto kamera
       // memperlambat halaman ini bagi seluruh pegawai, setiap kali dibuka.
-      setImageDataUrl(await imageFileToCompressedDataUrl(file))
+      setImageChange(await imageFileToCompressedDataUrl(file))
       setImageName(file.name)
       setImageError(null)
     } catch (err) {
@@ -86,7 +191,9 @@ function AnnouncementForm({ heading, submitLabel, submitIcon, initial, saving, i
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (!title.trim() || !body.trim()) return
-    onSubmit({ title: title.trim(), body: body.trim(), imageDataUrl })
+    // imageChange diteruskan apa adanya, termasuk undefined-nya: itulah yang
+    // memberi tahu pemanggil bahwa gambarnya tidak perlu ikut dikirim.
+    onSubmit({ title: title.trim(), body: body.trim(), imageDataUrl: imageChange })
   }
 
   return (
@@ -97,10 +204,10 @@ function AnnouncementForm({ heading, submitLabel, submitIcon, initial, saving, i
       <div className="announcement-image-field">
         <span>{isId ? 'Gambar (opsional)' : 'Image (optional)'}</span>
         <input ref={imageInputRef} type="file" accept="image/avif,image/gif,image/jpeg,image/png,image/webp" onChange={selectImage} hidden />
-        {imageDataUrl ? <div className="announcement-image-picker-preview">
-          <img src={imageDataUrl} alt="" />
+        {previewUrl ? <div className="announcement-image-picker-preview">
+          <img src={previewUrl} alt="" />
           <span>{imageName || (isId ? 'Gambar pengumuman' : 'Announcement image')}</span>
-          <button type="button" className="icon-button" title={isId ? 'Hapus gambar' : 'Remove image'} aria-label={isId ? 'Hapus gambar' : 'Remove image'} onClick={() => { setImageDataUrl(null); setImageName(''); setImageError(null) }}><X size={16} /></button>
+          <button type="button" className="icon-button" title={isId ? 'Hapus gambar' : 'Remove image'} aria-label={isId ? 'Hapus gambar' : 'Remove image'} onClick={() => { setImageChange(null); setImageName(''); setImageError(null) }}><X size={16} /></button>
         </div> : <button type="button" className="announcement-image-picker" onClick={() => imageInputRef.current?.click()}><ImagePlus size={17} />{isId ? 'Tambahkan gambar' : 'Add image'}</button>}
         {imageError && <small className="announcement-image-error" role="alert">{imageError}</small>}
       </div>
@@ -200,7 +307,7 @@ export function AnnouncementsPage() {
   // dan bukti bacanya tercatat per pengumuman di server.
   useEffect(() => { markAnnouncementsSeen() }, [markAnnouncementsSeen])
 
-  const publish = async (values: { title: string; body: string; imageDataUrl: string | null }) => {
+  const publish = async (values: { title: string; body: string; imageDataUrl?: string | null }) => {
     if (!token) return
     setSaving(true)
     setError(null)
@@ -217,7 +324,7 @@ export function AnnouncementsPage() {
 
   const replaceInList = (updated: Announcement) => setAnnouncements((items) => items.map((item) => item.id === updated.id ? updated : item))
 
-  const saveEdit = async (announcement: Announcement, values: { title: string; body: string; imageDataUrl: string | null }) => {
+  const saveEdit = async (announcement: Announcement, values: { title: string; body: string; imageDataUrl?: string | null }) => {
     if (!token) return
     setBusyId(announcement.id)
     setError(null)
@@ -347,14 +454,16 @@ export function AnnouncementsPage() {
           const mine = canEdit(announcement)
           const editing = mine && editingId === announcement.id
           const busy = busyId === announcement.id
-          return <article key={announcement.id} className={`announcement-card${!announcement.isActive && !editing ? ' archived' : ''}${announcement.imageDataUrl && !editing ? ' with-image' : ''}`}>
+          return <WithAnnouncementImage key={announcement.id} announcement={announcement} token={token ?? undefined}>{(imageUrl) => (
+            <article className={`announcement-card${!announcement.isActive && !editing ? ' archived' : ''}${announcement.hasImage && !editing ? ' with-image' : ''}`}>
             <span className="announcement-icon">{editing ? <Pencil size={19} /> : <Megaphone size={19} />}</span>
             {editing ? <AnnouncementForm
               inline
               heading={isId ? 'Sunting pengumuman' : 'Edit announcement'}
               submitLabel={isId ? 'Simpan perubahan' : 'Save changes'}
               submitIcon={<Check size={17} />}
-              initial={{ title: announcement.title, body: announcement.body, imageDataUrl: announcement.imageDataUrl }}
+              initial={{ title: announcement.title, body: announcement.body, hasImage: announcement.hasImage }}
+              existingImageUrl={imageUrl}
               saving={busy}
               isId={isId}
               onSubmit={(values) => saveEdit(announcement, values)}
@@ -383,9 +492,9 @@ export function AnnouncementsPage() {
                     : `Read by ${announcement.readCount ?? 0} of ${announcement.audienceTotal ?? 0}`}
                 </button>}
               </div>
-              {announcement.imageDataUrl && <div className="announcement-media">
+              {announcement.hasImage && imageUrl && <div className="announcement-media">
                 <figure className="announcement-image">
-                  <img src={announcement.imageDataUrl} alt={isId ? `Gambar untuk pengumuman ${announcement.title}` : `Image for announcement ${announcement.title}`} />
+                  <img src={imageUrl} alt={isId ? `Gambar untuk pengumuman ${announcement.title}` : `Image for announcement ${announcement.title}`} />
                   {/* Bingkainya diisi penuh, jadi gambar yang bentuknya tidak
                       sepadan akan terpangkas; tombol ini yang menyediakan versi
                       utuhnya, sekalian ukuran penuh untuk poster yang berteks. */}
@@ -416,16 +525,12 @@ export function AnnouncementsPage() {
                 </div>
               </>}
             </div>}
-          </article>
+            </article>
+          )}</WithAnnouncementImage>
         })}
       </div>}
 
-      {zoomed?.imageDataUrl && <div className="announcement-lightbox" role="dialog" aria-modal="true" aria-label={zoomed.title} onClick={() => setZoomed(null)}>
-        <button type="button" className="announcement-lightbox-close" aria-label={isId ? 'Tutup' : 'Close'} onClick={() => setZoomed(null)}><X size={20} /></button>
-        {/* Klik pada gambarnya sendiri tidak menutup: menggeser atau menyorot
-            bagian gambar tidak boleh berakhir menutup tampilannya. */}
-        <img src={zoomed.imageDataUrl} alt={isId ? `Gambar untuk pengumuman ${zoomed.title}` : `Image for announcement ${zoomed.title}`} onClick={(event) => event.stopPropagation()} />
-      </div>}
+      {zoomed?.hasImage && <AnnouncementLightbox announcement={zoomed} token={token ?? undefined} isId={isId} onClose={() => setZoomed(null)} />}
 
       {pendingDelete && <div className="modal-overlay" onClick={() => !deleting && setPendingDelete(null)}>
         <div className="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="delete-announcement-title" onClick={(event) => event.stopPropagation()}>
