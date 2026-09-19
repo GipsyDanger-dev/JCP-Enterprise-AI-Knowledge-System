@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { WorkspacesController } from './workspaces/workspaces.controller';
-import { AiModule } from './ai/ai.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
@@ -25,7 +24,6 @@ import { OrganizationModule } from './organization/organization.module';
     ProcessingJobsModule,
     ChatModule,
     MessagingModule,
-    AiModule,
     NotificationsModule,
     AnnouncementsModule,
     BillingModule,
