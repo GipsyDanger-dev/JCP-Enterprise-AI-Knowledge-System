@@ -139,7 +139,10 @@ class KnowledgeBase:
         else:
             answer = matches[0][1]["text"]
         if is_no_answer(answer):
-            return no_answer_response(self.suggested_questions())
+            # Sama seperti jalur pgvector: potongan yang barusan ditemukan lebih
+            # dekat ke pertanyaannya daripada isi korpus yang diacak.
+            from_matches = questions_from_topics([chunk for _, chunk in matches])
+            return no_answer_response(from_matches or self.suggested_questions())
         # Sama seperti jalur pgvector: sitasi dipangkas setelah jawaban ada.
         supported = supporting_matches(answer, matches)
         return {

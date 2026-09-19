@@ -536,7 +536,21 @@ class PgVectorStore:
                 return no_answer_response(self.suggested_questions(scope=scope))
             return clarify_response(clarify, asked)
         if is_no_answer(answer):
-            return no_answer_response(self.suggested_questions(scope=scope))
+            # Usulannya disusun dari potongan yang BARUSAN ditemukan retrieval,
+            # bukan dari kueri acak baru ke seluruh korpus. Model menilai isinya
+            # tidak cukup untuk menjawab, tetapi potongan itu tetap yang paling
+            # dekat dengan yang ditanyakan — jadi chip-nya menawarkan jalan
+            # keluar yang masih nyambung, bukan judul dokumen sembarangan.
+            #
+            # Sekaligus menghapus satu kueri: `suggestion_topics` memakai
+            # ORDER BY random() atas seluruh chunks yang terlihat, dan itu tidak
+            # lagi dijalankan di jalur ini.
+            #
+            # Kalau potongannya tidak menghasilkan satu pun label yang layak
+            # (judul kosong, penggalan tanpa nama bagian), barulah jatuh ke
+            # kueri acak — chip kosong lebih buruk daripada chip yang melenceng.
+            from_matches = questions_from_topics([chunk for _, chunk in matches])
+            return no_answer_response(from_matches or self.suggested_questions(scope=scope))
         # Sitasi dipangkas SETELAH jawaban tersusun, bukan sebelumnya. Semua
         # chunk tetap ikut ke prompt — memangkasnya lebih awal justru membuang
         # bahan yang mungkin dipakai menjawab. Yang dibuang di sini hanya yang
