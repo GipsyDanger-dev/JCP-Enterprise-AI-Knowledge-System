@@ -628,15 +628,13 @@ button { cursor: pointer; }
 .filter-search { min-width: 240px; height: 36px; border: 1px solid var(--border-strong); background: var(--bg-card); border-radius: var(--radius-md); padding: 0 10px; display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
 .filter-search input { border: 0; outline: 0; min-width: 0; flex: 1; font-size: var(--fs-sm); }
 .data-table-wrap { display: flex; flex-direction: column; }
-/* Rel scroll kembar di atas tabel: tingginya dibuat lebih tebal dari scrollbar
-   global (6px) supaya gampang ditarik, dan track-nya selalu kelihatan biar
-   jelas bahwa bisa digeser. */
-.data-table-rail { overflow-x: auto; overflow-y: hidden; height: 10px; margin-bottom: 6px; border-radius: var(--radius-pill); }
-.data-table-rail > div { height: 1px; }
-.data-table-rail::-webkit-scrollbar { height: 10px; }
-.data-table-rail::-webkit-scrollbar-track { background: var(--bg-subtle); border-radius: var(--radius-pill); }
-.data-table-rail::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--radius-pill); }
-.data-table-rail::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+/* Rel custom, bukan native scrollbar. macOS dapat menyembunyikan native
+   scrollbar sebagai overlay; thumb ini tetap terlihat di semua platform. */
+.data-table-rail { position: relative; height: 12px; margin-bottom: 6px; border-radius: var(--radius-pill); background: var(--bg-subtle); cursor: pointer; touch-action: none; outline: 0; }
+.data-table-rail:focus-visible { box-shadow: 0 0 0 3px var(--brand-100); }
+.data-table-thumb { position: absolute; top: 2px; left: 0; height: 8px; min-width: 44px; border-radius: var(--radius-pill); background: var(--border-strong); cursor: grab; transition: background var(--ease-fast); }
+.data-table-rail:hover .data-table-thumb, .data-table-rail:focus-visible .data-table-thumb { background: var(--text-muted); }
+.data-table-rail.is-dragging, .data-table-rail.is-dragging .data-table-thumb { cursor: grabbing; }
 .data-table { overflow-x: auto; border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-xl); }
 .data-table table { width: 100%; border-collapse: collapse; min-width: 760px; }
 .data-table th, .data-table td { height: 57px; padding: 0 16px; border-bottom: 1px solid var(--border-soft); text-align: left; color: var(--text-secondary); font-size: var(--fs-sm); }

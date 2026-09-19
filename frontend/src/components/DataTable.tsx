@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 
 /**
- * Pembungkus `.data-table` yang menambahkan scrollbar horizontal kembar di atas
- * tabel. Scrollbar bawaan container menempel di dasar tabel, jadi pada daftar
- * yang panjang user harus menggulir halaman sampai bawah dulu hanya untuk
- * menggeser kolom. Rel atas ini digerakkan dua arah dengan tabelnya.
+ * Pembungkus `.data-table` yang menambahkan thumb horizontal di atas tabel.
+ * Native scrollbar macOS dapat disembunyikan sistem, sehingga kontrol ini
+ * digambar sendiri dan selalu tersedia saat tabel melebar.
  *
  * Rel hanya dirender kalau tabelnya memang melebar; kalau muat, tidak ada
  * garis nyangkut di atas tabel.
@@ -12,25 +11,25 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 export function DataTable({ children }: { children: ReactNode }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
-  const railRef = useRef<HTMLDivElement>(null)
-  const [railWidth, setRailWidth] = useState(0)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const dragOffset = useRef(0)
+  const tableId = useId()
   const [overflowing, setOverflowing] = useState(false)
+  const [scroll, setScroll] = useState({ left: 0, clientWidth: 0, scrollWidth: 0, trackWidth: 0 })
+  const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
     const wrap = wrapRef.current
     const body = bodyRef.current
     if (!wrap || !body) return
     const measure = () => {
-      // `.data-table` punya border 1px dan relnya tidak, jadi lebar-dalam
-      // keduanya beda 2px. Kalau spacer dibuat sama persis dengan scrollWidth
-      // tabel, scrollLeft maksimum rel jadi 2px lebih pendek: begitu tabel
-      // mentok, nilai yang dioper ke rel dipangkas browser dan rel menyeret
-      // tabel mundur lagi — tarik-menarik tepat di ujung. Spacer dilebihkan
-      // sebesar selisih itu supaya jangkauan keduanya identik. Diukur, bukan
-      // dipatok 2px, supaya ikut benar kalau border atau padangnya berubah.
-      const relBox = railRef.current ?? wrap
-      const selisih = relBox.clientWidth - body.clientWidth
-      setRailWidth(body.scrollWidth + selisih)
+      const trackWidth = trackRef.current?.clientWidth ?? wrap.clientWidth
+      setScroll((current) => ({
+        left: body.scrollLeft,
+        clientWidth: body.clientWidth,
+        scrollWidth: body.scrollWidth,
+        trackWidth: trackWidth || current.trackWidth,
+      }))
       setOverflowing(body.scrollWidth - body.clientWidth > 1)
     }
     measure()
@@ -39,46 +38,105 @@ export function DataTable({ children }: { children: ReactNode }) {
     const observer = new ResizeObserver(measure)
     observer.observe(body)
     if (body.firstElementChild) observer.observe(body.firstElementChild)
+    if (trackRef.current) observer.observe(trackRef.current)
     return () => observer.disconnect()
-  }, [])
-
-  // Rel baru dirender setelah tabelnya melebar, jadi posisinya disamakan dulu
-  // supaya tidak lompat ke kiri kalau tabel sudah terlanjur digeser.
-  useEffect(() => {
-    if (!overflowing) return
-    const body = bodyRef.current
-    const rail = railRef.current
-    if (body && rail) rail.scrollLeft = body.scrollLeft
   }, [overflowing])
 
-  // Menyetel scrollLeft memicu event scroll di elemen tujuan, dan event itu
-  // memantul balik ke sini. Event scroll dikirim asinkron, jadi penanda tidak
-  // bisa dilepas tepat setelah penyetelan — dilepas di frame berikutnya.
-  // Selama satu sisi masih menggerakkan yang lain, gema dari seberang diabaikan.
-  const penggerak = useRef<'body' | 'rail' | null>(null)
-  const lepas = useRef(0)
-  const mirror = (dari: 'body' | 'rail') => () => {
+  const maxScroll = Math.max(0, scroll.scrollWidth - scroll.clientWidth)
+  const thumbWidth = maxScroll > 0
+    ? Math.max(44, (scroll.clientWidth / scroll.scrollWidth) * scroll.trackWidth)
+    : scroll.trackWidth
+  const thumbOffset = maxScroll > 0
+    ? (scroll.left / maxScroll) * Math.max(0, scroll.trackWidth - thumbWidth)
+    : 0
+
+  const updateScroll = (left: number) => {
     const body = bodyRef.current
-    const rail = railRef.current
-    if (!body || !rail) return
-    if (penggerak.current && penggerak.current !== dari) return
-    penggerak.current = dari
-    const [asal, tujuan] = dari === 'body' ? [body, rail] : [rail, body]
-    tujuan.scrollLeft = asal.scrollLeft
-    cancelAnimationFrame(lepas.current)
-    lepas.current = requestAnimationFrame(() => { penggerak.current = null })
+    if (!body) return
+    body.scrollLeft = Math.max(0, Math.min(left, maxScroll))
+    setScroll((current) => ({ ...current, left: body.scrollLeft }))
   }
 
-  useEffect(() => () => cancelAnimationFrame(lepas.current), [])
+  const scrollFromPointer = (clientX: number, offset: number) => {
+    const track = trackRef.current
+    if (!track || maxScroll === 0) return
+    const position = Math.max(0, Math.min(
+      clientX - track.getBoundingClientRect().left - offset,
+      Math.max(0, scroll.trackWidth - thumbWidth),
+    ))
+    updateScroll((position / Math.max(1, scroll.trackWidth - thumbWidth)) * maxScroll)
+  }
+
+  const onBodyScroll = () => {
+    const body = bodyRef.current
+    if (body) setScroll((current) => ({ ...current, left: body.scrollLeft }))
+  }
+
+  const onTrackPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    dragOffset.current = thumbWidth / 2
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setDragging(true)
+    scrollFromPointer(event.clientX, dragOffset.current)
+  }
+
+  const onThumbPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    event.stopPropagation()
+    const track = trackRef.current
+    if (!track) return
+    dragOffset.current = event.clientX - track.getBoundingClientRect().left - thumbOffset
+    track.setPointerCapture(event.pointerId)
+    setDragging(true)
+  }
+
+  const onTrackPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (dragging) scrollFromPointer(event.clientX, dragOffset.current)
+  }
+
+  const onTrackPointerEnd = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    setDragging(false)
+  }
+
+  const onTrackKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = Math.max(40, scroll.clientWidth * 0.15)
+    if (event.key === 'ArrowLeft') updateScroll(scroll.left - step)
+    else if (event.key === 'ArrowRight') updateScroll(scroll.left + step)
+    else if (event.key === 'Home') updateScroll(0)
+    else if (event.key === 'End') updateScroll(maxScroll)
+    else return
+    event.preventDefault()
+  }
 
   return (
     <div className="data-table-wrap" ref={wrapRef}>
       {overflowing && (
-        <div className="data-table-rail" ref={railRef} onScroll={mirror('rail')} aria-hidden="true">
-          <div style={{ width: railWidth }} />
+        <div
+          ref={trackRef}
+          className={`data-table-rail${dragging ? ' is-dragging' : ''}`}
+          role="scrollbar"
+          tabIndex={0}
+          aria-label="Geser kolom tabel"
+          aria-controls={tableId}
+          aria-orientation="horizontal"
+          aria-valuemin={0}
+          aria-valuemax={maxScroll}
+          aria-valuenow={scroll.left}
+          onKeyDown={onTrackKeyDown}
+          onPointerDown={onTrackPointerDown}
+          onPointerMove={onTrackPointerMove}
+          onPointerUp={onTrackPointerEnd}
+          onPointerCancel={onTrackPointerEnd}
+        >
+          <div
+            className="data-table-thumb"
+            style={{ width: thumbWidth, transform: `translateX(${thumbOffset}px)` }}
+            onPointerDown={onThumbPointerDown}
+          />
         </div>
       )}
-      <div className="data-table" ref={bodyRef} onScroll={mirror('body')}>{children}</div>
+      <div id={tableId} className="data-table" ref={bodyRef} onScroll={onBodyScroll}>{children}</div>
     </div>
   )
 }
