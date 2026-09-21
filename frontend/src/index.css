@@ -1116,9 +1116,7 @@ button { cursor: pointer; }
   font-size: 11px;
   color: var(--text-muted, #8b8b8b);
 }
-.doc-access-control { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-.doc-access-control .select-wrapper { min-width: 210px; }
-.doc-access-error { flex: 1 1 100%; margin: 4px 0 0; font-size: 12px; color: #b91c1c; }
+.doc-access-error { margin: 4px 0 0; font-size: 12px; color: #b91c1c; }
 
 /* Kelola kategori: daftar sederhana, satu baris per kategori. */
 .category-modal { max-width: 560px; width: 100%; }
@@ -1167,20 +1165,29 @@ button { cursor: pointer; }
 }
 .category-row-name small { display: block; margin-top: 2px; font-size: 11px; color: var(--text-muted, #8b8b8b); }
 
-/* Baris tombol: centang pilih-semua di kiri, tindakan massal di tengah,
-   Tutup di kanan. */
-.doc-access-actions { flex-wrap: wrap; gap: 10px; align-items: center; }
+/* Baris tombol: centang pilih-semua di kiri, lalu kategori, akses, Terapkan,
+   dan Tutup — kelimanya satu baris.
+
+   display:contents pada pembungkus kendali massal disengaja: tanpa itu ketiga
+   isinya dihitung sebagai satu kotak yang tidak bisa dipecah, dan kotak itu
+   selalu turun sendiri ke baris kedua sementara Tutup tertinggal di baris
+   ketiga. Dengan contents, kelimanya jadi anak langsung baris ini. */
+.doc-access-actions { flex-wrap: wrap; gap: 8px; align-items: center; }
+.doc-access-bulk { display: contents; }
 .doc-access-select-all {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-right: auto;
-  font-size: 13px;
+  font-size: 12.5px;
+  white-space: nowrap;
   cursor: pointer;
 }
 .doc-access-select-all input { width: 15px; height: 15px; cursor: pointer; }
-.doc-access-bulk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.doc-access-bulk .select-wrapper { min-width: 200px; }
+.doc-access-actions .select-wrapper { flex: 0 1 150px; min-width: 116px; }
+.doc-access-actions .select-wrapper select { height: 38px; font-size: var(--fs-sm); }
+.doc-access-apply { flex: 0 0 auto; white-space: nowrap; }
+.doc-access-sep { opacity: .55; }
 .doc-access-foot { margin-top: 10px; }
 
 /* Penanda pada baris dokumen: terkunci untuk satu unit kerja. Dokumen tanpa
