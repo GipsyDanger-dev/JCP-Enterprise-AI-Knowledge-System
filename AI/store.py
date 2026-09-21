@@ -761,11 +761,31 @@ class PgVectorStore:
             )[0]
             embedding_ms = (time.perf_counter() - embedding_started) * 1000
             search_started = time.perf_counter()
-            retrieved_matches = [
-                (score, chunk)
-                for score, chunk in self.search(query_vector, top_k, filters=filters, scope=scope)
-                if score >= minimum_score
-            ]
+            hits = self.search(query_vector, top_k, filters=filters, scope=scope)
+            retrieved_matches = [(score, chunk) for score, chunk in hits if score >= minimum_score]
+            if not retrieved_matches and context_matches:
+                # Pertanyaan lanjutan sering berhenti persis di bawah ambang.
+                # "Jelaskan ringkasan lengkap tentang ekonomi" — kalimat yang
+                # ditawarkan sendiri oleh pertanyaan balik — meraih 0,444 pada
+                # dokumen yang benar, lalu semuanya dibuang. Yang tersisa hanya
+                # konteks giliran sebelumnya, dan jawaban di atas satu potongan
+                # gampang berujung "tidak ditemukan" untuk pertanyaan yang baru
+                # saja sistem tawarkan sendiri.
+                #
+                # Pijakannya sudah ada dari konteks itu, jadi yang nyaris lolos
+                # lebih berguna daripada tidak sama sekali. Tanpa konteks —
+                # pertanyaan pertama di sebuah percakapan — ambangnya tetap
+                # penuh, karena di sana tidak ada apa pun yang menjamin
+                # pertanyaannya masih menyangkut korpus ini.
+                retrieved_matches = [
+                    (score, chunk) for score, chunk in hits
+                    if score >= SHORT_TOPIC_MINIMUM_SCORE
+                ]
+                if retrieved_matches:
+                    print(
+                        f"[AI] Tidak ada yang melewati {minimum_score}; memakai "
+                        f"{len(retrieved_matches)} hasil nyaris-lolos untuk pertanyaan lanjutan"
+                    )
             search_ms = (time.perf_counter() - search_started) * 1000
             seen = {chunk["chunk_id"] for _, chunk in context_matches}
             matches = context_matches + [

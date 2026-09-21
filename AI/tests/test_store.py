@@ -385,6 +385,38 @@ class PgVectorStoreTests(unittest.TestCase):
         # itu tidak mulai mencari dari nol.
         self.assertEqual([item["chunk_id"] for item in hasil["retrieval"]], ["chunk-1"])
 
+    def test_hasil_nyaris_lolos_dipakai_untuk_pertanyaan_lanjutan(self):
+        """Pilihan yang ditawarkan sendiri oleh sistem tidak boleh kehabisan bahan.
+
+        "Jelaskan ringkasan lengkap tentang ekonomi" meraih 0,444 pada dokumen
+        yang benar — di bawah 0,45, jadi seluruhnya dibuang dan yang tersisa
+        cuma satu potongan titipan giliran sebelumnya. Jawaban di atas bahan
+        setipis itu kadang berakhir "tidak ditemukan".
+        """
+        def chunk(suffix):
+            return {
+                "chunk_id": f"chunk-{suffix}", "document_id": "doc-1",
+                "document_version_id": "version-1", "filename": "ekraf.pdf",
+                "version": 1, "page_number": 1, "section_title": "Ekonomi Kreatif",
+                "text": "Pengembangan ekonomi kreatif di Kabupaten Sleman.",
+            }
+        nyaris = [(0.444, chunk("a")), (0.424, chunk("b"))]
+        with patch_deps(), mock.patch("store.EMBEDDINGS_ENABLED", True):
+            db = PgVectorStore("postgresql://u:p@h/db")
+            with mock.patch("store.embed_texts", return_value=[[1.0, 0.0]]),                  mock.patch("store.generate_answer", return_value="Ringkasannya begini."),                  mock.patch.object(PgVectorStore, "search", return_value=nyaris):
+                with mock.patch.object(PgVectorStore, "context_chunks", return_value=[(1.0, chunk("lama"))]):
+                    lanjutan = db.ask(
+                        "Jelaskan ringkasan lengkap tentang ekonomi", use_llm=True,
+                        context_chunk_ids=["chunk-lama"], scope=AccessScope.unrestricted(),
+                    )
+                # Tanpa konteks, pertanyaan pertama tetap memakai ambang penuh.
+                with mock.patch.object(db, "_tfidf_fallback", return_value={}) as tfidf:
+                    db.ask("Jelaskan ringkasan lengkap tentang ekonomi", use_llm=True,
+                           scope=AccessScope.unrestricted())
+        dipakai = {item["chunk_id"] for item in lanjutan["retrieval"]}
+        self.assertTrue({"chunk-a", "chunk-b"} <= dipakai)
+        self.assertEqual(tfidf.call_count, 1)
+
     def test_pertanyaan_balik_bersandar_pada_hasil_pencarian_sendiri(self):
         """Pijakannya hasil pencarian untuk pertanyaan ini, bukan konteks lama.
 
