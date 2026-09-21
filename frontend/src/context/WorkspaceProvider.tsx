@@ -273,6 +273,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const sendQuestion = async (q: string, fromSuggestion = false) => {
     if (!q.trim()) return
     const messageId = `msg-${Date.now()}`
+    const mulai = Date.now()
     setQuestion('')
     // Immediately add user message to history (bubble shows right away)
     setChatHistory((prev) => [...prev, {
@@ -283,7 +284,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       suggestions: [],
       awaitingChoice: false,
       error: null,
-      timestamp: Date.now(),
+      timestamp: mulai,
+      durationMs: null,
     }])
     setIsLoadingAnswer(true)
     try {
@@ -299,13 +301,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
       setChatHistory((prev) => prev.map((msg) =>
         msg.id === messageId
-          ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, suggestions: res.suggestions ?? [], awaitingChoice: res.awaitingChoice ?? false, error: null }
+          ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, suggestions: res.suggestions ?? [], awaitingChoice: res.awaitingChoice ?? false, error: null, durationMs: Date.now() - mulai }
           : msg
       ))
     } catch (err) {
       setChatHistory((prev) => prev.map((msg) =>
         msg.id === messageId
-          ? { ...msg, error: errorMessage(err) }
+          ? { ...msg, error: errorMessage(err), durationMs: Date.now() - mulai }
           : msg
       ))
     } finally {
@@ -395,6 +397,7 @@ function toWorkspaceHistory(conversation: ConversationDetail): ChatMessage[] {
         suggestions: [],
         error: null,
         timestamp: new Date(message.createdAt).getTime(),
+        durationMs: null,
         awaitingChoice: false,
       })
       continue

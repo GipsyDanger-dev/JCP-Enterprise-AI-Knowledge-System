@@ -14,6 +14,12 @@ export interface ChatMessage {
   awaitingChoice: boolean
   error: string | null
   timestamp: number
+  /**
+   * Lama AI menjawab, dalam milidetik. null selama jawabannya masih ditunggu —
+   * dan tetap null untuk pesan yang dimuat dari riwayat, karena lamanya tidak
+   * ikut disimpan di server dan tidak bisa dihitung ulang belakangan.
+   */
+  durationMs: number | null
 }
 
 export interface WorkspaceContextValue {

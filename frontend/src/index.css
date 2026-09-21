@@ -674,6 +674,15 @@ button { cursor: pointer; }
 .assistant-message.no-answer { border-color: var(--warning); background: var(--warning-bg); }
 .assistant-message.no-answer .answer-label { color: var(--warning); }
 .typing-indicator { color: var(--text-muted); font-style: italic; }
+/* Penghitung lama jawaban, menempel di kiri bersama label. Angkanya tabular
+   supaya lebarnya tidak berdenyut tiap sepersepuluh detik, dan berhenti
+   berkedip begitu jawabannya tiba. */
+.answer-timer { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: var(--radius-pill); background: var(--bg-subtle); color: var(--text-muted); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; }
+.answer-timer.is-running { color: var(--brand-600); background: var(--brand-50); animation: answerTimerPulse 1.6s ease-in-out infinite; }
+@keyframes answerTimerPulse { 0%, 100% { opacity: 1; } 50% { opacity: .62; } }
+@media (prefers-reduced-motion: reduce) { .answer-timer.is-running { animation: none; } }
+[data-theme="dark"] .answer-timer { background: var(--bg-subtle); color: var(--text-dim); }
+[data-theme="dark"] .answer-timer.is-running { color: var(--brand-500); background: transparent; }
 .citations { margin-top: 14px; }
 .citations-label { display: block; margin-bottom: 8px; color: var(--text-strong); font-size: var(--fs-sm); font-weight: var(--fw-heavy); }
 /* Kartu bukti digulir mendatar, bukan dibungkus ke baris berikutnya: jawaban

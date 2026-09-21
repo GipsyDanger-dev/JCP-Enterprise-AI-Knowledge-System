@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ArrowUpRight, FileText, Loader2, Maximize2, MessageSquareText, Minimize2, Plus, Send, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, ArrowUpRight, FileText, Loader2, Maximize2, MessageSquareText, Minimize2, Plus, Send, ShieldCheck, Sparkles, Timer, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { SourceCard } from '@/components/SourceCard'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
@@ -110,26 +110,80 @@ function documentLabel(citation: { title?: string; filename: string }): string {
   return citation.title?.trim() || citation.filename
 }
 
+/** Selang perbaruan penghitung — cukup halus untuk terbaca berjalan. */
+const DETAK_PENGHITUNG = 100
+
+function formatDurasi(ms: number, isId: boolean) {
+  const detik = ms / 1000
+  if (detik < 60) {
+    const angka = detik.toFixed(1)
+    return isId ? `${angka.replace('.', ',')} dtk` : `${angka}s`
+  }
+  const menit = Math.floor(detik / 60)
+  const sisa = Math.round(detik % 60)
+  return isId ? `${menit} mnt ${sisa} dtk` : `${menit}m ${sisa}s`
+}
+
+/**
+ * Lama AI menjawab, berjalan selama jawabannya ditunggu lalu berhenti pada
+ * angka terakhirnya.
+ *
+ * Dihitung dari `startedAt` setiap detak, bukan ditambah sendiri: tab yang
+ * tidak aktif membuat interval melambat, dan penghitung yang menjumlah
+ * detaknya sendiri akan tertinggal jauh dari waktu yang sebenarnya berlalu.
+ *
+ * Yang ditampilkan setelah selesai adalah `durationMs` dari provider, bukan
+ * angka terakhir yang sempat terlihat — pesan yang dimuat dari riwayat tidak
+ * membawanya, jadi di sana penghitungnya memang tidak muncul.
+ */
+function AnswerTimer({ startedAt, durationMs, isRunning, isId }: { startedAt: number; durationMs: number | null; isRunning: boolean; isId: boolean }) {
+  const [berjalan, setBerjalan] = useState(() => Date.now() - startedAt)
+
+  useEffect(() => {
+    if (!isRunning) return
+    setBerjalan(Date.now() - startedAt)
+    const detak = window.setInterval(() => setBerjalan(Date.now() - startedAt), DETAK_PENGHITUNG)
+    return () => window.clearInterval(detak)
+  }, [isRunning, startedAt])
+
+  const ms = isRunning ? berjalan : durationMs
+  if (ms === null) return null
+
+  return (
+    <span
+      className={`answer-timer ${isRunning ? 'is-running' : ''}`}
+      // Dibaca sekali lewat title saja: pembacaan layar tidak perlu diberi tahu
+      // ulang sepuluh kali sedetik bahwa angkanya bertambah.
+      aria-live="off"
+      title={isRunning
+        ? (isId ? 'Waktu yang sudah berjalan' : 'Time elapsed so far')
+        : (isId ? 'Lama AI menjawab' : 'Time the AI took to answer')}
+    >
+      <Timer size={13} /> {formatDurasi(Math.max(0, ms), isId)}
+    </span>
+  )
+}
+
 function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: { msg: ChatMessage; isId: boolean; isPending: boolean; onOpenSource: (citation: Citation, question: string) => void; onSuggestion: (value: string) => void }) {
   return (
     <>
       <div className="user-message">{msg.question}</div>
       {isPending && !msg.answer && !msg.error && (
         <div className="assistant-message loading">
-          <div className="answer-label"><Loader2 size={16} className="spin" /> Enterprise AI</div>
+          <div className="answer-label"><Loader2 size={16} className="spin" /> Enterprise AI <AnswerTimer startedAt={msg.timestamp} durationMs={msg.durationMs} isRunning isId={isId} /></div>
           <p className="typing-indicator">{isId ? 'Mencari basis pengetahuan…' : 'Searching knowledge base…'}</p>
         </div>
       )}
       {!isPending && msg.error && !msg.answer && (
         <div className="assistant-message no-answer">
-          <div className="answer-label"><AlertTriangle size={16} /> Enterprise AI</div>
+          <div className="answer-label"><AlertTriangle size={16} /> Enterprise AI <AnswerTimer startedAt={msg.timestamp} durationMs={msg.durationMs} isRunning={false} isId={isId} /></div>
           <p>{msg.error}</p>
           {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} onSelect={onSuggestion} />}
         </div>
       )}
       {msg.answer && (
         <div className="assistant-message">
-          <div className="answer-label"><Sparkles size={16} /> Enterprise AI</div>
+          <div className="answer-label"><Sparkles size={16} /> Enterprise AI <AnswerTimer startedAt={msg.timestamp} durationMs={msg.durationMs} isRunning={false} isId={isId} /></div>
           <LegalStatusNotice citations={msg.citations} isId={isId} />
           <div className="answer-copy">{renderAnswer(msg.answer)}</div>
           {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} onSelect={onSuggestion} />}
