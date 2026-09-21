@@ -42,6 +42,7 @@ from generation.guardrails import (
     parse_clarify,
 )
 from generation.llm import DEFAULT_MODEL, generate_answer
+from generation.prompts import is_short_topic
 from generation.suggestions import MAX_SUGGESTIONS, questions_from_topics
 from ingestion.chunking import chunk_pages
 from ingestion.parsers import read_document
@@ -50,6 +51,16 @@ from provider_errors import ProviderError
 from retrieval.embeddings import embed_texts
 
 VECTOR_MINIMUM_SCORE = 0.45
+
+#: Ambang khusus label topik satu-dua kata, yang skornya jatuh justru karena
+#: pendek. Terukur pada korpus yang berjalan: kata yang ADA di dalam dokumen
+#: berhenti di 0,397–0,440 ("pajak", "pedagang", "kesehatan", "ekonomi",
+#: "retribusi") sementara yang di luar korpus tidak melewati 0,359 ("rendang"
+#: 0,359, "saham tesla" 0,357, "bitcoin" 0,301, "anime" 0,275). Jaraknya tipis,
+#: dan itu sebabnya kelonggaran ini hanya berlaku untuk kueri sependek itu —
+#: di sana pilihannya memang antara melonggarkan atau menyerah sama sekali,
+#: karena 0,45 menolak semuanya.
+SHORT_TOPIC_MINIMUM_SCORE = 0.38
 
 
 def clarify_quota_met(retrieved: list[Any], top_k: int) -> bool:
@@ -718,6 +729,14 @@ class PgVectorStore:
                 minimum_score = 0.0
                 print(f"[AI] Pertanyaan menyebut dokumen: {target['filename']}")
 
+        # Label topik sependek "ekonomi" tidak pernah melewati ambang biasa,
+        # walau dokumen yang benar berperingkat satu. Ambangnya dilonggarkan
+        # khusus untuk bentuk itu; nilai yang dipakai pemanggil atau yang sudah
+        # dilepas oleh sebutan dokumen di atas tidak diganggu.
+        short_topic = is_short_topic(lexical_query or query)
+        if short_topic and minimum_score == VECTOR_MINIMUM_SCORE:
+            minimum_score = SHORT_TOPIC_MINIMUM_SCORE
+
         if not EMBEDDINGS_ENABLED:
             return self._tfidf_fallback(
                 query, top_k, use_llm=use_llm, model=model, api_key=api_key,
@@ -769,7 +788,15 @@ class PgVectorStore:
         answer_started = time.perf_counter()
         result = self._answer_from_matches(
             query, matches, use_llm=use_llm, model=model, api_key=api_key,
-            allow_clarify=allow_clarify and clarify_quota_met(retrieved_matches, top_k),
+            # Kuota menjaga agar tiga pilihan tidak ditawarkan di atas bahan
+            # tipis. Label topik sependek "ekonomi" dikecualikan: skornya rendah
+            # karena pendek, bukan karena korpusnya sepi, dan justru di sanalah
+            # bertanya balik paling berguna — pertanyaannya memang belum
+            # menyebut aspek apa pun. Kalau korpusnya benar-benar tidak
+            # menyinggung, daftar ini kosong dan penjaga pijakan yang menutup.
+            allow_clarify=allow_clarify and (
+                clarify_quota_met(retrieved_matches, top_k) or short_topic
+            ),
             filters=filters, workspace_type=workspace_type, scope=scope,
             lexical_query=lexical_query, documents=documents,
             # Sudah tersaring `minimum_score` di atas, jadi ambangnya tidak

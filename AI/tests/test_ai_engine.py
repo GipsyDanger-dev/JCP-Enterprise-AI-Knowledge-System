@@ -8,7 +8,7 @@ from ai_engine import KnowledgeBase, chunk_pages, generate_answer
 from generation.guardrails import clarify_has_footing, clarify_response, parse_clarify
 from generation.llm import unwrap_clarify_envelope
 from store import clarify_quota_met
-from generation.prompts import build_messages, looks_like_topic_phrase
+from generation.prompts import build_messages, is_short_topic, looks_like_topic_phrase
 
 
 class RetrievalContractTests(unittest.TestCase):
@@ -214,6 +214,33 @@ class ClarifyFootingTests(unittest.TestCase):
         """TF-IDF memasukkan apa pun yang berbagi satu kata, jadi disaring di sini."""
         self.assertFalse(clarify_has_footing([(0.02, self.POTONGAN)], 0.08))
         self.assertTrue(clarify_has_footing([(0.19, self.POTONGAN)], 0.08))
+
+
+class ShortTopicTests(unittest.TestCase):
+    """Label satu-dua kata perlu ambang sendiri, bukan ambang kalimat penuh.
+
+    Kemiripan diukur atas seluruh kalimat, jadi satu kata umum tersebar tipis
+    dan tidak pernah menonjol. Terukur pada korpus yang berjalan: kata yang ADA
+    di dokumen berhenti di 0,397–0,440 sementara ambang biasanya 0,45, jadi
+    topik yang jelas ada justru selalu ditolak.
+    """
+
+    def test_kata_tunggal_dan_dua_kata_dianggap_pendek(self):
+        for query in ("ekonomi", "pajak", "ekonomi kreatif", "Perjalanan Dinas"):
+            with self.subTest(query=query):
+                self.assertTrue(is_short_topic(query))
+
+    def test_tiga_kata_ke_atas_memakai_ambang_biasa(self):
+        """Di atas dua kata skornya sudah tajam sendiri; 0,45 tetap berlaku."""
+        for query in ("rencana induk ekonomi", "penataan pedagang kaki lima"):
+            with self.subTest(query=query):
+                self.assertFalse(is_short_topic(query))
+
+    def test_kalimat_tanya_pendek_bukan_label_topik(self):
+        """"apa itu" sudah sebuah pertanyaan, jadi tidak ikut dilonggarkan."""
+        for query in ("apa itu", "berapa lama", "kenapa begitu"):
+            with self.subTest(query=query):
+                self.assertFalse(is_short_topic(query))
 
 
 class ClarifyEvidenceTests(unittest.TestCase):

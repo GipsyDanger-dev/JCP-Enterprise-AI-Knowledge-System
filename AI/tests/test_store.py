@@ -338,6 +338,53 @@ class PgVectorStoreTests(unittest.TestCase):
                 db.ask("harga bitcoin hari ini", scope=AccessScope.unrestricted())
         self.assertFalse(tfidf.call_args.kwargs.get("vector_found_nothing", False))
 
+    def test_label_topik_pendek_memakai_ambang_yang_lebih_longgar(self):
+        """"ekonomi" berhenti di 0,414 padahal dokumen yang benar peringkat satu.
+
+        Ambang 0,45 menolak semuanya, jadi topik yang jelas ada di korpus
+        berakhir "tidak ditemukan". Yang dilonggarkan hanya bentuk sependek ini;
+        kalimat penuh tetap memakai 0,45.
+        """
+        chunk = {
+            "chunk_id": "chunk-1", "document_id": "doc-1",
+            "document_version_id": "version-1", "filename": "ekraf.pdf",
+            "version": 1, "page_number": 1, "section_title": "Ekonomi Kreatif",
+            "text": "Pengembangan ekonomi kreatif di Kabupaten Sleman.",
+        }
+        with patch_deps(), mock.patch("store.EMBEDDINGS_ENABLED", True):
+            db = PgVectorStore("postgresql://u:p@h/db")
+            with mock.patch("store.embed_texts", return_value=[[1.0, 0.0]]),                  mock.patch.object(PgVectorStore, "search", return_value=[(0.414, chunk)]),                  mock.patch.object(db, "_tfidf_fallback", return_value={}) as tfidf:
+                pendek = db.ask("ekonomi", scope=AccessScope.unrestricted())
+                # Kalimat penuh dengan skor yang sama persis tetap ditolak.
+                db.ask("bagaimana kebijakan ekonomi daerah dijalankan",
+                       scope=AccessScope.unrestricted())
+        self.assertTrue(pendek["grounded"])
+        self.assertEqual(tfidf.call_count, 1)
+
+    def test_label_topik_pendek_boleh_bertanya_balik_walau_kuota_tipis(self):
+        """Satu kata justru saat paling berguna bertanya balik: aspeknya belum disebut.
+
+        Kuota pencarian dibuat agar tiga pilihan tidak ditawarkan di atas bahan
+        tipis. Untuk label sependek ini skornya rendah karena pendek, bukan
+        karena korpusnya sepi, jadi kuota itu dikecualikan.
+        """
+        chunk = {
+            "chunk_id": "chunk-1", "document_id": "doc-1",
+            "document_version_id": "version-1", "filename": "ekraf.pdf",
+            "version": 1, "page_number": 1, "section_title": "Ekonomi Kreatif",
+            "text": "Pengembangan ekonomi kreatif di Kabupaten Sleman.",
+        }
+        clarify = 'CLARIFY: {"pertanyaan": "Aspek apa yang ingin Anda ketahui?", "pilihan": ["Subsektornya"]}'
+        with patch_deps(), mock.patch("store.EMBEDDINGS_ENABLED", True):
+            db = PgVectorStore("postgresql://u:p@h/db")
+            with mock.patch("store.embed_texts", return_value=[[1.0, 0.0]]),                  mock.patch("store.generate_answer", return_value=clarify),                  mock.patch.object(PgVectorStore, "search", return_value=[(0.414, chunk)]):
+                hasil = db.ask("ekonomi", use_llm=True, allow_clarify=True,
+                               scope=AccessScope.unrestricted())
+        self.assertTrue(hasil["awaiting_choice"])
+        # Bahan yang melahirkan pilihan ikut pulang, supaya klik pada pilihan
+        # itu tidak mulai mencari dari nol.
+        self.assertEqual([item["chunk_id"] for item in hasil["retrieval"]], ["chunk-1"])
+
     def test_pertanyaan_balik_bersandar_pada_hasil_pencarian_sendiri(self):
         """Pijakannya hasil pencarian untuk pertanyaan ini, bukan konteks lama.
 

@@ -101,6 +101,24 @@ def looks_like_topic_phrase(query: str) -> bool:
     return not any(text.startswith(opener) for opener in _QUESTION_OPENERS)
 
 
+#: Satu-dua kata. Di atas itu kemiripannya sudah cukup tajam dengan sendirinya:
+#: "ekonomi kreatif" meraih 0,673 sementara "ekonomi" saja berhenti di 0,414.
+_MAX_SHORT_TOPIC_WORDS = 2
+
+
+def is_short_topic(query: str) -> bool:
+    """Label topik satu-dua kata — yang skornya jatuh justru KARENA pendek.
+
+    Kemiripan vektor diukur atas seluruh kalimat, jadi satu kata umum tersebar
+    tipis ke banyak potongan dan tidak pernah menonjol di mana pun. Akibatnya
+    topik yang jelas ada di korpus berhenti di bawah ambang biasa, padahal
+    dokumen yang benar justru berperingkat satu.
+    """
+    if not looks_like_topic_phrase(query):
+        return False
+    return len(query.strip().rstrip("?").split()) <= _MAX_SHORT_TOPIC_WORDS
+
+
 def _format_size(size_bytes: int | None) -> str:
     if not size_bytes:
         return "ukuran tidak tercatat"
