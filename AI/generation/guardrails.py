@@ -160,20 +160,36 @@ def clarify_has_footing(
     return any(score >= minimum_score for score, _ in fresh_matches)
 
 
-def clarify_response(clarify: dict[str, Any], query: str) -> dict[str, Any]:
+def clarify_response(
+    clarify: dict[str, Any],
+    query: str,
+    matches: list[tuple[float, dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
     """Pertanyaan balik plus pilihan, selalu dengan satu jalan keluar.
 
     Tanpa jalan keluar, salah menilai pertanyaan yang sebenarnya sudah jelas
     membuat pengguna tidak punya cara mendapatkan jawabannya.
+
+    ``matches`` adalah potongan yang dipakai model menyusun pilihannya. Id-nya
+    ikut dikembalikan lewat ``retrieval`` supaya pilihan yang diklik bisa
+    memulai dari bahan yang sama. Tanpa itu, giliran berikutnya mencari dari
+    nol dan bisa berakhir "informasi tidak ditemukan" untuk pertanyaan yang
+    baru saja ditawarkan sendiri oleh sistem.
     """
     escape = f"Jelaskan ringkasan lengkap tentang {query.strip().rstrip('?')}"
     return {
         "answer": clarify["question"],
         # Ini pertanyaan balik, bukan klaim berdasarkan dokumen: tanpa kutipan,
-        # lencana "Evidence verified" ikut tidak muncul.
+        # lencana "Evidence verified" ikut tidak muncul. `retrieval` bukan
+        # kutipan — ia tidak tampil di layar, hanya dibawa kembali sebagai
+        # konteks kalau salah satu pilihan diklik.
         "citations": [],
         "grounded": False,
-        "retrieval": [],
+        "retrieval": [
+            {"chunk_id": chunk["chunk_id"], "score": round(score, 4)}
+            for score, chunk in (matches or [])
+            if chunk.get("chunk_id")
+        ],
         "suggestions": [*clarify["options"], escape],
         # Penanda bagi antarmuka: percakapan sedang menunggu pengguna memilih,
         # bukan sekadar jawaban tanpa kutipan seperti "informasi tidak ditemukan".

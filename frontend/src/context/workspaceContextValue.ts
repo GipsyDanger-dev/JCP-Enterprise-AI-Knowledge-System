@@ -12,6 +12,13 @@ export interface ChatMessage {
   citations: Citation[]
   suggestions: string[]
   awaitingChoice: boolean
+  /**
+   * Potongan dokumen yang melahirkan tombol saran di pesan ini. Dikirim balik
+   * saat salah satu tombolnya diklik, supaya pertanyaan itu mulai dari bahan
+   * yang sama — bukan dari pencarian baru yang bisa berakhir "tidak ditemukan"
+   * untuk pertanyaan yang baru saja ditawarkan.
+   */
+  contextChunkIds: string[]
   error: string | null
   timestamp: number
   /**
@@ -36,7 +43,7 @@ export interface WorkspaceContextValue {
   // AI sedang menunggu pengguna memilih salah satu pertanyaan lanjutan.
   awaitingChoice: boolean
   onAsk: (event: FormEvent) => void
-  askQuestion: (value: string) => void
+  askQuestion: (value: string, contextChunkIds?: string[]) => void
   triggerUpload: () => void
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void
   isUploading: boolean

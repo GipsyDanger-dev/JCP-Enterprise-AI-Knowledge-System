@@ -1,4 +1,4 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class ChatQueryDto {
   @IsString()
@@ -15,4 +15,15 @@ export class ChatQueryDto {
   @IsOptional()
   @IsBoolean()
   fromSuggestion?: boolean;
+
+  // Bahan yang melahirkan tombol saran ini, dikirim balik saat tombolnya
+  // diklik. Isinya tetap disaring hak akses sebelum dipakai, jadi yang bisa
+  // dititipkan di sini paling jauh hanya potongan yang memang boleh dilihat
+  // pengirimnya.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @IsString({ each: true })
+  @MaxLength(200, { each: true })
+  contextChunkIds?: string[];
 }

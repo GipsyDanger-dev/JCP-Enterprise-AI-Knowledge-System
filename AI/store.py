@@ -545,7 +545,7 @@ class PgVectorStore:
                 # sebelumnya, sedangkan judul dokumen yang benar-benar ada
                 # memberinya jalan keluar yang bisa dijawab.
                 return no_answer_response(self.suggested_questions(scope=scope))
-            return clarify_response(clarify, asked)
+            return clarify_response(clarify, asked, matches)
         if is_no_answer(answer):
             # Usulannya disusun dari potongan yang BARUSAN ditemukan retrieval,
             # bukan dari kueri acak baru ke seluruh korpus. Model menilai isinya

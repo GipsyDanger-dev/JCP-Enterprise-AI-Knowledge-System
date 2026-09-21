@@ -164,7 +164,7 @@ function AnswerTimer({ startedAt, durationMs, isRunning, isId }: { startedAt: nu
   )
 }
 
-function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: { msg: ChatMessage; isId: boolean; isPending: boolean; onOpenSource: (citation: Citation, question: string) => void; onSuggestion: (value: string) => void }) {
+function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: { msg: ChatMessage; isId: boolean; isPending: boolean; onOpenSource: (citation: Citation, question: string) => void; onSuggestion: (value: string, contextChunkIds?: string[]) => void }) {
   return (
     <>
       <div className="user-message">{msg.question}</div>
@@ -178,7 +178,7 @@ function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: {
         <div className="assistant-message no-answer">
           <div className="answer-label"><AlertTriangle size={16} /> Enterprise AI <AnswerTimer startedAt={msg.timestamp} durationMs={msg.durationMs} isRunning={false} isId={isId} /></div>
           <p>{msg.error}</p>
-          {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} onSelect={onSuggestion} />}
+          {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} onSelect={(value) => onSuggestion(value, msg.contextChunkIds)} />}
         </div>
       )}
       {msg.answer && (
@@ -186,7 +186,7 @@ function ChatMessageItem({ msg, isId, isPending, onOpenSource, onSuggestion }: {
           <div className="answer-label"><Sparkles size={16} /> Enterprise AI <AnswerTimer startedAt={msg.timestamp} durationMs={msg.durationMs} isRunning={false} isId={isId} /></div>
           <LegalStatusNotice citations={msg.citations} isId={isId} />
           <div className="answer-copy">{renderAnswer(msg.answer)}</div>
-          {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} onSelect={onSuggestion} />}
+          {msg.suggestions.length > 0 && <SuggestionList suggestions={msg.suggestions} onSelect={(value) => onSuggestion(value, msg.contextChunkIds)} />}
           {msg.citations.length > 0 && (
             <div className="citations">
               <strong className="citations-label">{isId ? 'Bukti sumber' : 'Source evidence'}</strong>

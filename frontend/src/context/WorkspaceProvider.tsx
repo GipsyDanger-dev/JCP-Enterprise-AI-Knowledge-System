@@ -270,7 +270,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const sendQuestion = async (q: string, fromSuggestion = false) => {
+  const sendQuestion = async (q: string, fromSuggestion = false, contextChunkIds?: string[]) => {
     if (!q.trim()) return
     const messageId = `msg-${Date.now()}`
     const mulai = Date.now()
@@ -283,13 +283,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       citations: [],
       suggestions: [],
       awaitingChoice: false,
+      contextChunkIds: [],
       error: null,
       timestamp: mulai,
       durationMs: null,
     }])
     setIsLoadingAnswer(true)
     try {
-      const res = await queryChat({ question: q, conversationId: conversationId ?? undefined, fromSuggestion }, token ?? undefined)
+      const res = await queryChat({
+        question: q,
+        conversationId: conversationId ?? undefined,
+        fromSuggestion,
+        contextChunkIds: contextChunkIds?.length ? contextChunkIds : undefined,
+      }, token ?? undefined)
       // Ditandai sebelum `navigate()` di bawah, supaya effect pemuat sudah
       // melihat nilainya pada render mana pun yang menerima URL barunya.
       ownConversationRef.current = res.conversationId
@@ -301,7 +307,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
       setChatHistory((prev) => prev.map((msg) =>
         msg.id === messageId
-          ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, suggestions: res.suggestions ?? [], awaitingChoice: res.awaitingChoice ?? false, error: null, durationMs: Date.now() - mulai }
+          ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, suggestions: res.suggestions ?? [], awaitingChoice: res.awaitingChoice ?? false, contextChunkIds: res.contextChunkIds ?? [], error: null, durationMs: Date.now() - mulai }
           : msg
       ))
     } catch (err) {
@@ -322,9 +328,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // Dipakai hanya oleh tombol saran. Penandanya mematikan pertanyaan balik,
   // supaya aplikasi tidak mempertanyakan usulannya sendiri.
-  const askQuestion = (value: string) => {
+  const askQuestion = (value: string, contextChunkIds?: string[]) => {
     setQuestion(value)
-    sendQuestion(value, true)
+    sendQuestion(value, true, contextChunkIds)
   }
 
   const clearChat = useCallback(() => {
@@ -395,6 +401,10 @@ function toWorkspaceHistory(conversation: ConversationDetail): ChatMessage[] {
         answer: '',
         citations: [],
         suggestions: [],
+        // Riwayat yang dimuat ulang tidak membawa bahan pertanyaan balik:
+        // yang tersimpan di server hanya teksnya. Tombol saran pada pesan lama
+        // karena itu mencari dari awal, sama seperti sebelumnya.
+        contextChunkIds: [],
         error: null,
         timestamp: new Date(message.createdAt).getTime(),
         durationMs: null,

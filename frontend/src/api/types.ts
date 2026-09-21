@@ -306,6 +306,8 @@ export interface ChatQueryRequest {
   question: string
   conversationId?: string
   fromSuggestion?: boolean
+  /** Bahan yang melahirkan tombol saran ini; hanya diisi saat tombolnya diklik. */
+  contextChunkIds?: string[]
 }
 
 export interface ChatQueryResponse {
@@ -315,6 +317,8 @@ export interface ChatQueryResponse {
   citations: Citation[]
   suggestions?: string[]
   awaitingChoice?: boolean
+  /** Terisi hanya untuk pertanyaan balik: bahan di balik pilihan yang ditawarkan. */
+  contextChunkIds?: string[]
 }
 
 export interface ApiDocumentCategory {

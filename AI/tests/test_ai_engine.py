@@ -5,7 +5,7 @@ from unittest import mock
 from pathlib import Path
 
 from ai_engine import KnowledgeBase, chunk_pages, generate_answer
-from generation.guardrails import clarify_has_footing, parse_clarify
+from generation.guardrails import clarify_has_footing, clarify_response, parse_clarify
 from generation.llm import unwrap_clarify_envelope
 from store import clarify_quota_met
 from generation.prompts import build_messages, looks_like_topic_phrase
@@ -214,6 +214,39 @@ class ClarifyFootingTests(unittest.TestCase):
         """TF-IDF memasukkan apa pun yang berbagi satu kata, jadi disaring di sini."""
         self.assertFalse(clarify_has_footing([(0.02, self.POTONGAN)], 0.08))
         self.assertTrue(clarify_has_footing([(0.19, self.POTONGAN)], 0.08))
+
+
+class ClarifyEvidenceTests(unittest.TestCase):
+    """Pilihan yang ditawarkan harus membawa bahan yang melahirkannya.
+
+    Tanpa itu, pertanyaan yang baru saja ditawarkan sistem dicari dari nol pada
+    giliran berikutnya, dan bisa berakhir "informasi tidak ditemukan" — padahal
+    bahannya ada di tangan satu giliran sebelumnya.
+    """
+
+    CLARIFY = {"question": "Aspek apa yang ingin Anda ketahui?", "options": ["Subsektornya"]}
+
+    def test_id_potongan_ikut_dikembalikan(self):
+        matches = [
+            (0.67, {"chunk_id": "chunk-a"}),
+            (0.55, {"chunk_id": "chunk-b"}),
+        ]
+        hasil = clarify_response(self.CLARIFY, "ekonomi kreatif", matches)
+        self.assertEqual(
+            [item["chunk_id"] for item in hasil["retrieval"]], ["chunk-a", "chunk-b"]
+        )
+
+    def test_tetap_tanpa_sitasi(self):
+        """Ini pertanyaan balik, bukan klaim: kartu sumber tidak boleh muncul."""
+        hasil = clarify_response(self.CLARIFY, "ekonomi kreatif", [(0.67, {"chunk_id": "chunk-a"})])
+        self.assertEqual(hasil["citations"], [])
+        self.assertFalse(hasil["grounded"])
+        self.assertTrue(hasil["awaiting_choice"])
+
+    def test_tanpa_bahan_tetap_bisa_bertanya_balik(self):
+        """Pemanggil lama yang tidak mengirim potongan tidak boleh ikut patah."""
+        hasil = clarify_response(self.CLARIFY, "ekonomi kreatif")
+        self.assertEqual(hasil["retrieval"], [])
 
 
 class ClarifyQuotaTests(unittest.TestCase):

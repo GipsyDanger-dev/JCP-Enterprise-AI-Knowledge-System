@@ -23,6 +23,11 @@ interface AiAskResult {
   grounded: boolean;
   suggestions?: string[];
   awaiting_choice?: boolean;
+  /**
+   * Potongan yang dipakai menyusun jawaban. Untuk pertanyaan balik ini satu-
+   * satunya jejak bahannya, karena pertanyaan balik tidak punya sitasi.
+   */
+  retrieval?: { chunk_id: string }[];
 }
 
 // Pertanyaan definisional seperti "apa itu retribusi daerah" membuka topik
@@ -89,16 +94,25 @@ export class ChatService {
     actor: AuthenticatedUser,
     conversationId?: string,
     fromSuggestion?: boolean,
+    chosenContextChunkIds?: string[],
   ) {
     const conversation = await this.resolveConversation(question, actor, conversationId);
     const isFollowUp = isFollowUpQuestion(question);
+    // Pilihan dari pertanyaan balik membawa bahannya sendiri: potongan yang
+    // dipakai menyusun pilihan itu. Tanpa ini pertanyaan yang baru saja
+    // ditawarkan sistem harus mencari dari nol, dan bisa berakhir "tidak
+    // ditemukan" — persis pertanyaan yang sistem sendiri bilang bisa dijawab.
+    // Id-nya tetap disaring hak akses di AI service, jadi memercayainya sebatas
+    // "pernah terlihat oleh pengguna ini" sudah cukup.
+    const chosen = (chosenContextChunkIds ?? []).slice(0, 8);
     // These reads do not depend on each other. Run them together so the chat
     // request does not wait for three database round trips in sequence.
-    const [contextChunkIds, conversationTopic, access] = await Promise.all([
-      isFollowUp ? this.getContextChunkIds(conversation.id) : Promise.resolve([]),
+    const [previousChunkIds, conversationTopic, access] = await Promise.all([
+      isFollowUp && !chosen.length ? this.getContextChunkIds(conversation.id) : Promise.resolve([]),
       isFollowUp ? this.getConversationTopic(conversation.id) : Promise.resolve(undefined),
       this.accessScope(actor),
     ]);
+    const contextChunkIds = chosen.length ? chosen : previousChunkIds;
 
     await this.prisma.message.create({
       data: {
@@ -149,6 +163,12 @@ export class ChatService {
         // Antarmuka mengunci kolom ketik selama ini bernilai true, supaya
         // pengguna menuntaskan dulu pertanyaan balik dari AI.
         awaitingChoice: result.awaiting_choice ?? false,
+        // Hanya untuk pertanyaan balik: bahan yang melahirkan pilihannya,
+        // dikembalikan supaya klik pada salah satu pilihan bisa membawanya.
+        // Jawaban biasa tidak perlu — sitasinya sudah tersimpan di database.
+        contextChunkIds: result.awaiting_choice
+          ? (result.retrieval ?? []).map((item) => item.chunk_id).slice(0, 8)
+          : [],
       };
     } catch (error) {
       const answer = 'Maaf, pertanyaan belum dapat diproses sekarang. Coba salah satu pertanyaan berikut tentang dokumen perusahaan:';
@@ -161,6 +181,7 @@ export class ChatService {
         suggestions: QUICK_SUGGESTIONS,
         // Kegagalan bukan pertanyaan balik: kolom ketik harus tetap terbuka.
         awaitingChoice: false,
+        contextChunkIds: [],
       };
     }
   }
