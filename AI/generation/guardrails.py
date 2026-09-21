@@ -11,8 +11,6 @@ import re
 from typing import Any
 
 from config import NO_ANSWER
-from generation.citations import content_tokens
-from generation.prompts import QUESTION_WORDS
 
 OUT_OF_SCOPE = (
     "Saya hanya dapat membantu menjawab pertanyaan yang jawabannya ada pada "
@@ -130,49 +128,36 @@ def parse_clarify(answer: str) -> dict[str, Any] | None:
     return {"question": question, "options": [option for option in options if option][:3]}
 
 
-#: Kata penunjuk lanjutan dan partikel obrolan: pembawa maksud "seperti
-#: jawaban tadi, tapi ...".
-#: Kata-kata ini tidak memperkenalkan pokok baru, jadi kehadirannya tidak boleh
-#: dihitung sebagai tuntutan agar dokumen memuatnya. Tanpa daftar ini
-#: "jelaskan lebih detail" dinilai tak berpijak hanya karena kata "lebih" dan
-#: "detail" memang tidak ada di dalam teks dokumen mana pun.
-_FOLLOW_UP_WORDS = frozenset("""
-lebih detail detil rinci terperinci lanjut lanjutkan lagi ringkas ringkasan
-singkat contoh contohnya maksud maksudnya arti artinya tadi sebelumnya
-pertama kedua ketiga keempat kelima terakhir poin bagian atas bawah
-more detail details further again summarize summary briefly example meaning
-dong sih nih deh kok tuh aja saja lah pun kah kan
-coba mohon bisa boleh silakan please
-""".split())
-
-
-def clarify_has_footing(query: str, matches: list[tuple[float, dict[str, Any]]]) -> bool:
-    """Apakah pertanyaannya punya pijakan kata di potongan yang terambil?
+def clarify_has_footing(
+    fresh_matches: list[tuple[float, Any]], minimum_score: float = 0.0
+) -> bool:
+    """Apakah pertanyaannya mengambil bahannya sendiri, bukan menumpang konteks lama?
 
     Sitasi jawaban sebelumnya ikut dibawa sebagai konteks lanjutan, jadi
     potongan topik LAMA selalu ada di prompt meski pertanyaan barunya tidak
     berkaitan sama sekali. Dalam keadaan itu model cenderung menjembatani
     keduanya dan menawarkan pilihan yang isinya tidak ada di dokumen mana pun.
-    Bertanya balik hanya layak bila kata yang ditanyakan memang muncul di
-    bahan yang terambil; kalau tidak, berhenti lebih jujur daripada menebak.
 
-    Pertanyaan lanjutan yang menunjuk jawaban sebelumnya ("jelaskan lebih
-    detail", "yang kedua bagaimana") sengaja tetap lolos: ia memang tidak
-    membawa kata isi sendiri, dan itu bukan tanda tak berdasar.
+    Yang membuktikan pijakan adalah retrieval, bukan kosakata. ``fresh_matches``
+    hanya berisi hasil pencarian untuk pertanyaan ini; konteks giliran
+    sebelumnya tidak ikut, jadi satu pun hasil di atas ambang bukti sudah
+    berarti korpus benar-benar menyinggung yang ditanyakan.
+
+    Versi sebelumnya menuntut SETIAP kata isi pertanyaan muncul di potongan
+    yang terambil, dengan daftar kecualian yang ditulis tangan untuk kata
+    lanjutan ("lebih detail", "ringkas lagi"). Daftar itu tidak pernah bisa
+    lengkap: "isi dokumen X" ditolak hanya karena kata "isi" kebetulan tidak
+    ada di dalam teks dokumennya, padahal dokumennya jelas ketemu. Ambang
+    kemiripan sudah memisahkan keduanya jauh lebih tajam tanpa perlu dirawat —
+    pertanyaan di luar korpus berhenti di sekitar 0,31 sementara yang menyebut
+    dokumen nyata melewati 0,45 — dan ambang itu ikut berlaku untuk dokumen
+    apa pun yang diunggah kemudian.
+
+    ``minimum_score`` dipakai jalur yang daftarnya belum tersaring ambang bukti
+    (TF-IDF memasukkan apa pun yang berbagi satu kata). Jalur vektor sudah
+    menyaringnya lebih dulu, jadi cukup memakai bawaannya.
     """
-    asked = content_tokens(query) - QUESTION_WORDS - _FOLLOW_UP_WORDS
-    if not asked:
-        return True
-    tersedia: set[str] = set()
-    for _, chunk in matches:
-        tersedia |= content_tokens(chunk.get("text", ""))
-        tersedia |= content_tokens(chunk.get("title") or "")
-        tersedia |= content_tokens(chunk.get("filename") or "")
-    # SEMUA kata isinya harus ada, bukan sekadar salah satu. "harga bitcoin
-    # hari ini" memuat "harga" dan "hari" yang lazim ada di dokumen apa pun,
-    # sehingga syarat "salah satu cocok" meloloskannya justru karena kata
-    # umumnya — sementara kata pembedanya, "bitcoin", tidak ada di mana pun.
-    return asked <= tersedia
+    return any(score >= minimum_score for score, _ in fresh_matches)
 
 
 def clarify_response(clarify: dict[str, Any], query: str) -> dict[str, Any]:

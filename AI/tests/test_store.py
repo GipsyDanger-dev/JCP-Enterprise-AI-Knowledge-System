@@ -318,6 +318,60 @@ class PgVectorStoreTests(unittest.TestCase):
         )
         self.assertEqual(result, expected)
 
+    def test_vonis_pencarian_vektor_ikut_ke_jalur_cadangan(self):
+        """Vektor sudah bilang tidak ada yang cocok; jalur cadangan harus tahu itu.
+
+        TF-IDF mencocokkan kata, jadi ia tidak bisa menilai ulang pijakan
+        pertanyaan balik: pada korpus yang berjalan "harga bitcoin hari ini"
+        tetap meraih 0,21 lewat "harga" dan "hari". Kegagalan embedding lain
+        soal — di sana tidak ada vonis apa pun untuk dibawa.
+        """
+        with patch_deps(), mock.patch("store.EMBEDDINGS_ENABLED", True):
+            db = PgVectorStore("postgresql://u:p@h/db")
+            with mock.patch("store.embed_texts", return_value=[[1.0, 0.0]]),                  mock.patch.object(PgVectorStore, "search", return_value=[]),                  mock.patch.object(db, "_tfidf_fallback", return_value={}) as tfidf:
+                db.ask("harga bitcoin hari ini", scope=AccessScope.unrestricted())
+        self.assertTrue(tfidf.call_args.kwargs["vector_found_nothing"])
+
+        with patch_deps(), mock.patch("store.EMBEDDINGS_ENABLED", True):
+            db = PgVectorStore("postgresql://u:p@h/db")
+            with mock.patch("store.embed_texts", side_effect=RuntimeError("provider mati")),                  mock.patch.object(db, "_tfidf_fallback", return_value={}) as tfidf:
+                db.ask("harga bitcoin hari ini", scope=AccessScope.unrestricted())
+        self.assertFalse(tfidf.call_args.kwargs.get("vector_found_nothing", False))
+
+    def test_pertanyaan_balik_bersandar_pada_hasil_pencarian_sendiri(self):
+        """Pijakannya hasil pencarian untuk pertanyaan ini, bukan konteks lama.
+
+        Kata yang dipakai penanya tidak ikut menilai: "isi dokumen X" pernah
+        ditolak hanya karena kata "isi" tidak ada di dalam teks dokumennya,
+        padahal pencarian justru menemukan dokumennya.
+        """
+        chunk = {
+            "chunk_id": "chunk-1", "document_id": "doc-1",
+            "document_version_id": "version-1", "filename": "sop.txt",
+            "version": 1, "page_number": 1, "section_title": "SOP",
+            "text": "Biaya hotel maksimal Rp900.000.",
+        }
+        clarify = 'CLARIFY: {"pertanyaan": "Bagian mana yang ingin Anda ketahui?", "pilihan": ["Biaya hotel"]}'
+        with patch_deps(), mock.patch("store.EMBEDDINGS_ENABLED", True):
+            db = PgVectorStore("postgresql://u:p@h/db")
+            with mock.patch("store.embed_texts", return_value=[[1.0, 0.0]]),                  mock.patch("store.generate_answer", return_value=clarify),                  mock.patch.object(db, "suggested_questions", return_value=["cadangan"]):
+                with mock.patch.object(PgVectorStore, "search", return_value=[(0.51, chunk)]):
+                    berpijak = db.ask(
+                        "isi dokumen sop", use_llm=True, allow_clarify=True,
+                        scope=AccessScope.unrestricted(),
+                    )
+                # Tidak ada hasil untuk pertanyaan ini; yang ada hanya sitasi
+                # giliran sebelumnya, dan itu membuktikan pijakan untuk apa pun.
+                with mock.patch.object(PgVectorStore, "search", return_value=[]),                      mock.patch.object(PgVectorStore, "context_chunks", return_value=[(1.0, chunk)]):
+                    menumpang = db.ask(
+                        "harga bitcoin hari ini", use_llm=True, allow_clarify=True,
+                        context_chunk_ids=["chunk-1"], scope=AccessScope.unrestricted(),
+                    )
+        self.assertTrue(berpijak["awaiting_choice"])
+        self.assertEqual(berpijak["answer"], "Bagian mana yang ingin Anda ketahui?")
+        self.assertFalse(menumpang.get("awaiting_choice", False))
+        self.assertEqual(menumpang["answer"], "Informasi tidak ditemukan pada dokumen yang tersedia.")
+
     def test_delete_returns_false_when_missing(self):
         with patch_deps(cursor=FakeCursor(row=None)):
             db = PgVectorStore("postgresql://u:p@h/db")

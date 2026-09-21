@@ -170,50 +170,49 @@ if __name__ == "__main__":
 
 
 class ClarifyFootingTests(unittest.TestCase):
-    """Pertanyaan balik hanya boleh muncul kalau dokumennya memang menyinggung.
+    """Pertanyaan balik hanya boleh muncul kalau pencarian menemukan bahannya.
 
     Sitasi jawaban sebelumnya ikut dibawa sebagai konteks lanjutan, jadi
     potongan topik LAMA selalu hadir di prompt. Tanpa penjaga ini model
     menjembatani topik baru yang sama sekali asing ke topik lama, lalu
     menawarkan pilihan yang isinya tidak ada di dokumen mana pun.
+
+    Yang dinilai hanya hasil pencarian untuk pertanyaan ini; konteks lama
+    sengaja tidak ikut karena ia akan membuktikan pijakan untuk apa saja.
     """
 
-    KONTEKS = [(
-        1.0,
-        {
-            "text": (
-                "Pengembangan ekonomi kreatif di Kabupaten Sleman meliputi subsektor "
-                "kuliner dan kriya. Harga jual produk ditetapkan pelaku usaha setiap hari."
-            ),
-            "title": "SlemanNomor8Tahun2025ttgPengembanganEkonomiKreatif",
-            "filename": "sleman8.pdf",
-        },
-    )]
+    POTONGAN = {
+        "text": (
+            "Pengembangan ekonomi kreatif di Kabupaten Sleman meliputi subsektor "
+            "kuliner dan kriya. Harga jual produk ditetapkan pelaku usaha setiap hari."
+        ),
+        "title": "SlemanNomor8Tahun2025ttgPengembanganEkonomiKreatif",
+        "filename": "sleman8.pdf",
+    }
 
-    def test_topik_asing_tidak_berpijak(self):
-        for query in ("resep rendang padang", "jadwal liga champions", "cuaca jogja besok"):
-            with self.subTest(query=query):
-                self.assertFalse(clarify_has_footing(query, self.KONTEKS))
+    def test_tanpa_hasil_sendiri_tidak_berpijak(self):
+        """Topik di luar korpus tidak menembus ambang, jadi daftarnya kosong.
 
-    def test_topik_dokumen_tetap_berpijak(self):
-        for query in ("ekonomi kreatif", "subsektor kuliner", "apa itu kriya"):
-            with self.subTest(query=query):
-                self.assertTrue(clarify_has_footing(query, self.KONTEKS))
-
-    def test_kata_umum_saja_belum_cukup_jadi_pijakan(self):
-        """"harga" dan "hari" ada di dokumen, tapi "bitcoin" tidak di mana pun.
-
-        Syarat "salah satu kata cocok" meloloskan pertanyaan ini justru lewat
-        kata umumnya, jadi seluruh kata isinya yang harus ada.
+        Terukur pada korpus nyata: "harga bitcoin hari ini" berhenti di 0,311
+        dan "cuaca besok di jakarta" di 0,317, keduanya jauh di bawah 0,45.
         """
-        self.assertFalse(clarify_has_footing("harga bitcoin hari ini", self.KONTEKS))
-        self.assertTrue(clarify_has_footing("harga produk kuliner", self.KONTEKS))
+        self.assertFalse(clarify_has_footing([]))
 
-    def test_pertanyaan_lanjutan_tidak_ikut_terblokir(self):
-        """Lanjutan menunjuk jawaban sebelumnya, jadi wajar tanpa kata isi sendiri."""
-        for query in ("jelaskan lebih detail", "yang kedua bagaimana", "ringkas lagi dong"):
-            with self.subTest(query=query):
-                self.assertTrue(clarify_has_footing(query, self.KONTEKS))
+    def test_satu_hasil_di_atas_ambang_sudah_cukup(self):
+        self.assertTrue(clarify_has_footing([(0.51, self.POTONGAN)]))
+
+    def test_kata_yang_tidak_ada_di_teks_tidak_menggugurkan(self):
+        """"isi dokumen X" pernah ditolak karena kata "isi" tak ada di teksnya.
+
+        Dokumennya justru ketemu — 0,510 pada percobaan yang memicu perbaikan
+        ini — jadi pijakannya ada, dan kosakata tidak lagi ikut menilai.
+        """
+        self.assertTrue(clarify_has_footing([(0.510, self.POTONGAN), (0.453, self.POTONGAN)]))
+
+    def test_jalur_tfidf_menegakkan_ambang_buktinya_sendiri(self):
+        """TF-IDF memasukkan apa pun yang berbagi satu kata, jadi disaring di sini."""
+        self.assertFalse(clarify_has_footing([(0.02, self.POTONGAN)], 0.08))
+        self.assertTrue(clarify_has_footing([(0.19, self.POTONGAN)], 0.08))
 
 
 class ClarifyQuotaTests(unittest.TestCase):

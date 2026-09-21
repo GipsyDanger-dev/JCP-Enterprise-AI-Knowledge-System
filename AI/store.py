@@ -500,7 +500,9 @@ class PgVectorStore:
                              *, scope: AccessScope,
                              workspace_type: str = "COMPANY",
                              lexical_query: str | None = None,
-                             documents: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+                             documents: list[dict[str, Any]] | None = None,
+                             fresh_matches: list[tuple[float, dict[str, Any]]] | None = None,
+                             footing_score: float = 0.0) -> dict[str, Any]:
         """Turn retrieved chunks into the answer payload.
 
         Deliberately left outside the retrieval ``try`` blocks: a ProviderError
@@ -529,13 +531,15 @@ class PgVectorStore:
         clarify = parse_clarify(answer)
         if clarify:
             # Pertanyaan mentahnya, bukan `query` yang sudah dibubuhi label
-            # topik percakapan: label itu selalu cocok dengan konteks lama,
-            # jadi memakainya membuat penjaga di bawah tidak pernah menolak.
-            # Ia juga yang tampil di pilihan "Jelaskan ringkasan lengkap
-            # tentang ...", sehingga label internal tidak bocor ke layar.
+            # topik percakapan: yang tampil di pilihan "Jelaskan ringkasan
+            # lengkap tentang ..." harus kalimat penggunanya sendiri, bukan
+            # label internal.
             asked = lexical_query or query
-            if not clarify_has_footing(asked, matches):
-                print("[AI] Clarify ditolak: pertanyaan tidak berpijak pada dokumen")
+            # Yang diperiksa hasil pencarian untuk pertanyaan ini saja.
+            # `matches` sudah bercampur sitasi giliran sebelumnya, dan konteks
+            # lama itu akan membuktikan pijakan untuk topik apa pun.
+            if not clarify_has_footing(fresh_matches or [], footing_score):
+                print("[AI] Clarify ditolak: pencarian tidak menemukan bahan untuk pertanyaan ini")
                 # Usulannya diambil dari korpus, bukan dari model. Pilihan
                 # karangan model akan menyeret pengguna kembali ke topik
                 # sebelumnya, sedangkan judul dokumen yang benar-benar ada
@@ -577,7 +581,7 @@ class PgVectorStore:
             ],
         }
 
-    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False, filters: dict[str, Any] | None = None, context_chunk_ids: list[str] | None = None, workspace_type: str = "COMPANY", *, scope: AccessScope, lexical_query: str | None = None) -> dict[str, Any]:
+    def _tfidf_fallback(self, query: str, top_k: int = 5, use_llm: bool = False, model: str = DEFAULT_MODEL, api_key: str | None = None, allow_clarify: bool = False, filters: dict[str, Any] | None = None, context_chunk_ids: list[str] | None = None, workspace_type: str = "COMPANY", *, scope: AccessScope, lexical_query: str | None = None, vector_found_nothing: bool = False) -> dict[str, Any]:
         """TF-IDF fallback when vector search fails or finds nothing.
 
         ``lexical_query`` adalah pertanyaan pengguna tanpa label topik
@@ -586,6 +590,11 @@ class PgVectorStore:
         LAMA dan menenggelamkan dokumen yang benar-benar ditanyakan. Label itu
         tetap dipakai untuk pencarian vektor dan untuk prompt LLM, yang memang
         diuntungkan olehnya.
+
+        ``vector_found_nothing`` menandai jalur ini dimasuki karena pencarian
+        vektor tidak menemukan apa pun di atas ambang — bukan karena embedding
+        gagal. Vonis itu dibawa masuk untuk menilai kelayakan pertanyaan balik,
+        karena skor TF-IDF tidak bisa menggantikannya.
         """
         try:
             from retrieval.tfidf import TfidfRetriever
@@ -655,6 +664,17 @@ class PgVectorStore:
             allow_clarify=allow_clarify and clarify_quota_met(retrieved_matches, top_k),
             scope=scope, filters=filters, workspace_type=workspace_type,
             lexical_query=lexical_query,
+            # Pijakan pertanyaan balik. Kalau pencarian vektor sudah menyatakan
+            # tidak ada yang cocok, vonis itu yang berlaku; TF-IDF tidak bisa
+            # menggantikannya karena ia mencocokkan kata, bukan makna. Terukur
+            # pada korpus yang berjalan: "harga bitcoin hari ini" tetap meraih
+            # 0,21 lewat kata "harga" dan "hari", terlalu rapat dengan 0,33
+            # milik pertanyaan yang sungguh menyebut dokumennya.
+            #
+            # Yang tersisa untuk jalur ini hanya kasus embedding gagal, dan di
+            # sana ambang bukti TF-IDF memang satu-satunya yang ada.
+            fresh_matches=[] if vector_found_nothing else retrieved_matches,
+            footing_score=TfidfRetriever.minimum_score,
         )
 
 
@@ -741,16 +761,22 @@ class PgVectorStore:
         if not matches:
             # Vector search found nothing above threshold, try TF-IDF fallback
             print(f"[AI] Vector search: no matches above {minimum_score}, trying TF-IDF")
-            # Kelayakan bertanya balik tidak lagi ditentukan di sini. TF-IDF
-            # menilainya sendiri lewat `clarify_quota_met`, memakai ukuran yang
-            # sama dengan jalur vektor.
-            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters, context_chunk_ids=context_chunk_ids, workspace_type=workspace_type, scope=scope, lexical_query=lexical_query)
+            # Jawaban tetap dicoba dari kecocokan kata, tetapi pertanyaan balik
+            # tidak: pencarian semantik sudah menyatakan korpus tidak
+            # menyinggung yang ditanyakan, dan menawarkan pilihan di atas
+            # penilaian itu hanya akan berujung "tidak ditemukan" satu per satu.
+            return self._tfidf_fallback(query, top_k, use_llm=use_llm, model=model, api_key=api_key, allow_clarify=allow_clarify, filters=filters, context_chunk_ids=context_chunk_ids, workspace_type=workspace_type, scope=scope, lexical_query=lexical_query, vector_found_nothing=True)
         answer_started = time.perf_counter()
         result = self._answer_from_matches(
             query, matches, use_llm=use_llm, model=model, api_key=api_key,
             allow_clarify=allow_clarify and clarify_quota_met(retrieved_matches, top_k),
             filters=filters, workspace_type=workspace_type, scope=scope,
             lexical_query=lexical_query, documents=documents,
+            # Sudah tersaring `minimum_score` di atas, jadi ambangnya tidak
+            # perlu diterapkan dua kali. Saat pertanyaannya menyebut nama
+            # dokumen, ambang itu memang sengaja dilepas — dan dokumen yang
+            # disebut namanya memang sudah pijakan yang cukup.
+            fresh_matches=retrieved_matches,
         )
         print(
             "[AI] ask timing "
