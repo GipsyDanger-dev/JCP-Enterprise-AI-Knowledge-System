@@ -39,6 +39,19 @@ def strip_internal_chunk_references(answer: str) -> str:
     return _INTERNAL_CHUNK_REFERENCE.sub("", answer).strip()
 
 
+#: Pagar kode markdown di sekeliling balasan. ``response_format`` sudah meminta
+#: JSON polos, tetapi sebagian model tetap membungkusnya dengan ```json. Pagar
+#: itu membuat `json.loads` gagal, dan amplop yang gagal dibaca diteruskan apa
+#: adanya — sehingga JSON mentahnya yang tampil di layar sebagai "jawaban".
+_CODE_FENCE = re.compile(r"^```[^\n`]*\n(?P<isi>.*?)\n?```$", re.DOTALL)
+
+
+def _without_code_fence(content: str) -> str:
+    """Isi di dalam pagar kode, atau teks aslinya kalau tidak berpagar."""
+    fenced = _CODE_FENCE.match(content.strip())
+    return fenced.group("isi").strip() if fenced else content
+
+
 def unwrap_clarify_envelope(content: str) -> str:
     """Turn the typed JSON envelope back into what guardrails already parses.
 
@@ -48,7 +61,7 @@ def unwrap_clarify_envelope(content: str) -> str:
     the old text behaviour rather than failing the request.
     """
     try:
-        payload = json.loads(content)
+        payload = json.loads(_without_code_fence(content))
     except (json.JSONDecodeError, TypeError):
         return content
     if not isinstance(payload, dict):

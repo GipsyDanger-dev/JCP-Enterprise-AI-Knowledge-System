@@ -5,7 +5,8 @@ from unittest import mock
 from pathlib import Path
 
 from ai_engine import KnowledgeBase, chunk_pages, generate_answer
-from generation.guardrails import clarify_has_footing
+from generation.guardrails import clarify_has_footing, parse_clarify
+from generation.llm import unwrap_clarify_envelope
 from store import clarify_quota_met
 from generation.prompts import build_messages, looks_like_topic_phrase
 
@@ -235,3 +236,40 @@ class ClarifyQuotaTests(unittest.TestCase):
 
     def test_tanpa_bahan_tidak_boleh(self):
         self.assertFalse(clarify_quota_met([], self.TOP_K))
+
+
+class ClarifyEnvelopeTests(unittest.TestCase):
+    """Amplop JSON tetap terbaca meski model membungkusnya dengan pagar kode.
+
+    ``response_format`` meminta JSON polos, tetapi sebagian model tetap
+    menuliskannya di dalam ```json. Pagar itu membuat `json.loads` gagal, dan
+    amplop yang gagal dibaca diteruskan apa adanya — pengguna melihat JSON
+    mentah lengkap dengan "type" dan "pilihan" sebagai isi jawabannya.
+    """
+
+    CLARIFY = (
+        '{"type": "clarify", "pertanyaan": "Apa yang ingin Anda ketahui dari '
+        'dokumen tessss1?", "pilihan": ["Apa isi umum dokumen tessss1?"]}'
+    )
+
+    def test_pagar_kode_tidak_menyembunyikan_permintaan_penjelasan(self):
+        dibungkus = "```json\n" + self.CLARIFY + "\n```"
+        clarify = parse_clarify(unwrap_clarify_envelope(dibungkus))
+        self.assertIsNotNone(clarify)
+        self.assertEqual(
+            clarify["question"], "Apa yang ingin Anda ketahui dari dokumen tessss1?"
+        )
+
+    def test_pagar_kode_tidak_menyembunyikan_jawaban_biasa(self):
+        dibungkus = '```json\n{"type": "answer", "jawaban": "Batasnya Rp900.000."}\n```'
+        self.assertEqual(unwrap_clarify_envelope(dibungkus), "Batasnya Rp900.000.")
+
+    def test_tanpa_pagar_tetap_seperti_semula(self):
+        self.assertEqual(
+            unwrap_clarify_envelope("Batasnya Rp900.000."), "Batasnya Rp900.000."
+        )
+
+    def test_pagar_berisi_bukan_json_diteruskan_utuh(self):
+        """Balasan yang bukan amplop tetap lewat apa adanya, bukan dilucuti."""
+        prosa = "```\nbukan json\n```"
+        self.assertEqual(unwrap_clarify_envelope(prosa), prosa)
