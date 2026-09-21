@@ -39,6 +39,7 @@ import {
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
+import { UpdateDocumentCategoryDto } from './dto/update-document-category.dto';
 import { UpdateDocumentAccessDto } from './dto/update-document-access.dto';
 import { UpdateDocumentLegalStatusDto } from './dto/update-document-legal-status.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -101,6 +102,37 @@ export class DocumentsController {
   @ApiForbiddenResponse({ description: 'Only ADMIN can create document categories' })
   createCategory(@Body() input: CreateDocumentCategoryDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.documentsService.createCategory(input, actor);
+  }
+
+  // Kedua rute kategori di bawah harus dideklarasikan sebelum rute ':id'
+  // dokumen: Nest mencocokkan menurut urutan, dan 'categories' yang tersasar ke
+  // sana akan ditolak ParseUUIDPipe sebagai id dokumen yang tidak sah.
+  @Patch('categories/:id')
+  @ApiOperation({ summary: 'Ganti nama kategori dokumen' })
+  @ApiOkResponse({ description: 'Nama kategori tersimpan, termasuk pada dokumen yang memakainya' })
+  @ApiBadRequestResponse({ description: 'Nama terlalu pendek atau memakai kata yang dipesan' })
+  @ApiConflictResponse({ description: 'Sudah ada kategori lain dengan nama itu' })
+  @ApiNotFoundResponse({ description: 'Kategori tidak ada di workspace ini' })
+  @ApiForbiddenResponse({ description: 'Hanya admin yang boleh mengelola kategori' })
+  updateCategory(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() input: UpdateDocumentCategoryDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.documentsService.updateCategory(id, input, actor);
+  }
+
+  @Delete('categories/:id')
+  @ApiOperation({ summary: 'Hapus kategori dokumen yang sudah tidak dipakai' })
+  @ApiOkResponse({ description: 'Kategori dihapus' })
+  @ApiConflictResponse({ description: 'Masih ada dokumen aktif pada kategori ini' })
+  @ApiNotFoundResponse({ description: 'Kategori tidak ada di workspace ini' })
+  @ApiForbiddenResponse({ description: 'Hanya admin yang boleh mengelola kategori' })
+  removeCategory(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.documentsService.removeCategory(id, actor);
   }
 
   // Tanpa @AdminOnly, sama seperti unggah: ADMIN_UNIT boleh mengatur dokumen

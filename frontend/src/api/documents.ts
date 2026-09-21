@@ -74,6 +74,19 @@ export function createDocumentCategory(name: string, token?: string): Promise<Ap
   return request<ApiDocumentCategory>('/documents/categories', { method: 'POST', body: { name }, headers: authHeaders(token) })
 }
 
+/**
+ * Ganti nama kategori. Server sekaligus menulis ulang nama koleksi pada setiap
+ * dokumen yang memakainya, jadi daftar dokumen di klien perlu ikut disegarkan.
+ */
+export function updateDocumentCategory(id: string, name: string, token?: string): Promise<ApiDocumentCategory> {
+  return request<ApiDocumentCategory>(`/documents/categories/${id}`, { method: 'PATCH', body: { name }, headers: authHeaders(token) })
+}
+
+/** Hanya berhasil untuk kategori yang tidak lagi dipakai dokumen aktif. */
+export function deleteDocumentCategory(id: string, token?: string): Promise<{ id: string; name: string }> {
+  return request<{ id: string; name: string }>(`/documents/categories/${id}`, { method: 'DELETE', headers: authHeaders(token) })
+}
+
 export function getDocumentStatus(id: string, token?: string): Promise<DocumentStatusResponse> {
   return request<DocumentStatusResponse>(`/documents/${id}/status`, { headers: authHeaders(token) })
 }

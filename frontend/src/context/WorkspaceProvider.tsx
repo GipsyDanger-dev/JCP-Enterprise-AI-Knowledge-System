@@ -260,6 +260,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     )))
   }
 
+  const applyCategoryRename = (categoryId: string, name: string) => {
+    setDocuments((current) => current.map((item) => (
+      item.categoryId === categoryId ? { ...item, collection: name } : item
+    )))
+  }
+
   const removeDocument = async (id: string) => {
     if (!token) return
     try {
@@ -377,6 +383,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       uploadError,
       registerUploadedDocument,
       applyDocumentAccess,
+      applyCategoryRename,
       removeDocument,
       language,
       setLanguage,

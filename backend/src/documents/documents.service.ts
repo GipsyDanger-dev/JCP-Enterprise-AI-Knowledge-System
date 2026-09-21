@@ -22,6 +22,7 @@ import { DOCUMENT_STORAGE, DocumentStorage } from './document-storage.interface'
 import { UploadedDocumentFile, validateDocumentFile } from './document-file.validator';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { CreateDocumentCategoryDto } from './dto/create-document-category.dto';
+import { UpdateDocumentCategoryDto } from './dto/update-document-category.dto';
 import { UpdateDocumentAccessDto } from './dto/update-document-access.dto';
 import { UpdateDocumentLegalStatusDto } from './dto/update-document-legal-status.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -217,15 +218,31 @@ export class DocumentsService {
    * filter berisi pilihan yang tak pernah membuahkan hasil hanya membingungkan.
    */
   async listCategories(actor: AuthenticatedUser) {
-    return this.prisma.documentCategory.findMany({
+    const categories = await this.prisma.documentCategory.findMany({
       where: allowedCategoryFilter(actor) ?? {},
-      select: { id: true, name: true, createdAt: true },
+      // Jumlah dokumennya ikut karena dialog kelola kategori memakainya untuk
+      // memberi tahu lebih dulu mana yang belum bisa dihapus — menyodorkan
+      // tombol hapus yang selalu berakhir ditolak server sama saja dengan
+      // menyuruh admin menebak.
+      select: { id: true, name: true, createdAt: true, _count: { select: { documents: { where: { deletedAt: null } } } } },
       orderBy: { name: 'asc' },
     });
+    return categories.map(({ _count, ...category }) => ({ ...category, documentCount: _count.documents }));
+  }
+
+  /**
+   * Siapa yang boleh menambah, mengganti nama, dan menghapus kategori.
+   *
+   * Admin unit sengaja tidak ikut: kategori adalah penanda subjek milik
+   * seluruh organisasi, dipakai bersama semua unit. Satu unit yang bisa
+   * mengganti namanya akan mengubah tampilan arsip unit lain.
+   */
+  private pastikanBolehKelolaKategori(actor: AuthenticatedUser) {
+    if (!actor.isAdmin && actor.accountType !== 'PERSONAL') throw new ForbiddenException('Insufficient permissions');
   }
 
   async createCategory(input: CreateDocumentCategoryDto, actor: AuthenticatedUser) {
-    if (!actor.isAdmin && actor.accountType !== 'PERSONAL') throw new ForbiddenException('Insufficient permissions');
+    this.pastikanBolehKelolaKategori(actor);
     const name = normalizeCategoryName(input.name);
     if (name.length < 2) throw new BadRequestException('Category name must contain at least 2 characters');
     const key = categoryKey(name);
@@ -244,6 +261,83 @@ export class DocumentsService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Ganti nama kategori.
+   *
+   * `documents.collection` ikut ditulis ulang dalam satu transaksi. Kolom itu
+   * adalah salinan nama kategori yang dipakai daftar dokumen dan penyaringnya;
+   * kalau ditinggal, seluruh dokumen kategori ini tetap memakai nama lama yang
+   * sudah tidak ada di daftar mana pun, dan penyaringnya berhenti menemukan
+   * apa-apa.
+   */
+  async updateCategory(id: string, input: UpdateDocumentCategoryDto, actor: AuthenticatedUser) {
+    this.pastikanBolehKelolaKategori(actor);
+    const name = normalizeCategoryName(input.name);
+    if (name.length < 2) throw new BadRequestException('Category name must contain at least 2 characters');
+    const key = categoryKey(name);
+    if (key === 'all') throw new BadRequestException('"All" is reserved for the document filter');
+
+    const category = await this.prisma.documentCategory.findFirst({
+      where: { id, workspaceId: actor.workspaceId },
+      select: { id: true },
+    });
+    if (!category) throw new NotFoundException('Category not found');
+
+    // Bentrok dengan dirinya sendiri bukan bentrok: mengubah "Kepegawaian"
+    // menjadi "kepegawaian" menghasilkan kunci yang sama dan tetap boleh.
+    const bentrok = await this.prisma.documentCategory.findUnique({
+      where: { workspaceId_key: { workspaceId: actor.workspaceId, key } },
+      select: { id: true },
+    });
+    if (bentrok && bentrok.id !== id) throw new ConflictException('A category with this name already exists');
+
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.documentCategory.update({
+        where: { id },
+        data: { name, key },
+        select: { id: true, name: true, createdAt: true },
+      }),
+      this.prisma.document.updateMany({
+        where: { categoryId: id, workspaceId: actor.workspaceId },
+        data: { collection: name },
+      }),
+    ]);
+    return updated;
+  }
+
+  /**
+   * Hapus kategori, hanya kalau tidak ada dokumen aktif yang memakainya.
+   *
+   * Relasinya SetNull, jadi menghapus kategori berisi tidak akan menggugurkan
+   * dokumennya — tapi seluruh dokumen itu diam-diam kehilangan penanda
+   * subjeknya sekaligus, dan tak ada tombol untuk mengembalikannya. Lebih baik
+   * ditolak sambil menyebut angkanya, supaya admin memindahkan dokumennya
+   * sendiri dan tahu persis apa yang ia pindahkan.
+   *
+   * Dokumen yang sudah dihapus tidak ikut menghalangi: penanda subjek pada
+   * arsip yang tak lagi tampil di mana pun tidak menentukan apa-apa, dan
+   * menjadikannya penghalang berarti kategori lama tidak akan pernah bisa
+   * dihapus.
+   */
+  async removeCategory(id: string, actor: AuthenticatedUser) {
+    this.pastikanBolehKelolaKategori(actor);
+    const category = await this.prisma.documentCategory.findFirst({
+      where: { id, workspaceId: actor.workspaceId },
+      select: { id: true, name: true },
+    });
+    if (!category) throw new NotFoundException('Category not found');
+
+    const terpakai = await this.prisma.document.count({ where: { categoryId: id, deletedAt: null } });
+    if (terpakai > 0) {
+      throw new ConflictException(
+        `Kategori ini masih dipakai ${terpakai} dokumen. Pindahkan dokumennya ke kategori lain dulu.`,
+      );
+    }
+
+    await this.prisma.documentCategory.delete({ where: { id } });
+    return { id: category.id, name: category.name };
   }
 
   /**

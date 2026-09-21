@@ -51,6 +51,12 @@ export interface WorkspaceContextValue {
   registerUploadedDocument: (document: ApiDocument) => void
   /** Segarkan kategori dan penanda unit kerja satu dokumen setelah diubah admin. */
   applyDocumentAccess: (document: ApiDocument) => void
+  /**
+   * Ikutkan nama kategori yang baru ke dokumen yang memakainya. Server sudah
+   * menulisnya di database; ini hanya menyusulkan daftar yang sedang tampil,
+   * supaya nama lama tidak tertinggal di kolom koleksi sampai halaman dimuat ulang.
+   */
+  applyCategoryRename: (categoryId: string, name: string) => void
   removeDocument: (id: string) => Promise<void>
   language: Language
   setLanguage: (lang: Language) => void

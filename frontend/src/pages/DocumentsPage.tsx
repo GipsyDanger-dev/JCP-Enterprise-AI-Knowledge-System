@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowUpRight, Building2, ChevronDown, Download, FileText, FolderLock, FolderOpen, Pencil, Scale, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { ArrowUpRight, Building2, ChevronDown, Download, FileText, FolderCog, FolderLock, FolderOpen, Pencil, Scale, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusBadge } from '@/components/StatusBadge'
 import { DataTable } from '@/components/DataTable'
 import { UploadModal } from '@/components/UploadModal'
 import { DocumentAccessModal } from '@/components/DocumentAccessModal'
+import { CategoryManagerModal } from '@/components/CategoryManagerModal'
 import { downloadDocument, getDocumentBlob, getDocumentChunks, listDocumentCategories, updateDocument, updateDocumentAccess, updateDocumentLegalStatus, type DocumentChunk } from '@/api/documents'
 import { LEGAL_STATUSES, legalStatusHint, legalStatusLabel } from '@/utils/legalStatus'
 import type { ApiLegalStatus } from '@/api/types'
@@ -196,7 +197,7 @@ function DocViewer({ doc, isId, canManage, token, onClose, onDelete, onChunksLoa
 
 export function DocumentsPage() {
   const { token, user } = useAuth()
-  const { documents, role, uploadError, removeDocument, registerUploadedDocument, applyDocumentAccess, language } = useWorkspace()
+  const { documents, role, uploadError, removeDocument, registerUploadedDocument, applyDocumentAccess, applyCategoryRename, language } = useWorkspace()
   const isPersonal = user?.accountType === 'PERSONAL'
   const [renameDoc, setRenameDoc] = useState<DocumentItem | null>(null)
   const [renameTitle, setRenameTitle] = useState('')
@@ -284,6 +285,8 @@ export function DocumentsPage() {
   // Daftar akses seluruh dokumen sekaligus, untuk mengunci beberapa dokumen
   // satu dinas dalam sekali jalan.
   const [showDocumentAccess, setShowDocumentAccess] = useState(false)
+  // Kelola daftar kategorinya sendiri — menambah, mengganti nama, menghapus.
+  const [showCategories, setShowCategories] = useState(false)
   const [docChunks, setDocChunks] = useState<DocumentChunk[]>([])
   const [chunksLoading, setChunksLoading] = useState(false)
 
@@ -342,6 +345,31 @@ export function DocumentsPage() {
       return matchesQuery && matchesCollection
     })
   }, [documents, query, collection])
+
+  const collectionRef = useRef(collection)
+  collectionRef.current = collection
+
+  /**
+   * Daftar kategori terbaru dari dialog kelola kategori.
+   *
+   * Penyaring yang sedang aktif ikut diperiksa: kategori yang baru saja dihapus
+   * meninggalkan penyaring yang tidak cocok dengan apa pun, dan daftar dokumen
+   * akan tampak kosong tanpa sebab yang terlihat di layar.
+   */
+  const terapkanDaftarKategori = (data: ApiDocumentCategory[]) => {
+    setCategories(data)
+    const aktif = collectionRef.current
+    if (aktif !== 'All' && !data.some((category) => category.name === aktif)) {
+      handleCollectionChange('All')
+    }
+  }
+
+  /** Nama kategori berubah: dokumen yang memakainya dan penyaringnya ikut. */
+  const terapkanGantiNamaKategori = (categoryId: string, name: string) => {
+    const lama = categories.find((category) => category.id === categoryId)?.name
+    applyCategoryRename(categoryId, name)
+    if (lama && collectionRef.current === lama) handleCollectionChange(name)
+  }
 
   const handleCollectionChange = (c: string) => {
     setCollection(c)
@@ -409,6 +437,12 @@ export function DocumentsPage() {
     <>
       {!isPersonal && bolehKelolaMassal && <button className="secondary-button" onClick={() => setShowDocumentAccess(true)}>
         <FolderLock size={16} /> {isId ? 'Manajemen dokumen' : 'Document management'}
+      </button>}
+      {/* Kategori dipakai bersama seluruh unit, jadi yang boleh mengelolanya
+          sama dengan yang boleh membuatnya di server: super admin, dan pemilik
+          akun pribadi atas kategorinya sendiri. */}
+      {(role === 'admin' || isPersonal) && <button className="secondary-button" onClick={() => setShowCategories(true)}>
+        <FolderCog size={16} /> {isId ? 'Kelola kategori' : 'Manage categories'}
       </button>}
       <button className="primary-button" onClick={() => setShowUpload(true)}>
         <Upload size={17} /> {isId ? 'Unggah dokumen' : 'Upload document'}
@@ -530,6 +564,12 @@ export function DocumentsPage() {
         </div>
       </div>}
       <DocumentAccessModal open={showDocumentAccess} onClose={() => setShowDocumentAccess(false)} />
+      <CategoryManagerModal
+        open={showCategories}
+        onClose={() => setShowCategories(false)}
+        onChanged={terapkanDaftarKategori}
+        onRenamed={terapkanGantiNamaKategori}
+      />
 
       {/* Status keberlakuan: dialog tersendiri karena wewenangnya juga
           tersendiri — jabatan yang dicentang boleh membukanya tanpa boleh

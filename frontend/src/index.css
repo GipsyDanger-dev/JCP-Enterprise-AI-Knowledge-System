@@ -1120,6 +1120,53 @@ button { cursor: pointer; }
 .doc-access-control .select-wrapper { min-width: 210px; }
 .doc-access-error { flex: 1 1 100%; margin: 4px 0 0; font-size: 12px; color: #b91c1c; }
 
+/* Kelola kategori: daftar sederhana, satu baris per kategori. */
+.category-modal { max-width: 560px; width: 100%; }
+/*
+ * Formulir tambah: satu baris, kotak isian dan tombolnya bersebelahan.
+ *
+ * Penegasan arahnya perlu karena `.modal-card form` menjadikan SETIAP form di
+ * dalam kartu modal sebuah kolom setinggi badan dialog — aturan itu untuk
+ * dialog yang seluruh isinya satu form. Tanpa ini, `flex: 1 1 240px` pada
+ * kotak isian dibaca sebagai tinggi, dan kotaknya menjulang 240px.
+ */
+.category-modal .org-add-form {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.category-modal .org-add-form input { flex: 1 1 auto; height: 36px; }
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.category-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-soft, #ececec);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+.category-row-icon { flex: 0 0 auto; color: var(--text-muted, #8b8b8b); }
+.category-row-name { flex: 1 1 auto; min-width: 0; }
+.category-row-name strong {
+  display: block;
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.category-row-name small { display: block; margin-top: 2px; font-size: 11px; color: var(--text-muted, #8b8b8b); }
+
 /* Baris tombol: centang pilih-semua di kiri, tindakan massal di tengah,
    Tutup di kanan. */
 .doc-access-actions { flex-wrap: wrap; gap: 10px; align-items: center; }

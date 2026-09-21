@@ -325,6 +325,12 @@ export interface ApiDocumentCategory {
   id: string
   name: string
   createdAt: string
+  /**
+   * Jumlah dokumen aktif pada kategori ini. Hanya dikirim oleh endpoint daftar;
+   * endpoint yang membuat atau mengganti nama satu kategori membalas tanpa
+   * angka ini, jadi opsional.
+   */
+  documentCount?: number
 }
 
 export interface ConversationSummary {
