@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   Building2,
@@ -16,6 +16,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, errorMessage } from '@/api/client'
 import { LogoMark } from '@/components/Logo'
 import { GoogleSignInButton } from '@/components/GoogleSignInButton'
+import { LOGOUT_REASON_KEY } from '@/context/authContextValue'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import loginDocuments from '@/assets/login-documents.png'
@@ -42,7 +43,16 @@ export function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(() => (
+    sessionStorage.getItem(LOGOUT_REASON_KEY) === 'idle'
+      ? (isId ? 'Sesi berakhir karena tidak ada aktivitas selama 20 menit. Silakan masuk kembali.' : 'Your session ended after 20 minutes of inactivity. Please sign in again.')
+      : null
+  ))
+
+  // Dihapus di effect, bukan di initializer state: StrictMode memanggil
+  // initializer dua kali, dan penghapusan di panggilan pertama membuat pesan
+  // hilang di panggilan kedua.
+  useEffect(() => { sessionStorage.removeItem(LOGOUT_REASON_KEY) }, [])
   const [submitting, setSubmitting] = useState(false)
   const [touched, setTouched] = useState({ username: false, password: false })
 

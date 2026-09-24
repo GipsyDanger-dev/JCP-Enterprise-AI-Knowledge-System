@@ -26,3 +26,9 @@ export interface AuthContextValue {
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)
+
+/**
+ * Alasan sesi terakhir diakhiri, disimpan di sessionStorage oleh AuthProvider
+ * dan dibaca halaman login. Nilainya saat ini hanya 'idle'.
+ */
+export const LOGOUT_REASON_KEY = 'ea.logoutReason'
