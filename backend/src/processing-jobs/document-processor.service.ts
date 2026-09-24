@@ -1,10 +1,15 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Subscription } from 'rxjs';
 import { PrismaService } from '../database/prisma.service';
+import { DocumentQueueSignal } from '../documents/document-queue.signal';
 import { DocumentStorage, DOCUMENT_STORAGE } from '../documents/document-storage.interface';
 import { Inject } from '@nestjs/common';
 import { aiServiceUrl, workerToken } from '../config/env.util';
 
-const POLL_INTERVAL_MS = 3000;
+// Hanya jaring pengaman; job baru datang lewat DocumentQueueSignal. Sengaja
+// jauh di atas 5 menit: tiap sapuan membangunkan compute Neon dan membuatnya
+// menyala 5 menit, jadi sapuan tiap 10 menit pun masih memakan separuh kuota.
+const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 const AI_INGEST_MAX_ATTEMPTS = 3;
 const AI_INGEST_RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
@@ -19,26 +24,66 @@ function embeddingsEnabled(): boolean {
 }
 
 @Injectable()
-export class DocumentProcessorService implements OnModuleInit {
+export class DocumentProcessorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DocumentProcessorService.name);
   private readonly aiBaseUrl = aiServiceUrl();
   private processing = false;
+  private wokenWhileProcessing = false;
+  private sweepTimer?: NodeJS.Timeout;
+  private subscription?: Subscription;
 
   constructor(
     private readonly prisma: PrismaService,
     @Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage,
+    private readonly queueSignal: DocumentQueueSignal,
   ) {}
 
   onModuleInit() {
-    this.logger.log('Document processor polling started');
-    setInterval(() => this.processNext(), POLL_INTERVAL_MS);
+    this.logger.log('Document processor waiting for queued jobs');
+    this.subscription = this.queueSignal.queued$.subscribe(() => this.wake());
+    this.sweepTimer = setInterval(() => this.wake(), SWEEP_INTERVAL_MS);
+    // Job yang tertinggal saat backend mati tidak akan mengirim sinyal lagi.
+    this.wake();
   }
 
-  private async processNext() {
-    if (this.processing) return;
+  onModuleDestroy() {
+    this.subscription?.unsubscribe();
+    clearInterval(this.sweepTimer);
+  }
+
+  private wake() {
+    if (this.processing) {
+      // Job yang masuk saat antrean sedang dikerjakan mungkin sudah terlewat
+      // oleh query sebelumnya; tandai supaya antrean diperiksa sekali lagi.
+      this.wokenWhileProcessing = true;
+      return;
+    }
+    void this.drain();
+  }
+
+  private async drain() {
     this.processing = true;
+    try {
+      do {
+        this.wokenWhileProcessing = false;
+        while (await this.processNext()) {
+          // Terus ambil job berikutnya sampai antrean kosong.
+        }
+      } while (this.wokenWhileProcessing);
+    } finally {
+      this.processing = false;
+    }
+  }
+
+  /**
+   * Kerjakan satu job. Hasilnya true bila ada job yang diambil — berhasil
+   * atau gagal — dan false bila antrean kosong atau job belum sempat diambil,
+   * supaya drain tidak berputar tanpa henti saat database sedang bermasalah.
+   */
+  private async processNext(): Promise<boolean> {
     let activeJobId: string | null = null;
     let activeDocId: string | null = null;
+    let claimed = false;
 
     try {
       const job = await this.prisma.processingJob.findFirst({
@@ -60,10 +105,7 @@ export class DocumentProcessorService implements OnModuleInit {
         },
       });
 
-      if (!job) {
-        this.processing = false;
-        return;
-      }
+      if (!job) return false;
 
       activeJobId = job.id;
       activeDocId = job.documentVersion.document.id;
@@ -79,6 +121,7 @@ export class DocumentProcessorService implements OnModuleInit {
         where: { id: job.id },
         data: { status: 'PROCESSING', startedAt: new Date(), attemptCount: { increment: 1 } },
       });
+      claimed = true;
       await this.prisma.document.update({
         where: { id: docId },
         data: { status: 'PROCESSING' },
@@ -166,8 +209,7 @@ export class DocumentProcessorService implements OnModuleInit {
           });
         }
       } catch { }
-    } finally {
-      this.processing = false;
     }
+    return claimed;
   }
 }

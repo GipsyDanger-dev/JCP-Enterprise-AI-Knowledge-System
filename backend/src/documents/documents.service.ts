@@ -18,6 +18,7 @@ import { extname } from 'node:path';
 import { AuditLogsService, pelakuAktor } from '../audit-logs/audit-logs.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
+import { DocumentQueueSignal } from './document-queue.signal';
 import { DOCUMENT_STORAGE, DocumentStorage } from './document-storage.interface';
 import { UploadedDocumentFile, validateDocumentFile } from './document-file.validator';
 import { CreateDocumentDto } from './dto/create-document.dto';
@@ -60,6 +61,7 @@ export class DocumentsService {
     private readonly prisma: PrismaService,
     @Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage,
     private readonly auditLogs: AuditLogsService,
+    private readonly queueSignal: DocumentQueueSignal,
   ) {}
 
   /**
@@ -187,6 +189,7 @@ export class DocumentsService {
         },
       });
     }, { maxWait: 10_000, timeout: 20_000 });
+    this.queueSignal.notify();
 
     return {
       id: documentId,
