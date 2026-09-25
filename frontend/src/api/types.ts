@@ -319,6 +319,8 @@ export interface ChatQueryResponse {
   awaitingChoice?: boolean
   /** Terisi hanya untuk pertanyaan balik: bahan di balik pilihan yang ditawarkan. */
   contextChunkIds?: string[]
+  /** Lama AI menjawab menurut server — angka yang sama yang disimpan di riwayat. */
+  durationMs?: number
 }
 
 export interface ApiDocumentCategory {
@@ -351,6 +353,8 @@ export interface ConversationMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   citations: Citation[]
+  /** Hanya pada pesan assistant; null untuk pesan pengguna. */
+  durationMs: number | null
   createdAt: string
 }
 

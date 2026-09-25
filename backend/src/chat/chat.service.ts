@@ -96,6 +96,9 @@ export class ChatService {
     fromSuggestion?: boolean,
     chosenContextChunkIds?: string[],
   ) {
+    // Dihitung sejak permintaan masuk, sama dengan titik mulai penghitung di
+    // layar, supaya angka yang tersimpan tidak berbeda dari yang tadi terlihat.
+    const startedAt = Date.now();
     const conversation = await this.resolveConversation(question, actor, conversationId);
     const isFollowUp = isFollowUpQuestion(question);
     // Pilihan dari pertanyaan balik membawa bahannya sendiri: potongan yang
@@ -153,12 +156,14 @@ export class ChatService {
 
       const result = (await response.json()) as AiAskResult;
       const citations = await this.verifiedCitations(result.citations ?? [], actor);
-      await this.persistAssistantMessage(conversation.id, result.answer, citations);
+      const durationMs = Date.now() - startedAt;
+      await this.persistAssistantMessage(conversation.id, result.answer, citations, durationMs);
 
       return {
         conversationId: conversation.id,
         answer: result.answer,
         citations,
+        durationMs,
         suggestions: result.suggestions ?? [],
         // Antarmuka mengunci kolom ketik selama ini bernilai true, supaya
         // pengguna menuntaskan dulu pertanyaan balik dari AI.
@@ -173,11 +178,13 @@ export class ChatService {
     } catch (error) {
       const answer = 'Maaf, pertanyaan belum dapat diproses sekarang. Coba salah satu pertanyaan berikut tentang dokumen perusahaan:';
       const citations: ChatCitation[] = [];
-      await this.persistAssistantMessage(conversation.id, answer, citations);
+      const durationMs = Date.now() - startedAt;
+      await this.persistAssistantMessage(conversation.id, answer, citations, durationMs);
       return {
         conversationId: conversation.id,
         answer,
         citations,
+        durationMs,
         suggestions: QUICK_SUGGESTIONS,
         // Kegagalan bukan pertanyaan balik: kolom ketik harus tetap terbuka.
         awaitingChoice: false,
@@ -326,6 +333,7 @@ export class ChatService {
     conversationId: string,
     answer: string,
     citations: ChatCitation[],
+    durationMs: number,
   ) {
     const citationCandidates = citations.filter(
       (citation) => this.isUuid(citation.documentVersionId) && citation.chunkId,
@@ -350,6 +358,7 @@ export class ChatService {
           conversationId,
           role: MessageRole.ASSISTANT,
           content: answer,
+          durationMs,
           citations: {
             create: persistentCitations.map((citation, sortOrder) => ({
               documentVersionId: citation.documentVersionId,

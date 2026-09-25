@@ -615,6 +615,8 @@ model Message {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           MessageRole
   content        String       @db.Text
+  /// Lama AI menjawab, dalam milidetik. Hanya diisi pada pesan ASSISTANT.
+  durationMs     Int?         @map("duration_ms")
   citations      Citation[]
   createdAt      DateTime     @default(now()) @map("created_at")
 

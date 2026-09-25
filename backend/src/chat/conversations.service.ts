@@ -79,6 +79,7 @@ export class ConversationsService {
             id: true,
             role: true,
             content: true,
+            durationMs: true,
             createdAt: true,
             citations: {
               orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],

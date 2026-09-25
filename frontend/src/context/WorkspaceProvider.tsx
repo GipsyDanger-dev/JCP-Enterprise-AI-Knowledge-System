@@ -313,7 +313,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
       setChatHistory((prev) => prev.map((msg) =>
         msg.id === messageId
-          ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, suggestions: res.suggestions ?? [], awaitingChoice: res.awaitingChoice ?? false, contextChunkIds: res.contextChunkIds ?? [], error: null, durationMs: Date.now() - mulai }
+          ? { ...msg, answer: res.answer ?? res.message ?? '', citations: res.citations, suggestions: res.suggestions ?? [], awaitingChoice: res.awaitingChoice ?? false, contextChunkIds: res.contextChunkIds ?? [], error: null, durationMs: res.durationMs ?? Date.now() - mulai }
           : msg
       ))
     } catch (err) {
@@ -424,6 +424,7 @@ function toWorkspaceHistory(conversation: ConversationDetail): ChatMessage[] {
     if (latestQuestion) {
       latestQuestion.answer = message.content
       latestQuestion.citations = message.citations
+      latestQuestion.durationMs = message.durationMs ?? null
     }
   }
   return history

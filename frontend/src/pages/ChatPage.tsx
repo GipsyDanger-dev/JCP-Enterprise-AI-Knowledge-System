@@ -132,9 +132,9 @@ function formatDurasi(ms: number, isId: boolean) {
  * tidak aktif membuat interval melambat, dan penghitung yang menjumlah
  * detaknya sendiri akan tertinggal jauh dari waktu yang sebenarnya berlalu.
  *
- * Yang ditampilkan setelah selesai adalah `durationMs` dari provider, bukan
- * angka terakhir yang sempat terlihat — pesan yang dimuat dari riwayat tidak
- * membawanya, jadi di sana penghitungnya memang tidak muncul.
+ * Yang ditampilkan setelah selesai adalah `durationMs` yang dicatat server,
+ * bukan angka terakhir yang sempat terlihat — angka itulah yang tersimpan, jadi
+ * riwayat yang dibuka ulang menampilkan angka yang sama.
  */
 function AnswerTimer({ startedAt, durationMs, isRunning, isId }: { startedAt: number; durationMs: number | null; isRunning: boolean; isId: boolean }) {
   const [berjalan, setBerjalan] = useState(() => Date.now() - startedAt)
