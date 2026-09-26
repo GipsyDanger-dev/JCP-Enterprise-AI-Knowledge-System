@@ -1371,6 +1371,14 @@ button { cursor: pointer; }
 /* Kontrol yang sengaja dikunci: tetap terbaca, tapi jelas tidak bisa dipakai. */
 .select-wrapper select:disabled { opacity: .55; cursor: not-allowed; background: var(--bg-hover); }
 .icon-button:disabled, .icon-button:disabled:hover { opacity: .35; cursor: not-allowed; background: transparent; color: var(--text-secondary); }
+
+/* Tooltip kustom (lihat TooltipLayer): polos dan tipis, cukup untuk dibaca
+   tanpa menarik perhatian. Di mode gelap memakai permukaan yang sedikit lebih
+   terang dari kartu plus garis tepi, bukan warna terbalik yang mencolok. */
+.app-tooltip { position: fixed; top: 0; left: 0; z-index: 1000; max-width: min(260px, calc(100vw - 16px)); padding: 4px 8px; border: 1px solid transparent; border-radius: var(--radius-sm); background: #2b2a28; color: #f5f5f2; font-size: var(--fs-sm); font-weight: 400; line-height: 1.4; letter-spacing: .01em; overflow-wrap: anywhere; pointer-events: none; opacity: 0; transition: opacity .1s ease; }
+.app-tooltip.visible { opacity: 1; }
+[data-theme="dark"] .app-tooltip { background: #38383c; border-color: #48484d; color: var(--text-primary); }
+@media (prefers-reduced-motion: reduce) { .app-tooltip { transition: none; } }
 .select-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-muted); }
 
 /* ============ Settings page ============ */

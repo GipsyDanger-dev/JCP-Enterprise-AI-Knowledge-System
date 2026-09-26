@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { RequireAuth, RequireCompanyAccount, RequirePlatformOwner, RequireRole } from '@/components/RequireAuth'
+import { TooltipLayer } from '@/components/TooltipLayer'
 import { AuthProvider } from '@/context/AuthProvider'
 import { WorkspaceProvider } from '@/context/WorkspaceProvider'
 import { ActivityPage } from '@/pages/ActivityPage'
@@ -41,6 +42,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ThemeInitializer />
+      <TooltipLayer />
       <AuthProvider>
         <WorkspaceProvider>
           <Routes>
