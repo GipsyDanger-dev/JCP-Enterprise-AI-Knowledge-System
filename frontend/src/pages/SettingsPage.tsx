@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Check, Globe, LoaderCircle, Moon, Palette, Save, Sun, User } from 'lucide-react'
+import { Check, GraduationCap, Globe, LoaderCircle, Moon, Palette, PlayCircle, Save, Sun, User } from 'lucide-react'
 import { ShieldCheck } from 'lucide-react'
 import { ApiError, errorMessage } from '@/api/client'
 import { PageHeading } from '@/components/PageHeading'
+import { TutorialModal } from '@/components/TutorialModal'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { userRoleLabel } from '@/utils/users'
+import { isTutorialHidden, setTutorialHidden } from '@/utils/tutorial'
 import { isNotificationsEnabled, setNotificationsEnabled, isBrowserNotificationsEnabled, setBrowserNotificationsEnabled, requestNotificationPermission } from '@/utils/notifications'
 
 const THEME_KEY = 'jcp-theme'
@@ -41,6 +43,8 @@ export function SettingsPage() {
   const [profileError, setProfileError] = useState('')
   const [profileSaved, setProfileSaved] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
+  const [tutorialOpen, setTutorialOpen] = useState(false)
+  const [tutorialOnLogin, setTutorialOnLogin] = useState(() => (user ? !isTutorialHidden(user.id) : true))
 
   const isPersonal = user?.accountType === 'PERSONAL'
 
@@ -78,6 +82,13 @@ export function SettingsPage() {
   }, [browserNotif])
 
   const isId = language === 'id'
+
+  const toggleTutorialOnLogin = () => {
+    if (!user) return
+    const next = !tutorialOnLogin
+    setTutorialOnLogin(next)
+    setTutorialHidden(user.id, !next)
+  }
 
   const saveProfile = async () => {
     setProfileError('')
@@ -360,7 +371,40 @@ export function SettingsPage() {
             </div>
           </div>
         </section>
+
+        <section className="settings-section">
+          <div className="settings-section-header">
+            <span className="settings-icon"><GraduationCap size={18} /></span>
+            <div>
+              <h3>Tutorial</h3>
+              <small>{isId ? 'Panduan singkat cara memakai Enterprise AI' : 'A short guide to using Enterprise AI'}</small>
+            </div>
+          </div>
+          <div className="settings-form">
+            <div className="settings-switch-row">
+              <div className="settings-switch-info">
+                <label>{isId ? 'Lihat tutorial' : 'View tutorial'}</label>
+                <small>{isId ? 'Buka lagi slide langkah demi langkahnya kapan saja.' : 'Go through the step-by-step slides again any time.'}</small>
+              </div>
+              <button type="button" className="secondary-button" onClick={() => setTutorialOpen(true)}>
+                <PlayCircle size={15} /> {isId ? 'Buka tutorial' : 'Open tutorial'}
+              </button>
+            </div>
+            <div className="settings-switch-row">
+              <div className="settings-switch-info">
+                <label>{isId ? 'Tampilkan saat masuk' : 'Show when signing in'}</label>
+                <small>{tutorialOnLogin
+                  ? (isId ? 'Tutorial muncul sekali setiap kali Anda login.' : 'The tutorial appears once each time you sign in.')
+                  : (isId ? 'Tutorial tidak muncul otomatis.' : 'The tutorial does not open on its own.')}</small>
+              </div>
+              <button className={`toggle-switch ${tutorialOnLogin ? 'on' : ''}`} onClick={toggleTutorialOnLogin} type="button" aria-pressed={tutorialOnLogin}>
+                <span className="toggle-knob" />
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
+      {tutorialOpen && <TutorialModal onClose={() => setTutorialOpen(false)} />}
     </div>
   )
 }

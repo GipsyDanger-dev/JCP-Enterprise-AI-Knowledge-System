@@ -15,6 +15,7 @@ import {
   updateOwnProfile as apiUpdateOwnProfile,
 } from '@/api/auth'
 import type { ApiUser, OwnProfileResponse } from '@/api/types'
+import { markTutorialPending } from '@/utils/tutorial'
 import { AuthContext, LOGOUT_REASON_KEY } from './authContextValue'
 
 /**
@@ -48,6 +49,9 @@ const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'scro
 function storeToken(accessToken: string) {
   localStorage.setItem(TOKEN_KEY, accessToken)
   localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()))
+  // Setiap login (biasa, Google, atau daftar) lewat sini, jadi cukup satu
+  // tempat untuk menjadwalkan tutorial di halaman akun berikutnya.
+  markTutorialPending()
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
