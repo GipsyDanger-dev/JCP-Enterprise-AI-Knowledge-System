@@ -330,11 +330,13 @@ export function DocumentsPage() {
         setCategories(data)
         // Satu kategori berarti tidak ada yang bisa dipilih: langsung jadikan
         // lingkupnya, supaya judul filter menerangkan isi daftar apa adanya.
-        if (data.length === 1) setCollection(data[0].name)
+        // Akun pribadi dikecualikan: kategorinya opsional, jadi dokumen tanpa
+        // kategori akan ikut tersembunyi kalau lingkupnya dipersempit.
+        if (data.length === 1 && !isPersonal) setCollection(data[0].name)
       })
       .catch(() => { if (!batal) setCategories([]) })
     return () => { batal = true }
-  }, [token])
+  }, [token, isPersonal])
 
   const filtered = useMemo(() => {
     return documents.filter((doc) => {
@@ -458,15 +460,20 @@ export function DocumentsPage() {
         <div className="filter-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isId ? 'Cari dokumen' : 'Search documents'} /></div>
         {/* Tanpa kategori yang bisa diakses, filternya tidak ditampilkan sama
             sekali. Dengan tepat satu kategori, pilihan "Semua" dibuang karena
-            hasilnya akan persis sama dengan kategori itu sendiri. */}
-        {categories.length > 0 && (
+            hasilnya akan persis sama dengan kategori itu sendiri.
+
+            Akun pribadi selalu mendapat dropdown lengkap dengan "Semua
+            kategori" sebagai bawaan: di sana kategori opsional, jadi "Semua"
+            tetap berbeda dari kategori mana pun — ia juga memuat dokumen yang
+            belum diberi kategori. */}
+        {(categories.length > 0 || isPersonal) && (
         <div className="collection-dropdown-wrap">
           <button className="secondary-button" onClick={() => setShowCollections(!showCollections)}>
             <FolderOpen size={16} />
             {collection === 'All' ? (isId ? 'Semua kategori' : 'All categories') : collection}
-            {categories.length > 1 && <ChevronDown size={14} />}
+            {(categories.length > 1 || isPersonal) && <ChevronDown size={14} />}
           </button>
-          {showCollections && categories.length > 1 && (
+          {showCollections && (categories.length > 1 || isPersonal) && (
             <div className="collection-dropdown">
               <button className={collection === 'All' ? 'active' : ''} onClick={() => handleCollectionChange('All')}>
                 {isId ? 'Semua kategori' : 'All categories'}
