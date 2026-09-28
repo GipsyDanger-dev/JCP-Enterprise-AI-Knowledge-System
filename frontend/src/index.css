@@ -732,7 +732,7 @@ button { cursor: pointer; }
 
 .login-mode-switch { display: grid; grid-template-columns: 1fr 1fr; max-width: 430px; margin: 0 0 18px; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); }
 .login-mode-switch button { height: 34px; border: 0; border-radius: 5px; background: transparent; color: var(--text-muted); font: inherit; font-size: 12px; font-weight: var(--fw-bold); cursor: pointer; }
-.login-mode-switch button.active { background: var(--bg-card); color: var(--text-strong); box-shadow: var(--shadow-sm); }
+.login-mode-switch button.active { background: var(--brand-600); color: var(--on-dark); box-shadow: 0 4px 10px color-mix(in srgb, var(--brand-700) 22%, transparent); }
 
 .login-error, .login-notice { display: flex; align-items: center; gap: 7px; max-width: 430px; min-height: 40px; margin-bottom: 16px; padding: 8px 12px; border-radius: 6px; font-size: var(--fs-xs); line-height: 1.35; animation: fadeIn .2s ease; }
 .login-error svg, .login-notice svg { flex: 0 0 auto; margin-top: 0; }
@@ -758,6 +758,12 @@ button { cursor: pointer; }
 .login-submit:hover:not(:disabled) { background: var(--brand-700); transform: translateY(-1px); box-shadow: 0 10px 18px color-mix(in srgb, var(--brand-700) 28%, transparent); }
 .login-submit:active:not(:disabled) { transform: translateY(0); }
 .login-submit:disabled { opacity: .65; cursor: not-allowed; }
+.login-text-action { justify-self: start; display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 0; background: transparent; color: var(--brand-700); font: inherit; font-size: var(--fs-xs); font-weight: var(--fw-semibold); cursor: pointer; }
+.login-text-action:hover { color: var(--brand-800); text-decoration: underline; }
+.login-text-action:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 3px; border-radius: 2px; }
+.login-forgot-action { justify-self: end; margin-top: -8px; }
+.login-back-action { margin-top: 2px; }
+.login-code-wrap input { font-size: 19px; font-weight: var(--fw-heavy); letter-spacing: .28em; font-variant-numeric: tabular-nums; }
 .login-google-frame { position: relative; width: 100%; min-height: 44px; display: grid; place-items: center; overflow: hidden; border-radius: 5px; }
 .login-google-frame > span { position: absolute; color: var(--text-muted); font-size: var(--fs-xs); }
 .login-google-frame > div { width: 100%; min-height: 44px; display: grid; place-items: center; }

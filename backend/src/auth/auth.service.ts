@@ -2,14 +2,17 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
+  NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { AccountType, AuditAction, AuditActorType, Prisma, User, UserRole } from '@prisma/client';
+import { AccountType, AuditAction, AuditActorType, AuthVerificationPurpose, Prisma, User, UserRole } from '@prisma/client';
 import { OAuth2Client } from 'google-auth-library';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import { trialDurationDays } from '../config/env.util';
 import { JabatanPermissions, JwtPayload } from './auth.types';
@@ -23,6 +26,18 @@ import { hashPassword, verifyPassword } from './password.util';
 import { BillingService } from '../billing/billing.service';
 import { seedJabatanDanRoleLabel } from '../../prisma/organization-defaults';
 import { JABATAN_PERMISSION_SELECT, wewenangJabatan } from './jabatan.utils';
+import { VerificationEmailService } from './verification-email.service';
+
+const VERIFICATION_CODE_TTL_MS = 10 * 60 * 1000;
+const VERIFICATION_CODE_COOLDOWN_MS = 60 * 1000;
+const VERIFICATION_CODE_MAX_ATTEMPTS = 5;
+const PASSWORD_RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
+
+type PendingPersonalRegistration = {
+  displayName: string;
+  username: string;
+  passwordHash: string;
+};
 
 
 @Injectable()
@@ -33,6 +48,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly billing: BillingService,
+    private readonly emailService: VerificationEmailService,
   ) {}
 
   async login(input: LoginDto, ipAddress?: string, userAgent?: string) {
@@ -55,8 +71,6 @@ export class AuthService {
 
   async registerPersonal(
     input: RegisterPersonalDto,
-    ipAddress?: string,
-    userAgent?: string,
   ) {
     if (input.password !== input.confirmPassword) {
       throw new BadRequestException('Password confirmation does not match');
@@ -65,21 +79,52 @@ export class AuthService {
     const email = input.email.trim().toLowerCase();
     const displayName = input.displayName.trim();
     const username = input.username.trim().toLowerCase();
+    const existingUser = await this.prisma.user.findFirst({
+      where: { OR: [{ email }, { username }] },
+      select: { id: true },
+    });
+    if (existingUser) throw new ConflictException('Username or email is already registered');
+
     const passwordHash = await hashPassword(input.password);
+    await this.issueVerificationCode(email, AuthVerificationPurpose.PERSONAL_REGISTRATION, {
+      payload: { displayName, username, passwordHash },
+    });
+
+    return {
+      verificationRequired: true as const,
+      email,
+      expiresInSeconds: VERIFICATION_CODE_TTL_MS / 1000,
+      resendAfterSeconds: VERIFICATION_CODE_COOLDOWN_MS / 1000,
+    };
+  }
+
+  async verifyPersonalRegistration(
+    emailInput: string,
+    code: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    const email = emailInput.trim().toLowerCase();
+    const challenge = await this.verifyCode(email, AuthVerificationPurpose.PERSONAL_REGISTRATION, code);
+    const payload = this.registrationPayload(challenge.payload);
 
     try {
-      const user = await this.prisma.user.create({
-        data: {
-          email,
-          username,
-          displayName,
-          passwordHash,
-          accountType: AccountType.PERSONAL,
-          workspace: { create: { name: displayName, type: AccountType.PERSONAL } },
-          role: UserRole.USER,
-          isAdmin: false,
-          isActive: true,
-        },
+      const user = await this.prisma.$transaction(async (transaction) => {
+        const created = await transaction.user.create({
+          data: {
+            email,
+            username: payload.username,
+            displayName: payload.displayName,
+            passwordHash: payload.passwordHash,
+            accountType: AccountType.PERSONAL,
+            workspace: { create: { name: payload.displayName, type: AccountType.PERSONAL } },
+            role: UserRole.USER,
+            isAdmin: false,
+            isActive: true,
+          },
+        });
+        await transaction.authVerificationCode.delete({ where: { id: challenge.id } });
+        return created;
       });
 
       return this.issueApplicationSession(user, 'PASSWORD', ipAddress, userAgent, true);
@@ -89,6 +134,81 @@ export class AuthService {
       }
       throw error;
     }
+  }
+
+  async requestPasswordReset(emailInput: string) {
+    const email = emailInput.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || user.accountType !== AccountType.PERSONAL) {
+      throw new NotFoundException('No personal account is registered with this email');
+    }
+    if (!user.isActive) throw new BadRequestException('This account is inactive');
+    if (!user.passwordHash) throw new BadRequestException('This account uses Google sign-in and has no password to reset');
+
+    await this.issueVerificationCode(email, AuthVerificationPurpose.PASSWORD_RESET, { userId: user.id });
+    return {
+      codeSent: true as const,
+      email,
+      expiresInSeconds: VERIFICATION_CODE_TTL_MS / 1000,
+      resendAfterSeconds: VERIFICATION_CODE_COOLDOWN_MS / 1000,
+    };
+  }
+
+  async verifyPasswordResetCode(emailInput: string, code: string) {
+    const email = emailInput.trim().toLowerCase();
+    const challenge = await this.verifyCode(email, AuthVerificationPurpose.PASSWORD_RESET, code);
+    if (!challenge.userId) throw new BadRequestException('Invalid password reset request');
+
+    const resetToken = randomBytes(32).toString('base64url');
+    const resetTokenHash = createHash('sha256').update(resetToken).digest('hex');
+    await this.prisma.authVerificationCode.update({
+      where: { id: challenge.id },
+      data: {
+        resetTokenHash,
+        verifiedAt: new Date(),
+        expiresAt: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
+      },
+    });
+
+    return { resetToken, expiresInSeconds: PASSWORD_RESET_TOKEN_TTL_MS / 1000 };
+  }
+
+  async resetPassword(resetToken: string, password: string, confirmPassword: string) {
+    if (password !== confirmPassword) throw new BadRequestException('Password confirmation does not match');
+    const resetTokenHash = createHash('sha256').update(resetToken).digest('hex');
+    const challenge = await this.prisma.authVerificationCode.findUnique({
+      where: { resetTokenHash },
+      include: { user: { select: { id: true, workspaceId: true, isActive: true, accountType: true } } },
+    });
+    if (
+      !challenge
+      || challenge.purpose !== AuthVerificationPurpose.PASSWORD_RESET
+      || !challenge.verifiedAt
+      || challenge.expiresAt <= new Date()
+      || !challenge.user?.isActive
+      || challenge.user.accountType !== AccountType.PERSONAL
+    ) {
+      throw new BadRequestException('Password reset session is invalid or expired');
+    }
+
+    const passwordHash = await hashPassword(password);
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.user.update({ where: { id: challenge.user!.id }, data: { passwordHash } });
+      await transaction.session.deleteMany({ where: { userId: challenge.user!.id } });
+      await transaction.authVerificationCode.delete({ where: { id: challenge.id } });
+      await transaction.auditLog.create({
+        data: {
+          actorType: AuditActorType.SYSTEM,
+          action: AuditAction.AUTH_PASSWORD_RESET,
+          targetType: 'USER',
+          targetId: challenge.user!.id,
+          workspaceId: challenge.user!.workspaceId,
+          metadata: { source: 'forgot_password' },
+        },
+      });
+    });
+
+    return { success: true as const };
   }
 
   async registerCompany(
@@ -260,6 +380,93 @@ export class AuthService {
     }
 
     return this.issueApplicationSession(user, 'GOOGLE', ipAddress, userAgent, isNewAccount);
+  }
+
+  private async issueVerificationCode(
+    email: string,
+    purpose: AuthVerificationPurpose,
+    options: { payload?: PendingPersonalRegistration; userId?: string },
+  ) {
+    const now = new Date();
+    await this.prisma.authVerificationCode.deleteMany({ where: { expiresAt: { lt: now } } });
+    const existing = await this.prisma.authVerificationCode.findUnique({
+      where: { email_purpose: { email, purpose } },
+      select: { createdAt: true },
+    });
+    if (existing && now.getTime() - existing.createdAt.getTime() < VERIFICATION_CODE_COOLDOWN_MS) {
+      throw new HttpException('Please wait before requesting another verification code', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    const id = randomUUID();
+    const code = randomInt(100000, 1000000).toString();
+    const codeHash = this.verificationCodeHash(id, email, purpose, code);
+    const expiresAt = new Date(now.getTime() + VERIFICATION_CODE_TTL_MS);
+    const [, challenge] = await this.prisma.$transaction([
+      this.prisma.authVerificationCode.deleteMany({ where: { email, purpose } }),
+      this.prisma.authVerificationCode.create({
+        data: {
+          id,
+          email,
+          purpose,
+          codeHash,
+          expiresAt,
+          userId: options.userId,
+          payload: options.payload,
+        },
+      }),
+    ]);
+
+    try {
+      await this.emailService.sendCode(email, code, purpose);
+    } catch (error) {
+      await this.prisma.authVerificationCode.deleteMany({ where: { id: challenge.id } });
+      throw error;
+    }
+  }
+
+  private async verifyCode(email: string, purpose: AuthVerificationPurpose, code: string) {
+    const challenge = await this.prisma.authVerificationCode.findUnique({
+      where: { email_purpose: { email, purpose } },
+    });
+    if (!challenge || challenge.verifiedAt) throw new BadRequestException('Invalid or expired verification code');
+    if (challenge.expiresAt <= new Date()) {
+      await this.prisma.authVerificationCode.deleteMany({ where: { id: challenge.id } });
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+    if (challenge.attempts >= VERIFICATION_CODE_MAX_ATTEMPTS) {
+      await this.prisma.authVerificationCode.deleteMany({ where: { id: challenge.id } });
+      throw new HttpException('Too many invalid code attempts. Request a new code', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    const expected = Buffer.from(challenge.codeHash, 'hex');
+    const received = Buffer.from(this.verificationCodeHash(challenge.id, email, purpose, code), 'hex');
+    if (expected.length !== received.length || !timingSafeEqual(expected, received)) {
+      await this.prisma.authVerificationCode.update({
+        where: { id: challenge.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+    return challenge;
+  }
+
+  private verificationCodeHash(id: string, email: string, purpose: AuthVerificationPurpose, code: string) {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET is required');
+    return createHmac('sha256', secret).update(`${id}:${email}:${purpose}:${code}`).digest('hex');
+  }
+
+  private registrationPayload(value: Prisma.JsonValue): PendingPersonalRegistration {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new BadRequestException('Registration verification data is invalid');
+    }
+    const displayName = value.displayName;
+    const username = value.username;
+    const passwordHash = value.passwordHash;
+    if (typeof displayName !== 'string' || typeof username !== 'string' || typeof passwordHash !== 'string') {
+      throw new BadRequestException('Registration verification data is invalid');
+    }
+    return { displayName, username, passwordHash };
   }
 
   private async issueApplicationSession(

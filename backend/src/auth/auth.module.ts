@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { BillingModule } from '../billing/billing.module';
+import { VerificationEmailService } from './verification-email.service';
 
 function requiredJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -27,7 +28,7 @@ const expiresIn = (process.env.JWT_EXPIRES_IN ?? '24h') as JwtSignOptions['expir
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, RolesGuard],
+  providers: [AuthService, JwtAuthGuard, RolesGuard, VerificationEmailService],
   exports: [AuthService, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

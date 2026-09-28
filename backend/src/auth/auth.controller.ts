@@ -1,8 +1,11 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Ip, Post, Put, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiAcceptedResponse,
+  ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiServiceUnavailableResponse,
@@ -20,6 +23,9 @@ import { RegisterPersonalDto } from './dto/register-personal.dto';
 import { RegisterCompanyDto } from './dto/register-company.dto';
 import { CheckCompanyAvailabilityDto } from './dto/check-company-availability.dto';
 import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
+import { EmailCodeDto } from './dto/email-code.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -40,16 +46,50 @@ export class AuthController {
   }
 
   @Post('register/personal')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a PERSONAL account with email and password' })
-  @ApiCreatedResponse({ description: 'JWT access token and PERSONAL user profile' })
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Send the verification code for a manual PERSONAL registration' })
+  @ApiAcceptedResponse({ description: 'Verification code queued for delivery' })
   @ApiConflictResponse({ description: 'Email is already registered' })
-  registerPersonal(
-    @Body() input: RegisterPersonalDto,
+  registerPersonal(@Body() input: RegisterPersonalDto) {
+    return this.authService.registerPersonal(input);
+  }
+
+  @Post('register/personal/verify')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Verify the emailed code and create a PERSONAL account' })
+  @ApiCreatedResponse({ description: 'JWT access token and verified PERSONAL user profile' })
+  @ApiBadRequestResponse({ description: 'Invalid or expired verification code' })
+  verifyPersonalRegistration(
+    @Body() input: EmailCodeDto,
     @Ip() ip?: string,
     @Headers('user-agent') userAgent?: string,
   ) {
-    return this.authService.registerPersonal(input, ip, userAgent);
+    return this.authService.verifyPersonalRegistration(input.email, input.code, ip, userAgent);
+  }
+
+  @Post('password/forgot')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Send a password reset code to a registered email address' })
+  @ApiAcceptedResponse({ description: 'Password reset code queued for delivery' })
+  @ApiNotFoundResponse({ description: 'No PERSONAL account is registered with this email' })
+  forgotPassword(@Body() input: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(input.email);
+  }
+
+  @Post('password/verify-code')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify a password reset code and return a one-time reset token' })
+  @ApiBadRequestResponse({ description: 'Invalid or expired verification code' })
+  verifyPasswordResetCode(@Body() input: EmailCodeDto) {
+    return this.authService.verifyPasswordResetCode(input.email, input.code);
+  }
+
+  @Post('password/reset')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set a new password using a verified one-time reset token' })
+  @ApiBadRequestResponse({ description: 'Invalid reset token or password confirmation' })
+  resetPassword(@Body() input: ResetPasswordDto) {
+    return this.authService.resetPassword(input.resetToken, input.password, input.confirmPassword);
   }
 
   @Post('register/company')

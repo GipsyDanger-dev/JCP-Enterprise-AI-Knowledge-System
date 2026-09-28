@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { ApiUser, CompanyCheckoutResponse, LoginResponse, OwnProfileResponse } from '@/api/types'
+import type { ApiUser, CompanyCheckoutResponse, LoginResponse, OwnProfileResponse, VerificationCodeDeliveryResponse } from '@/api/types'
 
 export interface AuthContextValue {
   user: ApiUser | null
@@ -8,7 +8,11 @@ export interface AuthContextValue {
   loading: boolean
   login: (username: string, password: string) => Promise<void>
   loginWithGoogle: (credential: string) => Promise<void>
-  registerPersonal: (displayName: string, username: string, email: string, password: string, confirmPassword: string) => Promise<void>
+  registerPersonal: (displayName: string, username: string, email: string, password: string, confirmPassword: string) => Promise<VerificationCodeDeliveryResponse>
+  verifyPersonalRegistration: (email: string, code: string) => Promise<void>
+  forgotPersonalPassword: (email: string) => Promise<VerificationCodeDeliveryResponse>
+  verifyPersonalPasswordResetCode: (email: string, code: string) => Promise<string>
+  resetPersonalPassword: (resetToken: string, password: string, confirmPassword: string) => Promise<void>
   registerCompany: (input: {
     organizationName: string
     adminName: string

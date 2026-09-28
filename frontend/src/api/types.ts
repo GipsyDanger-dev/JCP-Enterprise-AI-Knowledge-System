@@ -97,6 +97,30 @@ export interface PersonalRegisterRequest {
   confirmPassword: string
 }
 
+export interface VerificationCodeDeliveryResponse {
+  email: string
+  expiresInSeconds: number
+  resendAfterSeconds: number
+  verificationRequired?: true
+  codeSent?: true
+}
+
+export interface EmailCodeRequest {
+  email: string
+  code: string
+}
+
+export interface PasswordResetCodeResponse {
+  resetToken: string
+  expiresInSeconds: number
+}
+
+export interface ResetPasswordRequest {
+  resetToken: string
+  password: string
+  confirmPassword: string
+}
+
 export interface CompanyRegisterRequest {
   organizationName: string
   adminName: string

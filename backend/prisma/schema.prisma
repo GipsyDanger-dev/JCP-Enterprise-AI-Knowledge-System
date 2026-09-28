@@ -233,6 +233,7 @@ enum AuditActorType {
 enum AuditAction {
   AUTH_LOGIN
   AUTH_LOGOUT
+  AUTH_PASSWORD_RESET
   USER_CREATED
   USER_UPDATED
   /// Penghapusan permanen, bukan penonaktifan. Sengaja dibedakan dari
@@ -250,6 +251,11 @@ enum AuditAction {
 enum NotificationType {
   ANNOUNCEMENT_PUBLISHED
   MESSAGE_RECEIVED
+}
+
+enum AuthVerificationPurpose {
+  PERSONAL_REGISTRATION
+  PASSWORD_RESET
 }
 
 model User {
@@ -290,9 +296,30 @@ model User {
   notifications       AppNotification[]
   announcements       Announcement[]
   announcementReads   AnnouncementRead[]
+  verificationCodes   AuthVerificationCode[]
 
   @@unique([workspaceId, employeeNumber])
   @@map("users")
+}
+
+model AuthVerificationCode {
+  id             String                  @id @default(uuid()) @db.Uuid
+  email          String
+  purpose        AuthVerificationPurpose
+  codeHash       String                  @map("code_hash")
+  payload        Json?
+  userId         String?                 @map("user_id") @db.Uuid
+  user           User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resetTokenHash String?                 @unique @map("reset_token_hash")
+  verifiedAt     DateTime?               @map("verified_at")
+  expiresAt      DateTime                @map("expires_at")
+  attempts       Int                     @default(0)
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+
+  @@unique([email, purpose])
+  @@index([expiresAt])
+  @@map("auth_verification_codes")
 }
 
 model Document {

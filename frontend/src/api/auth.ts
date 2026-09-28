@@ -1,6 +1,6 @@
 import { request } from './client'
 import type { CompanyAvailabilityResponse } from './types'
-import type { CompanyCheckoutResponse, CompanyRegisterRequest, GoogleLoginRequest, LoginRequest, LoginResponse, MeResponse, PersonalRegisterRequest, OwnProfileResponse } from './types'
+import type { CompanyCheckoutResponse, CompanyRegisterRequest, EmailCodeRequest, GoogleLoginRequest, LoginRequest, LoginResponse, MeResponse, PasswordResetCodeResponse, PersonalRegisterRequest, ResetPasswordRequest, VerificationCodeDeliveryResponse, OwnProfileResponse } from './types'
 
 export function login(credentials: LoginRequest): Promise<LoginResponse> {
   return request<LoginResponse>('/auth/login', { method: 'POST', body: credentials })
@@ -10,8 +10,24 @@ export function loginWithGoogle(credentials: GoogleLoginRequest): Promise<LoginR
   return request<LoginResponse>('/auth/google', { method: 'POST', body: credentials })
 }
 
-export function registerPersonal(credentials: PersonalRegisterRequest): Promise<LoginResponse> {
-  return request<LoginResponse>('/auth/register/personal', { method: 'POST', body: credentials })
+export function registerPersonal(credentials: PersonalRegisterRequest): Promise<VerificationCodeDeliveryResponse> {
+  return request<VerificationCodeDeliveryResponse>('/auth/register/personal', { method: 'POST', body: credentials })
+}
+
+export function verifyPersonalRegistration(credentials: EmailCodeRequest): Promise<LoginResponse> {
+  return request<LoginResponse>('/auth/register/personal/verify', { method: 'POST', body: credentials })
+}
+
+export function forgotPersonalPassword(email: string): Promise<VerificationCodeDeliveryResponse> {
+  return request<VerificationCodeDeliveryResponse>('/auth/password/forgot', { method: 'POST', body: { email } })
+}
+
+export function verifyPersonalPasswordResetCode(credentials: EmailCodeRequest): Promise<PasswordResetCodeResponse> {
+  return request<PasswordResetCodeResponse>('/auth/password/verify-code', { method: 'POST', body: credentials })
+}
+
+export function resetPersonalPassword(credentials: ResetPasswordRequest): Promise<{ success: true }> {
+  return request<{ success: true }>('/auth/password/reset', { method: 'POST', body: credentials })
 }
 
 export function registerCompany(credentials: CompanyRegisterRequest): Promise<LoginResponse | CompanyCheckoutResponse> {

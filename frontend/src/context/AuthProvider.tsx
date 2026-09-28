@@ -3,9 +3,13 @@ import type { ReactNode } from 'react'
 import {
   login as apiLogin,
   loginWithGoogle as apiGoogleLogin,
+  forgotPersonalPassword as apiForgotPersonalPassword,
   logout as apiLogout,
   me as apiMe,
   registerPersonal as apiRegisterPersonal,
+  resetPersonalPassword as apiResetPersonalPassword,
+  verifyPersonalPasswordResetCode as apiVerifyPersonalPasswordResetCode,
+  verifyPersonalRegistration as apiVerifyPersonalRegistration,
   registerCompany as apiRegisterCompany,
   updateOwnProfile as apiUpdateOwnProfile,
 } from '@/api/auth'
@@ -117,10 +121,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     confirmPassword: string,
   ) => {
-    const response = await apiRegisterPersonal({ displayName, username, email, password, confirmPassword })
+    return apiRegisterPersonal({ displayName, username, email, password, confirmPassword })
+  }, [])
+
+  const verifyPersonalRegistration = useCallback(async (email: string, code: string) => {
+    const response = await apiVerifyPersonalRegistration({ email, code })
     storeToken(response.accessToken)
     setToken(response.accessToken)
     setUser(response.user)
+  }, [])
+
+  const forgotPersonalPassword = useCallback((email: string) => apiForgotPersonalPassword(email), [])
+
+  const verifyPersonalPasswordResetCode = useCallback(async (email: string, code: string) => {
+    const response = await apiVerifyPersonalPasswordResetCode({ email, code })
+    return response.resetToken
+  }, [])
+
+  const resetPersonalPassword = useCallback(async (resetToken: string, password: string, confirmPassword: string) => {
+    await apiResetPersonalPassword({ resetToken, password, confirmPassword })
   }, [])
 
   const registerCompany = useCallback(async (input: Parameters<typeof apiRegisterCompany>[0]) => {
@@ -204,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token, logout])
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, registerPersonal, registerCompany, updateOwnProfile, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, registerPersonal, verifyPersonalRegistration, forgotPersonalPassword, verifyPersonalPasswordResetCode, resetPersonalPassword, registerCompany, updateOwnProfile, logout }}>
       {children}
     </AuthContext.Provider>
   )
