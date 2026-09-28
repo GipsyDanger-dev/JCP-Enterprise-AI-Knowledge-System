@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Check, Clock3, CreditCard, LoaderCircle, ShieldAlert, Tag, Users } from 'lucide-react'
+import { ArrowLeft, Check, Clock3, CreditCard, LoaderCircle, Mail, ShieldAlert, ShieldCheck, Tag, Users } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, errorMessage } from '@/api/client'
 import type { CompanyRegisterRequest } from '@/api/types'
@@ -14,7 +14,7 @@ type PricingLocationState = { draft?: RegistrationDraft }
 export function CompanyPricingPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { registerCompany } = useAuth()
+  const { registerCompany, verifyCompanyRegistration } = useAuth()
   const { language } = useWorkspace()
   const isId = language === 'id'
   const draft = (location.state as PricingLocationState | null)?.draft
@@ -25,6 +25,9 @@ export function CompanyPricingPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [verificationPending, setVerificationPending] = useState(false)
+  const [verificationEmail, setVerificationEmail] = useState('')
+  const [verificationCode, setVerificationCode] = useState('')
 
   useEffect(() => {
     if (!draft) return
@@ -43,14 +46,36 @@ export function CompanyPricingPage() {
     setError('')
     try {
       const response = await registerCompany({ ...draft, onboardingMode: 'SUBSCRIBE', planSlug: selectedPlan.slug, cycle, couponCode: couponCode.trim() || undefined })
+      setVerificationEmail(response.email)
+      setVerificationCode('')
+      setVerificationPending(true)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 503) {
+        setError(isId ? 'Pembayaran sandbox belum siap. Periksa konfigurasi provider pembayaran.' : 'Sandbox payment is not configured. Check the payment provider configuration.')
+      } else {
+        setError(errorMessage(err))
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const verifyAndCheckout = async () => {
+    if (!/^\d{6}$/.test(verificationCode)) return
+    setSubmitting(true)
+    setError('')
+    try {
+      const response = await verifyCompanyRegistration(verificationEmail, verificationCode)
       if ('paymentUrl' in response && response.paymentUrl) {
         window.location.assign(response.paymentUrl)
       } else if ('orderId' in response) {
         navigate(`/billing/return?status=pending&orderId=${encodeURIComponent(response.orderId)}`, { replace: true })
+      } else {
+        navigate('/', { replace: true })
       }
     } catch (err) {
-      if (err instanceof ApiError && err.status === 503) {
-        setError(isId ? 'Pembayaran sandbox belum siap. Periksa API key SumoPod.' : 'Sandbox payment is not configured. Check the SumoPod API key.')
+      if (err instanceof ApiError && (err.status === 400 || err.status === 429)) {
+        setError(isId ? 'Kode salah, kedaluwarsa, atau sudah terlalu sering dicoba.' : 'The code is invalid, expired, or has been tried too many times.')
       } else {
         setError(errorMessage(err))
       }
@@ -61,6 +86,18 @@ export function CompanyPricingPage() {
 
   if (!draft) {
     return <main className="pricing-centered"><section className="pricing-empty"><ShieldAlert size={28} /><h1>{isId ? 'Data registrasi tidak ditemukan' : 'Registration data not found'}</h1><p>{isId ? 'Mulai kembali dari halaman registrasi perusahaan.' : 'Start again from company registration.'}</p><Link className="primary-button" to="/register/company">{isId ? 'Kembali ke registrasi' : 'Back to registration'}</Link></section></main>
+  }
+
+  if (verificationPending) {
+    return <main className="pricing-centered"><section className="pricing-empty">
+      <ShieldCheck size={28} />
+      <h1>{isId ? 'Verifikasi email sebelum checkout' : 'Verify your email before checkout'}</h1>
+      <p><Mail size={15} /> {isId ? `Kode enam digit telah dikirim ke ${verificationEmail}.` : `A six-digit code was sent to ${verificationEmail}.`}</p>
+      {error && <div className="login-error" role="alert"><ShieldAlert size={15} />{error}</div>}
+      <div className="login-input-wrap login-code-wrap"><ShieldCheck size={16} className="login-input-icon" /><input aria-label={isId ? 'Kode verifikasi email' : 'Email verification code'} type="text" inputMode="numeric" autoComplete="one-time-code" value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" maxLength={6} disabled={submitting} autoFocus /></div>
+      <button className="primary-button" type="button" onClick={verifyAndCheckout} disabled={submitting || !/^\d{6}$/.test(verificationCode)}>{submitting ? (isId ? 'Memverifikasi…' : 'Verifying…') : (isId ? 'Verifikasi dan lanjut bayar' : 'Verify and continue to payment')}</button>
+      <button className="login-text-action login-back-action" type="button" onClick={() => { setVerificationPending(false); setVerificationCode(''); setError('') }}><ArrowLeft size={14} />{isId ? 'Kembali ke pilihan paket' : 'Back to plan selection'}</button>
+    </section></main>
   }
 
   return <main className="pricing-centered">

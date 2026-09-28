@@ -3,14 +3,15 @@ import type { ReactNode } from 'react'
 import {
   login as apiLogin,
   loginWithGoogle as apiGoogleLogin,
-  forgotPersonalPassword as apiForgotPersonalPassword,
+  requestPasswordReset as apiRequestPasswordReset,
   logout as apiLogout,
   me as apiMe,
   registerPersonal as apiRegisterPersonal,
-  resetPersonalPassword as apiResetPersonalPassword,
-  verifyPersonalPasswordResetCode as apiVerifyPersonalPasswordResetCode,
+  resetPassword as apiResetPassword,
+  verifyPasswordResetCode as apiVerifyPasswordResetCode,
   verifyPersonalRegistration as apiVerifyPersonalRegistration,
   registerCompany as apiRegisterCompany,
+  verifyCompanyRegistration as apiVerifyCompanyRegistration,
   updateOwnProfile as apiUpdateOwnProfile,
 } from '@/api/auth'
 import type { ApiUser, OwnProfileResponse } from '@/api/types'
@@ -131,19 +132,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user)
   }, [])
 
-  const forgotPersonalPassword = useCallback((email: string) => apiForgotPersonalPassword(email), [])
+  const requestPasswordReset = useCallback((email: string) => apiRequestPasswordReset(email), [])
 
-  const verifyPersonalPasswordResetCode = useCallback(async (email: string, code: string) => {
-    const response = await apiVerifyPersonalPasswordResetCode({ email, code })
+  const verifyPasswordResetCode = useCallback(async (email: string, code: string) => {
+    const response = await apiVerifyPasswordResetCode({ email, code })
     return response.resetToken
   }, [])
 
-  const resetPersonalPassword = useCallback(async (resetToken: string, password: string, confirmPassword: string) => {
-    await apiResetPersonalPassword({ resetToken, password, confirmPassword })
+  const resetPassword = useCallback(async (resetToken: string, password: string, confirmPassword: string) => {
+    await apiResetPassword({ resetToken, password, confirmPassword })
   }, [])
 
   const registerCompany = useCallback(async (input: Parameters<typeof apiRegisterCompany>[0]) => {
-    const response = await apiRegisterCompany(input)
+    return apiRegisterCompany(input)
+  }, [])
+
+  const verifyCompanyRegistration = useCallback(async (email: string, code: string) => {
+    const response = await apiVerifyCompanyRegistration({ email, code })
     if ('accessToken' in response) {
       storeToken(response.accessToken)
       setToken(response.accessToken)
@@ -223,7 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token, logout])
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, registerPersonal, verifyPersonalRegistration, forgotPersonalPassword, verifyPersonalPasswordResetCode, resetPersonalPassword, registerCompany, updateOwnProfile, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, registerPersonal, verifyPersonalRegistration, requestPasswordReset, verifyPasswordResetCode, resetPassword, registerCompany, verifyCompanyRegistration, updateOwnProfile, logout }}>
       {children}
     </AuthContext.Provider>
   )

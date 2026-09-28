@@ -10,9 +10,9 @@ export interface AuthContextValue {
   loginWithGoogle: (credential: string) => Promise<void>
   registerPersonal: (displayName: string, username: string, email: string, password: string, confirmPassword: string) => Promise<VerificationCodeDeliveryResponse>
   verifyPersonalRegistration: (email: string, code: string) => Promise<void>
-  forgotPersonalPassword: (email: string) => Promise<VerificationCodeDeliveryResponse>
-  verifyPersonalPasswordResetCode: (email: string, code: string) => Promise<string>
-  resetPersonalPassword: (resetToken: string, password: string, confirmPassword: string) => Promise<void>
+  requestPasswordReset: (email: string) => Promise<VerificationCodeDeliveryResponse>
+  verifyPasswordResetCode: (email: string, code: string) => Promise<string>
+  resetPassword: (resetToken: string, password: string, confirmPassword: string) => Promise<void>
   registerCompany: (input: {
     organizationName: string
     adminName: string
@@ -24,7 +24,8 @@ export interface AuthContextValue {
     planSlug?: string
     cycle?: 'MONTHLY' | 'YEARLY'
     couponCode?: string
-  }) => Promise<LoginResponse | CompanyCheckoutResponse>
+  }) => Promise<VerificationCodeDeliveryResponse>
+  verifyCompanyRegistration: (email: string, code: string) => Promise<LoginResponse | CompanyCheckoutResponse>
   updateOwnProfile: (data: Partial<OwnProfileResponse>) => Promise<OwnProfileResponse>
   logout: () => void
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { Building2, Check, Clock3, CreditCard, Eye, EyeOff, LoaderCircle, Lock, Mail, ShieldAlert, UserRound } from 'lucide-react'
+import { ArrowLeft, Building2, Check, Clock3, CreditCard, Eye, EyeOff, Info, LoaderCircle, Lock, Mail, ShieldAlert, ShieldCheck, UserRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, errorMessage } from '@/api/client'
 import { checkCompanyAvailability } from '@/api/auth'
@@ -13,7 +13,7 @@ type OnboardingMode = 'TRIAL' | 'SUBSCRIBE'
 
 export function CompanyRegisterPage() {
   const navigate = useNavigate()
-  const { registerCompany } = useAuth()
+  const { registerCompany, verifyCompanyRegistration } = useAuth()
   const { language } = useWorkspace()
   const isId = language === 'id'
   const paymentEnabled = false
@@ -27,12 +27,16 @@ export function CompanyRegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+  const [verificationPending, setVerificationPending] = useState(false)
+  const [verificationCode, setVerificationCode] = useState('')
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
+    setNotice(null)
     setFieldErrors({})
     const requiredFields = [
       ['organizationName', organizationName, isId ? 'Nama organisasi wajib diisi.' : 'Organization name is required.'],
@@ -79,8 +83,11 @@ export function CompanyRegisterPage() {
         return
       }
 
-      await registerCompany({ ...draft, onboardingMode: 'TRIAL' })
-      navigate('/', { replace: true })
+      const delivery = await registerCompany({ ...draft, onboardingMode: 'TRIAL' })
+      setAdminEmail(delivery.email)
+      setVerificationCode('')
+      setVerificationPending(true)
+      setNotice(isId ? `Kode verifikasi telah dikirim ke ${delivery.email}.` : `A verification code was sent to ${delivery.email}.`)
     } catch (err) {
       if (err instanceof ApiError && err.status === 503) {
         setError(isId ? 'Pembayaran online belum tersedia. Pilih trial gratis untuk mulai sekarang.' : 'Online payment is not available yet. Choose the free trial to start now.')
@@ -107,6 +114,37 @@ export function CompanyRegisterPage() {
     }
   }
 
+  const verifyRegistration = async (event: FormEvent) => {
+    event.preventDefault()
+    setError(null)
+    if (!/^\d{6}$/.test(verificationCode)) {
+      setError(isId ? 'Masukkan kode verifikasi enam digit.' : 'Enter the six-digit verification code.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const response = await verifyCompanyRegistration(adminEmail, verificationCode)
+      if ('accessToken' in response) {
+        navigate('/', { replace: true })
+      } else if (response.paymentUrl) {
+        window.location.assign(response.paymentUrl)
+      } else {
+        navigate(`/billing/return?status=pending&orderId=${encodeURIComponent(response.orderId)}`, { replace: true })
+      }
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 400 || err.status === 429)) {
+        setError(isId ? 'Kode salah, kedaluwarsa, atau sudah terlalu sering dicoba.' : 'The code is invalid, expired, or has been tried too many times.')
+      } else if (err instanceof ApiError && err.status === 409) {
+        setError(isId ? 'Username atau email admin sudah digunakan. Kembali dan gunakan data lain.' : 'The admin username or email is already in use. Go back and use different details.')
+      } else {
+        setError(errorMessage(err))
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <main className="login-centered">
       <section className="login-workspace" aria-label={isId ? 'Pendaftaran workspace perusahaan' : 'Company workspace registration'}>
@@ -114,23 +152,42 @@ export function CompanyRegisterPage() {
           <div className="login-form-shell register-company-shell">
             <div className="login-brand"><LogoMark size={28} /><span>Enterprise AI</span></div>
             <div className="login-card-header">
-              <h1>{isId ? 'Buat workspace perusahaan' : 'Create a company workspace'}</h1>
-              <p>{isId ? 'Mulai demo tanpa menunggu persetujuan.' : 'Start a workspace without waiting for approval.'}</p>
+              <h1>{verificationPending
+                ? (isId ? 'Verifikasi email admin' : 'Verify the admin email')
+                : (isId ? 'Buat workspace perusahaan' : 'Create a company workspace')}</h1>
+              <p>{verificationPending
+                ? (isId ? 'Workspace dan masa trial baru dibuat setelah email terverifikasi.' : 'The workspace and trial begin only after email verification.')
+                : (isId ? 'Verifikasi email admin untuk memulai trial dengan aman.' : 'Verify the admin email to start a secure trial.')}</p>
             </div>
 
             {error && <div className="login-error" role="alert"><ShieldAlert size={15} /> {error}</div>}
+            {notice && <div className="login-notice" role="status"><Info size={16} /> {notice}</div>}
 
-            <div className="onboarding-choice-grid" role="radiogroup" aria-label={isId ? 'Pilih cara mulai' : 'Choose how to start'}>
+            {!verificationPending && <div className="onboarding-choice-grid" role="radiogroup" aria-label={isId ? 'Pilih cara mulai' : 'Choose how to start'}>
               <button type="button" className={onboardingMode === 'TRIAL' ? 'active' : ''} onClick={() => setOnboardingMode('TRIAL')}>
-                <Clock3 size={18} /><span><strong>{isId ? 'Trial gratis' : 'Free trial'}</strong><small>{isId ? 'Akses langsung selama masa trial' : 'Immediate access during trial'}</small></span>
+                <Clock3 size={18} /><span><strong>{isId ? 'Trial gratis' : 'Free trial'}</strong><small>{isId ? 'Aktif setelah email terverifikasi' : 'Active after email verification'}</small></span>
                 {onboardingMode === 'TRIAL' && <Check size={15} />}
               </button>
               <button type="button" className="disabled" disabled={!paymentEnabled} aria-disabled={!paymentEnabled} title={isId ? 'Pembayaran belum tersedia' : 'Payment is not available yet'}>
                 <CreditCard size={18} /><span><strong>{isId ? 'Berlangganan' : 'Subscribe now'}</strong><small>{isId ? 'Pembayaran belum tersedia' : 'Payment is not available yet'}</small></span>
               </button>
-            </div>
+            </div>}
 
-            <form className="login-form-centered" onSubmit={submit} noValidate>
+            {verificationPending ? (
+              <form className="login-form-centered" onSubmit={verifyRegistration} noValidate>
+                <div className="login-field">
+                  <label htmlFor="company-verification-code">{isId ? 'Kode verifikasi email' : 'Email verification code'}</label>
+                  <div className="login-input-wrap login-code-wrap">
+                    <ShieldCheck size={16} className="login-input-icon" />
+                    <input id="company-verification-code" type="text" inputMode="numeric" autoComplete="one-time-code" value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" pattern="[0-9]{6}" maxLength={6} disabled={submitting} autoFocus />
+                  </div>
+                </div>
+                <button className="login-submit" type="submit" disabled={submitting || !/^\d{6}$/.test(verificationCode)}>{submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Memverifikasi…' : 'Verifying…'}</> : (isId ? 'Verifikasi dan mulai trial' : 'Verify and start trial')}</button>
+                <button type="button" className="login-text-action login-back-action" onClick={() => { setError(null); setNotice(null); setVerificationPending(false); setVerificationCode('') }}>
+                  <ArrowLeft size={14} /> {isId ? 'Kembali dan ubah data' : 'Back and edit details'}
+                </button>
+              </form>
+            ) : <form className="login-form-centered" onSubmit={submit} noValidate>
               <div className={`login-field ${fieldErrors.organizationName ? 'invalid' : ''}`}><label htmlFor="company-organization">{isId ? 'Nama organisasi' : 'Organization name'}</label><div className="login-input-wrap"><Building2 size={16} className="login-input-icon" /><input id="company-organization" value={organizationName} onChange={(event) => { setOrganizationName(event.target.value); setFieldErrors((current) => ({ ...current, organizationName: '' })) }} required disabled={submitting} /></div>{fieldErrors.organizationName && <span className="login-field-error">{fieldErrors.organizationName}</span>}</div>
               <div className="register-two-col">
                 <Field label={isId ? 'Nama admin' : 'Admin name'} id="company-admin-name" value={adminName} error={fieldErrors.adminName} icon={<UserRound size={16} />} onChange={(value) => { setAdminName(value); setFieldErrors((current) => ({ ...current, adminName: '' })) }} disabled={submitting} />
@@ -141,10 +198,10 @@ export function CompanyRegisterPage() {
                 <PasswordField id="company-password" label={isId ? 'Kata sandi' : 'Password'} value={password} error={fieldErrors.password} onChange={(value) => { setPassword(value); setFieldErrors((current) => ({ ...current, password: '' })) }} show={showPassword} onToggle={() => setShowPassword((value) => !value)} disabled={submitting} isId={isId} />
                 <PasswordField id="company-confirm-password" label={isId ? 'Konfirmasi' : 'Confirm'} value={confirmPassword} error={fieldErrors.confirmPassword} onChange={(value) => { setConfirmPassword(value); setFieldErrors((current) => ({ ...current, confirmPassword: '' })) }} show={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} disabled={submitting} isId={isId} />
               </div>
-              <button className="login-submit" type="submit" disabled={submitting}>{submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Menyiapkan workspace…' : 'Setting up workspace…'}</> : (onboardingMode === 'TRIAL' ? (isId ? 'Mulai trial gratis' : 'Start free trial') : (isId ? 'Lanjut ke pilih paket' : 'Continue to plans'))}</button>
-              <p className="login-terms"><Lock size={12} /> {isId ? 'Admin dapat mengundang pegawai setelah workspace dibuat.' : 'The admin can invite employees after setup.'}</p>
-            </form>
-            <p className="register-back-link"><Link to="/login">{isId ? 'Sudah punya akun? Masuk' : 'Already have an account? Sign in'}</Link></p>
+              <button className="login-submit" type="submit" disabled={submitting}>{submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Mengirim kode…' : 'Sending code…'}</> : (onboardingMode === 'TRIAL' ? (isId ? 'Kirim kode dan lanjutkan' : 'Send code and continue') : (isId ? 'Lanjut ke pilih paket' : 'Continue to plans'))}</button>
+              <p className="login-terms"><Lock size={12} /> {isId ? 'Workspace dan trial belum dibuat sebelum kode email benar.' : 'The workspace and trial are not created until the email code is verified.'}</p>
+            </form>}
+            {!verificationPending && <p className="register-back-link"><Link to="/login">{isId ? 'Sudah punya akun? Masuk' : 'Already have an account? Sign in'}</Link></p>}
           </div>
         </div>
         <aside className="login-knowledge" aria-hidden="true"><img src={loginDocuments} alt="" /><div className="login-visual-copy"><span>ENTERPRISE AI KNOWLEDGE SYSTEM</span><p>{isId ? 'Bangun ruang pengetahuan perusahaan Anda.' : 'Build your company knowledge workspace.'}</p></div></aside>

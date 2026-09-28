@@ -71,7 +71,7 @@ export class AuthController {
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Send a password reset code to a registered email address' })
   @ApiAcceptedResponse({ description: 'Password reset code queued for delivery' })
-  @ApiNotFoundResponse({ description: 'No PERSONAL account is registered with this email' })
+  @ApiNotFoundResponse({ description: 'No account is registered with this email' })
   forgotPassword(@Body() input: ForgotPasswordDto) {
     return this.authService.requestPasswordReset(input.email);
   }
@@ -93,16 +93,26 @@ export class AuthController {
   }
 
   @Post('register/company')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a COMPANY workspace with an immediate trial' })
-  @ApiCreatedResponse({ description: 'JWT access token and COMPANY admin profile' })
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Send the verification code for a COMPANY registration' })
+  @ApiAcceptedResponse({ description: 'Verification code queued for delivery; no workspace or trial created yet' })
   @ApiConflictResponse({ description: 'Username or email is already registered' })
-  registerCompany(
-    @Body() input: RegisterCompanyDto,
+  registerCompany(@Body() input: RegisterCompanyDto) {
+    return this.authService.registerCompany(input);
+  }
+
+  @Post('register/company/verify')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Verify the admin email, then create the COMPANY workspace and start its trial' })
+  @ApiCreatedResponse({ description: 'JWT access token or checkout details for the verified COMPANY administrator' })
+  @ApiBadRequestResponse({ description: 'Invalid or expired verification code' })
+  @ApiConflictResponse({ description: 'Username or email was registered while verification was pending' })
+  verifyCompanyRegistration(
+    @Body() input: EmailCodeDto,
     @Ip() ip?: string,
     @Headers('user-agent') userAgent?: string,
   ) {
-    return this.authService.registerCompany(input, ip, userAgent);
+    return this.authService.verifyCompanyRegistration(input.email, input.code, ip, userAgent);
   }
 
   @Post('register/company/check')

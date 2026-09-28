@@ -28,16 +28,16 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 type AccountType = 'company' | 'personal'
 type PersonalMode = 'login' | 'register'
-type PersonalFlow = 'credentials' | 'register-code' | 'forgot-email' | 'forgot-code' | 'reset-password'
+type AuthFlow = 'credentials' | 'register-code' | 'forgot-email' | 'forgot-code' | 'reset-password'
 
 export function LoginPage() {
   const navigate = useNavigate()
-  const { login, loginWithGoogle, registerPersonal, verifyPersonalRegistration, forgotPersonalPassword, verifyPersonalPasswordResetCode, resetPersonalPassword } = useAuth()
+  const { login, loginWithGoogle, registerPersonal, verifyPersonalRegistration, requestPasswordReset, verifyPasswordResetCode, resetPassword: submitResetPassword } = useAuth()
   const { language } = useWorkspace()
   const isId = language === 'id'
   const [accountType, setAccountType] = useState<AccountType>('company')
   const [personalMode, setPersonalMode] = useState<PersonalMode>('login')
-  const [personalFlow, setPersonalFlow] = useState<PersonalFlow>('credentials')
+  const [authFlow, setAuthFlow] = useState<AuthFlow>('credentials')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [personalName, setPersonalName] = useState('')
@@ -65,12 +65,17 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
   const [touched, setTouched] = useState({ username: false, password: false })
 
-  const usernameInvalid = touched.username && username.trim() !== '' && !USERNAME_PATTERN.test(username.trim())
+  const companyIdentity = username.trim()
+  const usernameInvalid = touched.username && companyIdentity !== '' && !USERNAME_PATTERN.test(companyIdentity) && !EMAIL_PATTERN.test(companyIdentity)
   const passwordInvalid = touched.password && password.length > 0 && password.length < 6
+  const resetPasswordMinimum = accountType === 'company' ? 10 : 8
 
   const selectAccountType = (type: AccountType) => {
     setAccountType(type)
-    setPersonalFlow('credentials')
+    setAuthFlow('credentials')
+    setVerificationCode('')
+    setResetEmail('')
+    setResetToken('')
     setError(null)
     setNotice(null)
     setShowPassword(false)
@@ -78,7 +83,7 @@ export function LoginPage() {
 
   const selectPersonalMode = (mode: PersonalMode) => {
     setPersonalMode(mode)
-    setPersonalFlow('credentials')
+    setAuthFlow('credentials')
     setVerificationCode('')
     setError(null)
     setNotice(null)
@@ -95,14 +100,14 @@ export function LoginPage() {
       setError(isId ? 'Username dan kata sandi wajib diisi.' : 'Username and password are required.')
       return
     }
-    if (!USERNAME_PATTERN.test(username.trim())) {
-      setError(isId ? 'Format username belum sesuai.' : 'The username format is invalid.')
+    if (!USERNAME_PATTERN.test(companyIdentity) && !EMAIL_PATTERN.test(companyIdentity)) {
+      setError(isId ? 'Masukkan username atau email yang valid.' : 'Enter a valid username or email.')
       return
     }
 
     setSubmitting(true)
     try {
-      await login(username.trim(), password)
+      await login(companyIdentity.toLowerCase(), password)
       navigate('/', { replace: true })
     } catch (err) {
       if (err instanceof ApiError && err.status === 401 && err.message.toLowerCase().includes('trial')) {
@@ -179,7 +184,7 @@ export function LoginPage() {
         )
         setPersonalEmail(delivery.email)
         setVerificationCode('')
-        setPersonalFlow('register-code')
+        setAuthFlow('register-code')
         setNotice(isId ? `Kode verifikasi telah dikirim ke ${delivery.email}.` : `A verification code was sent to ${delivery.email}.`)
         return
       } else {
@@ -234,14 +239,16 @@ export function LoginPage() {
     }
     setSubmitting(true)
     try {
-      const delivery = await forgotPersonalPassword(email)
+      const delivery = await requestPasswordReset(email)
       setResetEmail(delivery.email)
       setVerificationCode('')
-      setPersonalFlow('forgot-code')
+      setAuthFlow('forgot-code')
       setNotice(isId ? `Kode reset telah dikirim ke ${delivery.email}.` : `A reset code was sent to ${delivery.email}.`)
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
-        setError(isId ? 'Email tersebut tidak terdaftar sebagai akun Personal.' : 'That email is not registered as a Personal account.')
+        setError(accountType === 'company'
+          ? (isId ? 'Email tersebut tidak terdaftar sebagai akun Company.' : 'That email is not registered as a Company account.')
+          : (isId ? 'Email tersebut tidak terdaftar sebagai akun Personal.' : 'That email is not registered as a Personal account.'))
       } else if (err instanceof ApiError && err.status === 429) {
         setError(isId ? 'Kode baru saja dikirim. Tunggu satu menit sebelum mencoba lagi.' : 'A code was just sent. Wait one minute before trying again.')
       } else if (err instanceof ApiError && err.status === 400) {
@@ -263,11 +270,11 @@ export function LoginPage() {
     }
     setSubmitting(true)
     try {
-      const token = await verifyPersonalPasswordResetCode(resetEmail, verificationCode)
+      const token = await verifyPasswordResetCode(resetEmail, verificationCode)
       setResetToken(token)
       setResetPassword('')
       setResetConfirmPassword('')
-      setPersonalFlow('reset-password')
+      setAuthFlow('reset-password')
       setNotice(isId ? 'Kode benar. Silakan buat password baru.' : 'Code verified. Create a new password.')
     } catch (err) {
       if (err instanceof ApiError && (err.status === 400 || err.status === 429)) {
@@ -283,8 +290,8 @@ export function LoginPage() {
   const handleResetPasswordSubmit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
-    if (resetPassword.length < 8) {
-      setError(isId ? 'Password baru minimal 8 karakter.' : 'The new password must contain at least 8 characters.')
+    if (resetPassword.length < resetPasswordMinimum) {
+      setError(isId ? `Password baru minimal ${resetPasswordMinimum} karakter.` : `The new password must contain at least ${resetPasswordMinimum} characters.`)
       return
     }
     if (resetPassword !== resetConfirmPassword) {
@@ -293,10 +300,15 @@ export function LoginPage() {
     }
     setSubmitting(true)
     try {
-      await resetPersonalPassword(resetToken, resetPassword, resetConfirmPassword)
-      setPersonalUsername(resetEmail)
-      setPersonalPassword('')
-      setPersonalFlow('credentials')
+      await submitResetPassword(resetToken, resetPassword, resetConfirmPassword)
+      if (accountType === 'company') {
+        setUsername(resetEmail)
+        setPassword('')
+      } else {
+        setPersonalUsername(resetEmail)
+        setPersonalPassword('')
+      }
+      setAuthFlow('credentials')
       setPersonalMode('login')
       setVerificationCode('')
       setResetToken('')
@@ -323,29 +335,31 @@ export function LoginPage() {
             </div>
 
             <div className="login-card-header">
-              <h1>{accountType === 'company'
-                ? (isId ? 'Selamat datang kembali' : 'Welcome back')
-                : personalFlow === 'register-code'
+              <h1>{authFlow === 'forgot-email'
+                ? (isId ? 'Lupa kata sandi' : 'Forgot password')
+                : authFlow === 'forgot-code'
+                  ? (isId ? 'Masukkan kode reset' : 'Enter reset code')
+                  : authFlow === 'reset-password'
+                    ? (isId ? 'Buat kata sandi baru' : 'Create a new password')
+                    : accountType === 'company'
+                      ? (isId ? 'Selamat datang kembali' : 'Welcome back')
+                      : authFlow === 'register-code'
                   ? (isId ? 'Verifikasi email Anda' : 'Verify your email')
-                  : personalFlow === 'forgot-email'
-                    ? (isId ? 'Lupa kata sandi' : 'Forgot password')
-                    : personalFlow === 'forgot-code'
-                      ? (isId ? 'Masukkan kode reset' : 'Enter reset code')
-                      : personalFlow === 'reset-password'
-                        ? (isId ? 'Buat kata sandi baru' : 'Create a new password')
                         : (personalMode === 'login'
                             ? (isId ? 'Masuk sebagai Personal' : 'Personal sign in')
                             : (isId ? 'Buat akun Personal' : 'Create a Personal account'))}</h1>
-              <p>{accountType === 'company'
-                ? (isId ? 'Masuk menggunakan akun yang diberikan perusahaan Anda.' : 'Sign in with the account provided by your company.')
-                : personalFlow === 'register-code'
+              <p>{authFlow === 'forgot-email'
+                ? (accountType === 'company'
+                    ? (isId ? 'Masukkan email akun Company yang ingin dipulihkan.' : 'Enter the email of the Company account you want to recover.')
+                    : (isId ? 'Masukkan email akun Personal yang ingin dipulihkan.' : 'Enter the email of the Personal account you want to recover.'))
+                : authFlow === 'forgot-code'
+                  ? (isId ? 'Gunakan kode enam digit yang kami kirim ke email Anda.' : 'Use the six-digit code sent to your email.')
+                  : authFlow === 'reset-password'
+                    ? (isId ? 'Gunakan password baru yang kuat dan mudah Anda ingat.' : 'Choose a strong new password you can remember.')
+                    : accountType === 'company'
+                      ? (isId ? 'Masuk menggunakan akun yang diberikan perusahaan Anda.' : 'Sign in with the account provided by your company.')
+                      : authFlow === 'register-code'
                   ? (isId ? 'Periksa inbox email untuk menyelesaikan pendaftaran.' : 'Check your email inbox to finish registration.')
-                  : personalFlow === 'forgot-email'
-                    ? (isId ? 'Masukkan email akun Personal yang ingin dipulihkan.' : 'Enter the email of the Personal account you want to recover.')
-                    : personalFlow === 'forgot-code'
-                      ? (isId ? 'Gunakan kode enam digit yang kami kirim ke email Anda.' : 'Use the six-digit code sent to your email.')
-                      : personalFlow === 'reset-password'
-                        ? (isId ? 'Gunakan password baru yang kuat dan mudah Anda ingat.' : 'Choose a strong new password you can remember.')
                         : (isId ? 'Kelola dokumen dan workspace milik Anda sendiri.' : 'Manage documents and a workspace of your own.')}</p>
             </div>
 
@@ -372,7 +386,7 @@ export function LoginPage() {
               </button>
             </div>
 
-            {accountType === 'personal' && personalFlow === 'credentials' && (
+            {accountType === 'personal' && authFlow === 'credentials' && (
               <div className="login-mode-switch" role="tablist" aria-label={isId ? 'Masuk atau daftar' : 'Sign in or register'}>
                 <button type="button" role="tab" aria-selected={personalMode === 'login'} className={personalMode === 'login' ? 'active' : ''} onClick={() => selectPersonalMode('login')}>{isId ? 'Masuk' : 'Sign in'}</button>
                 <button type="button" role="tab" aria-selected={personalMode === 'register'} className={personalMode === 'register' ? 'active' : ''} onClick={() => selectPersonalMode('register')}>{isId ? 'Daftar' : 'Register'}</button>
@@ -382,25 +396,70 @@ export function LoginPage() {
             {error && <div className="login-error" role="alert"><ShieldAlert size={15} /> {error}</div>}
             {notice && <div className="login-notice" role="status"><Info size={16} /> {notice}</div>}
 
-            {accountType === 'company' ? (
+            {authFlow === 'forgot-email' ? (
+              <form className="login-form-centered" onSubmit={handleForgotEmailSubmit} noValidate>
+                <div className="login-field">
+                  <label htmlFor="forgot-account-email">Email</label>
+                  <div className="login-input-wrap">
+                    <Mail size={16} className="login-input-icon" />
+                    <input id="forgot-account-email" type="email" value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} placeholder={isId ? 'nama@email.com' : 'name@email.com'} autoComplete="email" disabled={submitting} autoFocus />
+                  </div>
+                </div>
+                <button className="login-submit" type="submit" disabled={submitting || !resetEmail.trim()}>
+                  {submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Mengirim…' : 'Sending…'}</> : (isId ? 'Kirim kode reset' : 'Send reset code')}
+                </button>
+                <button type="button" className="login-text-action login-back-action" onClick={() => { setError(null); setNotice(null); setAuthFlow('credentials') }}>
+                  <ArrowLeft size={14} /> {accountType === 'company'
+                    ? (isId ? 'Kembali ke masuk Company' : 'Back to Company sign in')
+                    : (isId ? 'Kembali ke masuk Personal' : 'Back to Personal sign in')}
+                </button>
+              </form>
+            ) : authFlow === 'forgot-code' ? (
+              <form className="login-form-centered" onSubmit={handleForgotCodeSubmit} noValidate>
+                <CodeField value={verificationCode} onChange={setVerificationCode} disabled={submitting} isId={isId} purpose="reset" />
+                <button className="login-submit" type="submit" disabled={submitting || !/^\d{6}$/.test(verificationCode)}>
+                  {submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Memeriksa…' : 'Checking…'}</> : (isId ? 'Verifikasi kode' : 'Verify code')}
+                </button>
+                <button type="button" className="login-text-action login-back-action" onClick={() => { setError(null); setNotice(null); setAuthFlow('forgot-email') }}>
+                  <ArrowLeft size={14} /> {isId ? 'Ganti alamat email' : 'Change email address'}
+                </button>
+              </form>
+            ) : authFlow === 'reset-password' ? (
+              <form className="login-form-centered" onSubmit={handleResetPasswordSubmit} noValidate>
+                <PasswordField id="reset-account-password" label={isId ? 'Password baru' : 'New password'} value={resetPassword} onChange={setResetPassword} show={showPassword} onToggle={() => setShowPassword((value) => !value)} autoComplete="new-password" disabled={submitting} invalid={resetPassword.length > 0 && resetPassword.length < resetPasswordMinimum} minimumLength={resetPasswordMinimum} isId={isId} />
+                <PasswordField id="reset-account-confirm-password" label={isId ? 'Konfirmasi password baru' : 'Confirm new password'} value={resetConfirmPassword} onChange={setResetConfirmPassword} show={showPassword} onToggle={() => setShowPassword((value) => !value)} autoComplete="new-password" disabled={submitting} isId={isId} />
+                {resetConfirmPassword && resetPassword !== resetConfirmPassword && <span className="login-field-error">{isId ? 'Konfirmasi password baru tidak sama.' : 'The new password confirmation does not match.'}</span>}
+                <button className="login-submit" type="submit" disabled={submitting || resetPassword.length < resetPasswordMinimum || resetPassword !== resetConfirmPassword}>
+                  {submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Menyimpan…' : 'Saving…'}</> : (isId ? 'Simpan password baru' : 'Save new password')}
+                </button>
+              </form>
+            ) : accountType === 'company' ? (
               <form className="login-form-centered" onSubmit={handleCompanySubmit} noValidate>
                 <div className={`login-field ${usernameInvalid ? 'invalid' : ''}`}>
-                  <label htmlFor="login-username">Username</label>
+                  <label htmlFor="login-username">{isId ? 'Username atau email' : 'Username or email'}</label>
                   <div className="login-input-wrap">
                     <UserRound size={16} className="login-input-icon" />
-                    <input id="login-username" type="text" value={username} onChange={(event) => setUsername(event.target.value)} onBlur={() => setTouched((value) => ({ ...value, username: true }))} placeholder={isId ? 'Masukkan username Anda' : 'Enter your username'} autoComplete="username" disabled={submitting} />
+                    <input id="login-username" type="text" value={username} onChange={(event) => setUsername(event.target.value)} onBlur={() => setTouched((value) => ({ ...value, username: true }))} placeholder={isId ? 'Masukkan username atau email' : 'Enter your username or email'} autoComplete="username" disabled={submitting} />
                   </div>
-                  {usernameInvalid && <span className="login-field-error">{isId ? 'Gunakan 3–50 karakter: huruf, angka, titik, strip, atau garis bawah.' : 'Use 3–50 letters, numbers, periods, hyphens, or underscores.'}</span>}
+                  {usernameInvalid && <span className="login-field-error">{isId ? 'Masukkan username atau email yang valid.' : 'Enter a valid username or email.'}</span>}
                 </div>
 
                 <PasswordField id="login-password" label={isId ? 'Kata sandi' : 'Password'} value={password} onChange={setPassword} show={showPassword} onToggle={() => setShowPassword((value) => !value)} autoComplete="current-password" disabled={submitting} invalid={passwordInvalid} isId={isId} />
+
+                <button
+                  type="button"
+                  className="login-text-action login-forgot-action"
+                  onClick={() => { setError(null); setNotice(null); setResetEmail(''); setAuthFlow('forgot-email') }}
+                >
+                  {isId ? 'Lupa kata sandi?' : 'Forgot password?'}
+                </button>
 
                 <button className="login-submit" type="submit" disabled={submitting}>
                   {submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Memverifikasi…' : 'Verifying…'}</> : (isId ? 'Masuk ke workspace' : 'Enter workspace')}
                 </button>
                 <p className="register-back-link"><Link to="/register/company">{isId ? 'Belum punya workspace? Mulai trial gratis' : 'Do not have a workspace? Start a free trial'}</Link></p>
               </form>
-            ) : personalFlow === 'credentials' ? (
+            ) : authFlow === 'credentials' ? (
               <form className="login-form-centered" onSubmit={handlePersonalSubmit} noValidate>
                 <GoogleSignInButton
                   mode={personalMode}
@@ -455,7 +514,7 @@ export function LoginPage() {
                   <button
                     type="button"
                     className="login-text-action login-forgot-action"
-                    onClick={() => { setError(null); setNotice(null); setResetEmail(''); setPersonalFlow('forgot-email') }}
+                    onClick={() => { setError(null); setNotice(null); setResetEmail(''); setAuthFlow('forgot-email') }}
                   >
                     {isId ? 'Lupa kata sandi?' : 'Forgot password?'}
                   </button>
@@ -472,49 +531,14 @@ export function LoginPage() {
                 </button>
                 <p className="login-terms">{isId ? 'Dengan melanjutkan, Anda menyetujui ketentuan layanan dan kebijakan privasi.' : 'By continuing, you agree to the terms of service and privacy policy.'}</p>
               </form>
-            ) : personalFlow === 'register-code' ? (
+            ) : (
               <form className="login-form-centered" onSubmit={handleRegistrationCodeSubmit} noValidate>
                 <CodeField value={verificationCode} onChange={setVerificationCode} disabled={submitting} isId={isId} purpose="registration" />
                 <button className="login-submit" type="submit" disabled={submitting || !/^\d{6}$/.test(verificationCode)}>
                   {submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Memverifikasi…' : 'Verifying…'}</> : (isId ? 'Verifikasi dan buat akun' : 'Verify and create account')}
                 </button>
-                <button type="button" className="login-text-action login-back-action" onClick={() => { setError(null); setNotice(null); setPersonalFlow('credentials') }}>
+                <button type="button" className="login-text-action login-back-action" onClick={() => { setError(null); setNotice(null); setAuthFlow('credentials') }}>
                   <ArrowLeft size={14} /> {isId ? 'Kembali ke formulir pendaftaran' : 'Back to registration form'}
-                </button>
-              </form>
-            ) : personalFlow === 'forgot-email' ? (
-              <form className="login-form-centered" onSubmit={handleForgotEmailSubmit} noValidate>
-                <div className="login-field">
-                  <label htmlFor="forgot-personal-email">Email</label>
-                  <div className="login-input-wrap">
-                    <Mail size={16} className="login-input-icon" />
-                    <input id="forgot-personal-email" type="email" value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} placeholder={isId ? 'nama@email.com' : 'name@email.com'} autoComplete="email" disabled={submitting} autoFocus />
-                  </div>
-                </div>
-                <button className="login-submit" type="submit" disabled={submitting || !resetEmail.trim()}>
-                  {submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Mengirim…' : 'Sending…'}</> : (isId ? 'Kirim kode reset' : 'Send reset code')}
-                </button>
-                <button type="button" className="login-text-action login-back-action" onClick={() => { setError(null); setNotice(null); setPersonalFlow('credentials') }}>
-                  <ArrowLeft size={14} /> {isId ? 'Kembali ke masuk Personal' : 'Back to Personal sign in'}
-                </button>
-              </form>
-            ) : personalFlow === 'forgot-code' ? (
-              <form className="login-form-centered" onSubmit={handleForgotCodeSubmit} noValidate>
-                <CodeField value={verificationCode} onChange={setVerificationCode} disabled={submitting} isId={isId} purpose="reset" />
-                <button className="login-submit" type="submit" disabled={submitting || !/^\d{6}$/.test(verificationCode)}>
-                  {submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Memeriksa…' : 'Checking…'}</> : (isId ? 'Verifikasi kode' : 'Verify code')}
-                </button>
-                <button type="button" className="login-text-action login-back-action" onClick={() => { setError(null); setNotice(null); setPersonalFlow('forgot-email') }}>
-                  <ArrowLeft size={14} /> {isId ? 'Ganti alamat email' : 'Change email address'}
-                </button>
-              </form>
-            ) : (
-              <form className="login-form-centered" onSubmit={handleResetPasswordSubmit} noValidate>
-                <PasswordField id="reset-personal-password" label={isId ? 'Password baru' : 'New password'} value={resetPassword} onChange={setResetPassword} show={showPassword} onToggle={() => setShowPassword((value) => !value)} autoComplete="new-password" disabled={submitting} invalid={resetPassword.length > 0 && resetPassword.length < 8} isId={isId} />
-                <PasswordField id="reset-personal-confirm-password" label={isId ? 'Konfirmasi password baru' : 'Confirm new password'} value={resetConfirmPassword} onChange={setResetConfirmPassword} show={showPassword} onToggle={() => setShowPassword((value) => !value)} autoComplete="new-password" disabled={submitting} isId={isId} />
-                {resetConfirmPassword && resetPassword !== resetConfirmPassword && <span className="login-field-error">{isId ? 'Konfirmasi password baru tidak sama.' : 'The new password confirmation does not match.'}</span>}
-                <button className="login-submit" type="submit" disabled={submitting || resetPassword.length < 8 || resetPassword !== resetConfirmPassword}>
-                  {submitting ? <><LoaderCircle size={16} className="spin" /> {isId ? 'Menyimpan…' : 'Saving…'}</> : (isId ? 'Simpan password baru' : 'Save new password')}
                 </button>
               </form>
             )}
@@ -572,7 +596,7 @@ function CodeField({ value, onChange, disabled, isId, purpose }: {
   )
 }
 
-function PasswordField({ id, label, value, onChange, show, onToggle, autoComplete, disabled = false, invalid = false, isId }: {
+function PasswordField({ id, label, value, onChange, show, onToggle, autoComplete, disabled = false, invalid = false, minimumLength = 6, isId }: {
   id: string
   label: string
   value: string
@@ -582,6 +606,7 @@ function PasswordField({ id, label, value, onChange, show, onToggle, autoComplet
   autoComplete: string
   disabled?: boolean
   invalid?: boolean
+  minimumLength?: number
   isId: boolean
 }) {
   return (
@@ -594,7 +619,7 @@ function PasswordField({ id, label, value, onChange, show, onToggle, autoComplet
           {show ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>
-      {invalid && <span className="login-field-error">{isId ? 'Kata sandi harus minimal 6 karakter.' : 'Password must be at least 6 characters.'}</span>}
+      {invalid && <span className="login-field-error">{isId ? `Kata sandi harus minimal ${minimumLength} karakter.` : `Password must be at least ${minimumLength} characters.`}</span>}
     </div>
   )
 }

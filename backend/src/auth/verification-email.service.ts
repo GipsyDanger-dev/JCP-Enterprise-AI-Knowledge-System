@@ -1,7 +1,10 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import nodemailer, { Transporter } from 'nodemailer';
 
-type VerificationEmailPurpose = 'PERSONAL_REGISTRATION' | 'PASSWORD_RESET';
+type VerificationEmailPurpose =
+  | 'PERSONAL_REGISTRATION'
+  | 'COMPANY_REGISTRATION'
+  | 'PASSWORD_RESET';
 
 @Injectable()
 export class VerificationEmailService {
@@ -45,13 +48,15 @@ export class VerificationEmailService {
       throw new ServiceUnavailableException(this.configurationError ?? 'Email delivery is not configured');
     }
 
-    const registration = purpose === 'PERSONAL_REGISTRATION';
+    const registration = purpose !== 'PASSWORD_RESET';
     const subject = registration
       ? 'Kode verifikasi akun Enterprise AI'
       : 'Kode reset kata sandi Enterprise AI';
-    const action = registration
-      ? 'menyelesaikan pendaftaran akun'
-      : 'melanjutkan penggantian kata sandi';
+    const action = purpose === 'COMPANY_REGISTRATION'
+      ? 'memverifikasi email admin dan membuat workspace perusahaan'
+      : registration
+        ? 'menyelesaikan pendaftaran akun'
+        : 'melanjutkan penggantian kata sandi';
 
     try {
       await this.transporter.sendMail({

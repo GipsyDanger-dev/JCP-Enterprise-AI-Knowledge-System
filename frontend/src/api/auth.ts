@@ -18,20 +18,24 @@ export function verifyPersonalRegistration(credentials: EmailCodeRequest): Promi
   return request<LoginResponse>('/auth/register/personal/verify', { method: 'POST', body: credentials })
 }
 
-export function forgotPersonalPassword(email: string): Promise<VerificationCodeDeliveryResponse> {
+export function requestPasswordReset(email: string): Promise<VerificationCodeDeliveryResponse> {
   return request<VerificationCodeDeliveryResponse>('/auth/password/forgot', { method: 'POST', body: { email } })
 }
 
-export function verifyPersonalPasswordResetCode(credentials: EmailCodeRequest): Promise<PasswordResetCodeResponse> {
+export function verifyPasswordResetCode(credentials: EmailCodeRequest): Promise<PasswordResetCodeResponse> {
   return request<PasswordResetCodeResponse>('/auth/password/verify-code', { method: 'POST', body: credentials })
 }
 
-export function resetPersonalPassword(credentials: ResetPasswordRequest): Promise<{ success: true }> {
+export function resetPassword(credentials: ResetPasswordRequest): Promise<{ success: true }> {
   return request<{ success: true }>('/auth/password/reset', { method: 'POST', body: credentials })
 }
 
-export function registerCompany(credentials: CompanyRegisterRequest): Promise<LoginResponse | CompanyCheckoutResponse> {
-  return request<LoginResponse | CompanyCheckoutResponse>('/auth/register/company', { method: 'POST', body: credentials })
+export function registerCompany(credentials: CompanyRegisterRequest): Promise<VerificationCodeDeliveryResponse> {
+  return request<VerificationCodeDeliveryResponse>('/auth/register/company', { method: 'POST', body: credentials })
+}
+
+export function verifyCompanyRegistration(credentials: EmailCodeRequest): Promise<LoginResponse | CompanyCheckoutResponse> {
+  return request<LoginResponse | CompanyCheckoutResponse>('/auth/register/company/verify', { method: 'POST', body: credentials })
 }
 
 export function checkCompanyAvailability(adminUsername: string, adminEmail: string): Promise<CompanyAvailabilityResponse> {

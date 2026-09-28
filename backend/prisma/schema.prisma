@@ -255,6 +255,7 @@ enum NotificationType {
 
 enum AuthVerificationPurpose {
   PERSONAL_REGISTRATION
+  COMPANY_REGISTRATION
   PASSWORD_RESET
 }
 

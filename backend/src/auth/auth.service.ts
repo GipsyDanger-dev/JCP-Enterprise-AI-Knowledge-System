@@ -10,7 +10,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { AccountType, AuditAction, AuditActorType, AuthVerificationPurpose, Prisma, User, UserRole } from '@prisma/client';
+import { AccountType, AuditAction, AuditActorType, AuthVerificationPurpose, BillingCycle, Prisma, User, UserRole } from '@prisma/client';
 import { OAuth2Client } from 'google-auth-library';
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
@@ -38,6 +38,19 @@ type PendingPersonalRegistration = {
   username: string;
   passwordHash: string;
 };
+
+type PendingCompanyRegistration = {
+  organizationName: string;
+  adminName: string;
+  adminUsername: string;
+  passwordHash: string;
+  onboardingMode: 'TRIAL' | 'SUBSCRIBE';
+  planSlug: string;
+  cycle: BillingCycle;
+  couponCode: string | null;
+};
+
+type PendingRegistration = PendingPersonalRegistration | PendingCompanyRegistration;
 
 
 @Injectable()
@@ -106,7 +119,7 @@ export class AuthService {
   ) {
     const email = emailInput.trim().toLowerCase();
     const challenge = await this.verifyCode(email, AuthVerificationPurpose.PERSONAL_REGISTRATION, code);
-    const payload = this.registrationPayload(challenge.payload);
+    const payload = this.personalRegistrationPayload(challenge.payload);
 
     try {
       const user = await this.prisma.$transaction(async (transaction) => {
@@ -139,9 +152,7 @@ export class AuthService {
   async requestPasswordReset(emailInput: string) {
     const email = emailInput.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user || user.accountType !== AccountType.PERSONAL) {
-      throw new NotFoundException('No personal account is registered with this email');
-    }
+    if (!user) throw new NotFoundException('No account is registered with this email');
     if (!user.isActive) throw new BadRequestException('This account is inactive');
     if (!user.passwordHash) throw new BadRequestException('This account uses Google sign-in and has no password to reset');
 
@@ -186,9 +197,12 @@ export class AuthService {
       || !challenge.verifiedAt
       || challenge.expiresAt <= new Date()
       || !challenge.user?.isActive
-      || challenge.user.accountType !== AccountType.PERSONAL
     ) {
       throw new BadRequestException('Password reset session is invalid or expired');
+    }
+
+    if (challenge.user.accountType === AccountType.COMPANY && password.length < 10) {
+      throw new BadRequestException('Company passwords must contain at least 10 characters');
     }
 
     const passwordHash = await hashPassword(password);
@@ -211,18 +225,52 @@ export class AuthService {
     return { success: true as const };
   }
 
-  async registerCompany(
-    input: RegisterCompanyDto,
-    ipAddress?: string,
-    userAgent?: string,
-  ) {
+  async registerCompany(input: RegisterCompanyDto) {
     if (input.password !== input.confirmPassword) {
       throw new BadRequestException('Password confirmation does not match');
     }
     if (input.onboardingMode === 'SUBSCRIBE') this.billing.assertPaymentConfigured();
     const email = input.adminEmail.trim().toLowerCase();
     const username = input.adminUsername.trim().toLowerCase();
+    const existingUser = await this.prisma.user.findFirst({
+      where: { OR: [{ email }, { username }] },
+      select: { id: true },
+    });
+    if (existingUser) throw new ConflictException('Username or email is already registered');
+
     const passwordHash = await hashPassword(input.password);
+    await this.issueVerificationCode(email, AuthVerificationPurpose.COMPANY_REGISTRATION, {
+      payload: {
+        organizationName: input.organizationName.trim(),
+        adminName: input.adminName.trim(),
+        adminUsername: username,
+        passwordHash,
+        onboardingMode: input.onboardingMode,
+        planSlug: input.planSlug.trim() || 'starter',
+        cycle: input.cycle,
+        couponCode: input.couponCode?.trim() || null,
+      },
+    });
+
+    return {
+      verificationRequired: true as const,
+      email,
+      expiresInSeconds: VERIFICATION_CODE_TTL_MS / 1000,
+      resendAfterSeconds: VERIFICATION_CODE_COOLDOWN_MS / 1000,
+    };
+  }
+
+  async verifyCompanyRegistration(
+    emailInput: string,
+    code: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    const email = emailInput.trim().toLowerCase();
+    const challenge = await this.verifyCode(email, AuthVerificationPurpose.COMPANY_REGISTRATION, code);
+    const payload = this.companyRegistrationPayload(challenge.payload);
+    if (payload.onboardingMode === 'SUBSCRIBE') this.billing.assertPaymentConfigured();
+
     const trialStartedAt = new Date();
     const trialEndsAt = new Date(trialStartedAt.getTime() + trialDurationDays() * 24 * 60 * 60 * 1000);
 
@@ -230,22 +278,22 @@ export class AuthService {
       const result = await this.prisma.$transaction(async (transaction) => {
         const workspace = await transaction.workspace.create({
           data: {
-            name: input.organizationName.trim(),
+            name: payload.organizationName,
             type: AccountType.COMPANY,
-            subscriptionStatus: input.onboardingMode === 'SUBSCRIBE' ? 'PENDING_PAYMENT' : 'TRIAL',
-            trialStartedAt: input.onboardingMode === 'TRIAL' ? trialStartedAt : null,
-            trialEndsAt: input.onboardingMode === 'TRIAL' ? trialEndsAt : null,
-            subscriptionPlan: input.onboardingMode === 'TRIAL' ? 'trial' : null,
+            subscriptionStatus: payload.onboardingMode === 'SUBSCRIBE' ? 'PENDING_PAYMENT' : 'TRIAL',
+            trialStartedAt: payload.onboardingMode === 'TRIAL' ? trialStartedAt : null,
+            trialEndsAt: payload.onboardingMode === 'TRIAL' ? trialEndsAt : null,
+            subscriptionPlan: payload.onboardingMode === 'TRIAL' ? 'trial' : null,
             users: {
               create: {
                 email,
-                username,
-                displayName: input.adminName.trim(),
-                passwordHash,
+                username: payload.adminUsername,
+                displayName: payload.adminName,
+                passwordHash: payload.passwordHash,
                 accountType: AccountType.COMPANY,
                 role: UserRole.SUPER_ADMIN,
                 isAdmin: true,
-                isActive: input.onboardingMode === 'TRIAL',
+                isActive: payload.onboardingMode === 'TRIAL',
               },
             },
             categories: {
@@ -256,7 +304,7 @@ export class AuthService {
               ],
             },
           },
-          include: { users: { where: { username }, take: 1 } },
+          include: { users: { where: { username: payload.adminUsername }, take: 1 } },
         });
         const createdUser = workspace.users[0];
         if (!createdUser) throw new Error('Company administrator could not be created');
@@ -264,6 +312,7 @@ export class AuthService {
         // pertama, dan admin baru tidak punya cara mengisinya selain mengetik
         // satu per satu.
         await seedJabatanDanRoleLabel(transaction, workspace.id);
+        await transaction.authVerificationCode.delete({ where: { id: challenge.id } });
         await transaction.auditLog.create({
           data: {
             actorType: AuditActorType.USER,
@@ -272,17 +321,17 @@ export class AuthService {
             targetType: 'WORKSPACE',
             targetId: workspace.id,
             workspaceId: workspace.id,
-            metadata: { onboardingMode: input.onboardingMode, subscriptionStatus: input.onboardingMode === 'TRIAL' ? 'TRIAL' : 'PENDING_PAYMENT' },
+            metadata: { onboardingMode: payload.onboardingMode, subscriptionStatus: payload.onboardingMode === 'TRIAL' ? 'TRIAL' : 'PENDING_PAYMENT', emailVerified: true },
           },
         });
         return { createdUser, workspaceId: workspace.id };
       });
 
-      if (input.onboardingMode === 'SUBSCRIBE') {
+      if (payload.onboardingMode === 'SUBSCRIBE') {
         const order = await this.billing.createInitialOrder(result.workspaceId, {
-          planSlug: input.planSlug,
-          cycle: input.cycle,
-          couponCode: input.couponCode,
+          planSlug: payload.planSlug,
+          cycle: payload.cycle,
+          couponCode: payload.couponCode ?? undefined,
         });
         return { onboardingMode: 'SUBSCRIBE', orderId: order.id, paymentUrl: order.paymentUrl, expiresAt: order.expiresAt };
       }
@@ -385,7 +434,7 @@ export class AuthService {
   private async issueVerificationCode(
     email: string,
     purpose: AuthVerificationPurpose,
-    options: { payload?: PendingPersonalRegistration; userId?: string },
+    options: { payload?: PendingRegistration; userId?: string },
   ) {
     const now = new Date();
     await this.prisma.authVerificationCode.deleteMany({ where: { expiresAt: { lt: now } } });
@@ -456,7 +505,7 @@ export class AuthService {
     return createHmac('sha256', secret).update(`${id}:${email}:${purpose}:${code}`).digest('hex');
   }
 
-  private registrationPayload(value: Prisma.JsonValue): PendingPersonalRegistration {
+  private personalRegistrationPayload(value: Prisma.JsonValue): PendingPersonalRegistration {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       throw new BadRequestException('Registration verification data is invalid');
     }
@@ -467,6 +516,44 @@ export class AuthService {
       throw new BadRequestException('Registration verification data is invalid');
     }
     return { displayName, username, passwordHash };
+  }
+
+  private companyRegistrationPayload(value: Prisma.JsonValue): PendingCompanyRegistration {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new BadRequestException('Registration verification data is invalid');
+    }
+    const {
+      organizationName,
+      adminName,
+      adminUsername,
+      passwordHash,
+      onboardingMode,
+      planSlug,
+      cycle,
+      couponCode,
+    } = value;
+    if (
+      typeof organizationName !== 'string'
+      || typeof adminName !== 'string'
+      || typeof adminUsername !== 'string'
+      || typeof passwordHash !== 'string'
+      || (onboardingMode !== 'TRIAL' && onboardingMode !== 'SUBSCRIBE')
+      || typeof planSlug !== 'string'
+      || (cycle !== BillingCycle.MONTHLY && cycle !== BillingCycle.YEARLY)
+      || (couponCode !== null && typeof couponCode !== 'string')
+    ) {
+      throw new BadRequestException('Registration verification data is invalid');
+    }
+    return {
+      organizationName,
+      adminName,
+      adminUsername,
+      passwordHash,
+      onboardingMode,
+      planSlug,
+      cycle,
+      couponCode,
+    };
   }
 
   private async issueApplicationSession(
