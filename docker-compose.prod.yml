@@ -3,6 +3,11 @@ services:
     build:
       context: ./backend
       target: production
+    # Jangan mewarisi command, bind mount, atau dependency PostgreSQL lokal dari
+    # compose development. Image production menjalankan migrate + start:prod.
+    command: !reset null
+    volumes: !reset []
+    depends_on: !reset {}
     environment:
       NODE_ENV: production
       BACKEND_PORT: 8000
@@ -49,6 +54,9 @@ services:
   ai-api:
     build:
       context: ./AI
+    # Production memakai kode di dalam image dan database dari AI_DATABASE_URL.
+    volumes: !reset []
+    depends_on: !reset {}
     entrypoint: ["uvicorn", "http_api:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       DATABASE_URL: ${AI_DATABASE_URL:?AI_DATABASE_URL is required for production}
@@ -76,6 +84,7 @@ services:
         VITE_API_BASE_URL: /api
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
     command: ["nginx", "-g", "daemon off;"]
+    volumes: !reset []
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
