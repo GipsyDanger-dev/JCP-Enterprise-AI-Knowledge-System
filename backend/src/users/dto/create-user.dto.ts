@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
-  IsEnum,
+  IsIn,
   IsUUID,
   IsOptional,
   IsString,
@@ -10,6 +10,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { ROLE_YANG_DIPAKAI } from '../../organization/organization.service';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'employee', maxLength: 50 })
@@ -68,9 +69,12 @@ export class CreateUserDto {
   @MaxLength(128)
   password!: string;
 
-  @ApiPropertyOptional({ enum: UserRole, default: 'PEGAWAI' })
+  // Hanya dua role yang masih punya arti. Nilai lain di enum UserRole —
+  // termasuk ADMIN_UNIT yang sudah dicabut — tinggal warisan di database dan
+  // tidak boleh dipasang lagi lewat API.
+  @ApiPropertyOptional({ enum: ROLE_YANG_DIPAKAI, default: 'PEGAWAI' })
   @IsOptional()
-  @IsEnum(UserRole)
+  @IsIn(ROLE_YANG_DIPAKAI)
   role?: UserRole;
 
   @ApiPropertyOptional({

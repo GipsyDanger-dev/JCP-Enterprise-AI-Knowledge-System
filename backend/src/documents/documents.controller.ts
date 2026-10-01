@@ -51,9 +51,10 @@ import { UpdateDocumentDto } from './dto/update-document.dto';
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
-  // Tanpa @AdminOnly: ADMIN_UNIT juga boleh mengunggah, tetapi hanya untuk unit
-  // kerjanya sendiri. Batasnya ditegakkan di service, karena baru bisa dinilai
-  // setelah kategori dan unit tujuan pada body permintaan diketahui.
+  // Tanpa @AdminOnly: jabatan bercentang "boleh unggah" juga boleh mengunggah,
+  // tetapi hanya untuk unit kerjanya sendiri. Batasnya ditegakkan di service,
+  // karena baru bisa dinilai setelah kategori dan unit tujuan pada body
+  // permintaan diketahui.
   @Post()
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_FILE_SIZE, files: 1 } }))
   @ApiConsumes('multipart/form-data')
@@ -135,9 +136,10 @@ export class DocumentsController {
     return this.documentsService.removeCategory(id, actor);
   }
 
-  // Tanpa @AdminOnly, sama seperti unggah: ADMIN_UNIT boleh mengatur dokumen
-  // unitnya sendiri. Batas wewenangnya ditegakkan di service, karena baru bisa
-  // dinilai setelah unit kerja dokumen sekarang dan unit tujuannya diketahui.
+  // Tanpa @AdminOnly, sama seperti unggah: pengunggah lewat jabatan boleh
+  // mengatur dokumen unggahannya sendiri. Batas wewenangnya ditegakkan di
+  // service, karena baru bisa dinilai setelah unit kerja dokumen sekarang dan
+  // unit tujuannya diketahui.
   @Patch(':id/access')
   @ApiOperation({ summary: 'Ubah kategori dan penanda unit kerja sebuah dokumen' })
   @ApiOkResponse({ description: 'Kategori dan penanda unit kerja tersimpan' })
@@ -209,7 +211,7 @@ export class DocumentsController {
     });
   }
 
-  // ADMIN_UNIT boleh menghapus dokumen unitnya sendiri; batasnya di service.
+  // Pengunggah lewat jabatan boleh menghapus unggahannya sendiri; batasnya di service.
   @Delete(':id')
   @ApiOperation({ summary: 'Soft-delete metadata and remove the stored binary file' })
   @ApiOkResponse({ description: 'Document deleted and active processing job stopped' })

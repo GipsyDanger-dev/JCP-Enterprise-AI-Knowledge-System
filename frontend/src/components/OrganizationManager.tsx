@@ -139,7 +139,7 @@ function UnitKerjaSection({ units, isId, token, onError, onChanged }: SectionPro
 
   const ubahStatus = async (unit: OrgUnitKerja) => {
     // Menonaktifkan unit TIDAK mencabut apa pun dari anggotanya — mereka tetap
-    // melihat dokumen unit ini, dan admin unit tetap mengelolanya. Yang berubah
+    // melihat dokumen unit ini, dan unggahan mereka tetap bisa mereka urus. Yang berubah
     // hanya unitnya hilang dari pilihan. Justru karena itu dikonfirmasi: kata
     // "nonaktifkan" terbaca seperti mencabut akses, dan admin yang mengira
     // begitu akan berhenti mencari cara yang benar.
@@ -685,10 +685,6 @@ const WEWENANG_TETAP: Record<string, { id: string; en: string }> = {
   SUPER_ADMIN: {
     id: 'Mengelola seluruh dokumen, pengguna, unit kerja, dan pengaturan workspace.',
     en: 'Manages all documents, users, work units, and workspace settings.',
-  },
-  ADMIN_UNIT: {
-    id: 'Mengunggah dan mengelola dokumen milik unit kerjanya sendiri, bukan unit lain.',
-    en: 'Uploads and manages documents owned by their own work unit only.',
   },
   PEGAWAI: {
     id: 'Membaca dan bertanya pada dokumen yang terbuka untuk unit kerjanya.',

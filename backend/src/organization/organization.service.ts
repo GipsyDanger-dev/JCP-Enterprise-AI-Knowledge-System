@@ -19,7 +19,7 @@ import {
  * instansi tombol untuk menamainya hanya akan memunculkan pilihan yang tidak
  * berarti apa-apa di form pembuatan akun.
  */
-export const ROLE_YANG_DIPAKAI: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN_UNIT, UserRole.PEGAWAI];
+export const ROLE_YANG_DIPAKAI: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.PEGAWAI];
 
 /**
  * Nama tampilan bawaan, dipakai saat workspace lama belum punya barisnya.
@@ -29,7 +29,6 @@ export const ROLE_YANG_DIPAKAI: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADM
  */
 const BAWAAN_ROLE: Record<string, { label: string; description: string }> = {
   [UserRole.SUPER_ADMIN]: { label: 'Admin', description: 'Mengelola seluruh dokumen, pengguna, dan pengaturan workspace.' },
-  [UserRole.ADMIN_UNIT]: { label: 'Admin Unit', description: 'Mengelola dokumen milik unit kerjanya sendiri.' },
   [UserRole.PEGAWAI]: { label: 'Pegawai', description: 'Membaca dokumen yang terbuka untuk unit kerjanya.' },
 };
 
@@ -121,8 +120,8 @@ function ringkasUnit<T extends { _count: { users: number; documents: number } }>
  * role. Dulu ketiganya hidup sebagai konstanta di prisma/reference-data.ts dan
  * enum di skema, jadi menambah satu jabatan berarti menunggu deploy.
  *
- * Yang TIDAK dipindahkan ke sini adalah perilaku role. Wewenang SUPER_ADMIN dan
- * ADMIN_UNIT tertanam di kode (documents/document-visibility.ts dan RolesGuard),
+ * Yang TIDAK dipindahkan ke sini adalah perilaku role. Wewenang SUPER_ADMIN
+ * tertanam di kode (documents/document-visibility.ts dan RolesGuard),
  * jadi role bikinan baru tidak akan punya aturan apa pun di baliknya dan hanya
  * akan berperilaku seperti PEGAWAI. Yang bisa diubah instansi cuma istilahnya.
  */
@@ -400,7 +399,7 @@ export class OrganizationService {
   // ---------------------------------------------------------------- nama role
 
   /**
-   * Nama tampilan ketiga role, selalu lengkap.
+   * Nama tampilan kedua role, selalu lengkap.
    *
    * Workspace yang dibuat sebelum fitur ini ada bisa saja belum punya barisnya —
    * yang hilang diisi dari konstanta bawaan di memori saja, bukan ditulis ke
@@ -427,7 +426,7 @@ export class OrganizationService {
 
     // Diperiksa terhadap daftar EFEKTIF, bukan langsung ke tabel: workspace lama
     // bisa saja belum punya barisnya dan masih memakai nama bawaan. Tanpa ini
-    // "Admin Unit" bisa diganti jadi "Admin" selama baris SUPER_ADMIN belum
+    // "Pegawai" bisa diganti jadi "Admin" selama baris SUPER_ADMIN belum
     // pernah disimpan — indeks unik di database pun tidak menangkapnya, karena
     // memang belum ada baris untuk ditabrak.
     const efektif = await this.roleLabels(actor.workspaceId);

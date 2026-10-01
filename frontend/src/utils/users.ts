@@ -11,7 +11,7 @@ export function userInitials(name: string): string {
 }
 
 /**
- * Role warisan dibaca sebagai salah satu dari ketiga role yang dipakai sekarang.
+ * Role warisan dibaca sebagai salah satu dari kedua role yang dipakai sekarang.
  *
  * Akun lawas masih menyimpan ADMIN, USER, sampai nama dinas sebagai role. Tanpa
  * diterjemahkan, satu daftar pengguna menampilkan dua istilah untuk wewenang
@@ -20,11 +20,11 @@ export function userInitials(name: string): string {
  *
  * Pemetaannya mengikuti isAdminRole() di backend, yang menyamakan ADMIN dengan
  * SUPER_ADMIN dan memperlakukan sisanya sebagai pegawai, jadi tidak ada
- * wewenang yang bergeser hanya karena namanya dirapikan.
+ * wewenang yang bergeser hanya karena namanya dirapikan. ADMIN_UNIT yang sudah
+ * dicabut ikut jatuh ke pegawai, sama seperti di backend.
  */
 export function normalizeRole(role: ApiRole): ApiCurrentRole {
   if (role === 'SUPER_ADMIN' || role === 'ADMIN') return 'SUPER_ADMIN'
-  if (role === 'ADMIN_UNIT') return 'ADMIN_UNIT'
   return 'PEGAWAI'
 }
 
@@ -41,6 +41,5 @@ export function userRoleLabel(role: ApiRole, labels?: ApiRoleLabel[]): string {
   const dipilih = labels?.find((item) => item.role === sekarang)
   if (dipilih) return dipilih.label
   if (sekarang === 'SUPER_ADMIN') return 'Admin'
-  if (sekarang === 'ADMIN_UNIT') return 'Admin Unit'
   return 'Pegawai'
 }

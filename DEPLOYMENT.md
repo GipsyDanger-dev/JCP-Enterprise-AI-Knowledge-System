@@ -310,7 +310,7 @@ users
 
 ### Key Tables
 
-- **users** — Akun dengan role `SUPER_ADMIN`/`ADMIN_UNIT`/`PEGAWAI` (legacy role masih ada di database), terikat pada workspace
+- **users** — Akun dengan role `SUPER_ADMIN`/`PEGAWAI` (legacy role, termasuk `ADMIN_UNIT` yang sudah dicabut, masih ada di enum database), terikat pada workspace
 - **documents** — Document metadata + collection
 - **document_versions** — Version history with file checksums
 - **document_files** — Binary file storage (PostgreSQL bytea)

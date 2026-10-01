@@ -168,15 +168,14 @@ export const JABATAN: JabatanSeed[] = [
 ];
 
 /**
- * Nama tampilan bawaan untuk ketiga role yang dipakai.
+ * Nama tampilan bawaan untuk kedua role yang dipakai.
  *
  * Hanya labelnya yang bisa diubah instansi, bukan perilakunya: wewenang tiap
  * role tertanam di kode, jadi menambah role baru tidak akan menambah aturan
  * apa pun di baliknya. Lihat model RoleLabel di schema.prisma.
  */
-export const ROLE_LABEL_BAWAAN: { role: 'SUPER_ADMIN' | 'ADMIN_UNIT' | 'PEGAWAI'; label: string; description: string }[] = [
+export const ROLE_LABEL_BAWAAN: { role: 'SUPER_ADMIN' | 'PEGAWAI'; label: string; description: string }[] = [
   { role: 'SUPER_ADMIN', label: 'Admin', description: 'Mengelola seluruh dokumen, pengguna, dan pengaturan workspace.' },
-  { role: 'ADMIN_UNIT', label: 'Admin Unit', description: 'Mengelola dokumen milik unit kerjanya sendiri.' },
   { role: 'PEGAWAI', label: 'Pegawai', description: 'Membaca dokumen yang terbuka untuk unit kerjanya.' },
 ];
 

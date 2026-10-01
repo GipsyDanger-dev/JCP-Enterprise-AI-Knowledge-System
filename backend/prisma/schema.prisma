@@ -18,10 +18,12 @@ enum UserRole {
   SEKRETARIS
   OPERASIONAL
   HUMAS
+  /// Dulu mengelola dokumen milik unit kerjanya sendiri. Dicabut 1 Oktober 2026
+  /// supaya seluruh pengelolaan terpusat di SUPER_ADMIN; akun pemegangnya
+  /// diturunkan menjadi PEGAWAI. Dibaca kode sebagai pegawai biasa.
+  ADMIN_UNIT
   // Dipakai sekarang
   SUPER_ADMIN
-  /// Boleh mengelola dokumen milik unit kerjanya sendiri, tidak unit lain.
-  ADMIN_UNIT
   PEGAWAI
   DINAS_PENDIDIKAN
   DINAS_KESEHATAN
@@ -427,7 +429,7 @@ model Jabatan {
   canViewAnnouncementReaders Boolean   @default(false) @map("can_view_announcement_readers")
   /// Boleh mengunggah dokumen untuk unit kerjanya sendiri, lalu mengubah dan
   /// menghapus apa yang ia unggah. TIDAK memberi kuasa atas dokumen unggahan
-  /// orang lain — itu wewenang ADMIN_UNIT. Tanpa unit kerja, izin ini tidak
+  /// orang lain — itu wewenang SUPER_ADMIN. Tanpa unit kerja, izin ini tidak
   /// berlaku sama sekali: dokumen tanpa penanda unit terbuka untuk seluruh
   /// pegawai, dan menerbitkan yang seperti itu adalah keputusan tingkat
   /// organisasi.
@@ -452,13 +454,13 @@ model Jabatan {
 }
 
 /**
- * Nama tampilan untuk ketiga UserRole yang dipakai.
+ * Nama tampilan untuk kedua UserRole yang dipakai.
  *
  * Hanya labelnya yang bisa diubah, bukan perilakunya: wewenang tiap role
  * tertanam di kode (lihat documents/document-visibility.ts dan RolesGuard),
  * jadi role buatan baru tidak akan punya aturan apa pun di baliknya. Yang
- * dibutuhkan di lapangan cuma penyesuaian istilah — "Admin Unit" di satu
- * instansi bisa bernama "Admin Dinas" di instansi lain.
+ * dibutuhkan di lapangan cuma penyesuaian istilah — "Pegawai" di satu
+ * instansi bisa bernama "Karyawan" di instansi lain.
  */
 model RoleLabel {
   workspaceId String    @map("workspace_id") @db.Uuid

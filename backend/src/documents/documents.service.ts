@@ -77,8 +77,8 @@ export class DocumentsService {
       throw new ForbiddenException('Anda tidak berwenang mengunggah dokumen');
     }
 
-    // Admin unit selalu mengunggah untuk unitnya sendiri. Dibuat sebagai
-    // bawaan supaya dokumen internal tidak bocor gara-gara lupa memilih.
+    // Pengunggah lewat jabatan selalu mengunggah untuk unitnya sendiri. Dibuat
+    // sebagai bawaan supaya dokumen internal tidak bocor gara-gara lupa memilih.
     const unitKerjaId = actor.isAdmin
       ? input.unitKerjaId ?? null
       : input.unitKerjaId ?? actor.unitKerjaId ?? null;
@@ -94,8 +94,8 @@ export class DocumentsService {
     let category: { id: string; name: string } | null = null;
     if (input.categoryId) {
       category = await this.prisma.documentCategory.findFirst({
-        // Admin unit tidak boleh menaruh dokumen di kategori yang unitnya
-        // sendiri tidak berhak membacanya.
+        // Pengunggah non-admin tidak boleh menaruh dokumen di kategori yang
+        // unitnya sendiri tidak berhak membacanya.
         where: { id: input.categoryId, ...(allowedCategoryFilter(actor) ?? {}) },
         select: { id: true, name: true },
       });
@@ -236,8 +236,8 @@ export class DocumentsService {
   /**
    * Siapa yang boleh menambah, mengganti nama, dan menghapus kategori.
    *
-   * Admin unit sengaja tidak ikut: kategori adalah penanda subjek milik
-   * seluruh organisasi, dipakai bersama semua unit. Satu unit yang bisa
+   * Pengunggah lewat jabatan sengaja tidak ikut: kategori adalah penanda
+   * subjek milik seluruh organisasi, dipakai bersama semua unit. Satu unit yang bisa
    * mengganti namanya akan mengubah tampilan arsip unit lain.
    */
   private pastikanBolehKelolaKategori(actor: AuthenticatedUser) {

@@ -35,8 +35,8 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const [categorySaving, setCategorySaving] = useState(false)
   // Bawaannya terbuka. Isi JDIH adalah peraturan daerah yang memang publik,
   // jadi mengunci harus jadi keputusan sadar admin — bukan sesuatu yang
-  // terjadi diam-diam pada setiap unggahan. Admin unit tidak punya pilihan
-  // ini: dokumennya selalu bertanda unitnya sendiri (ditegakkan server).
+  // terjadi diam-diam pada setiap unggahan. Pengunggah lewat jabatan tidak
+  // punya pilihan ini: dokumennya selalu bertanda unitnya sendiri (ditegakkan server).
   const [restrictToUnit, setRestrictToUnit] = useState(false)
   const [unitKerjaId, setUnitKerjaId] = useState('')
   // Bawaannya BERLAKU, sama seperti kolomnya di database. Yang penting di sini
@@ -106,7 +106,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
       const document = await uploadDocument(file, token ?? undefined, {
         title,
         categoryId: categoryId || undefined,
-        // Admin unit tidak mengirim id apa pun: server yang mengisikan unit
+        // Pengunggah non-admin tidak mengirim id apa pun: server yang mengisikan unit
         // kerjanya sendiri, sehingga nilai dari klien tidak bisa dipakai
         // menandai dokumen atas nama unit lain.
         unitKerjaId: isSuperAdmin ? (restrictToUnit ? unitKerjaId || undefined : undefined) : undefined,

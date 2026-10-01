@@ -216,18 +216,17 @@ export function DocumentsPage() {
    * yang memang tidak ada.
    */
   const ownUnitId = user?.unitKerja?.id ?? user?.unitKerjaId ?? null
-  const isUnitAdmin = user?.role === 'ADMIN_UNIT'
   const jabatanBolehUnggah = user?.jabatan?.canUploadDocuments ?? false
 
   const bolehUntukUnit = (unitId: string | null) => {
     if (isPersonal) return !unitId
     if (role === 'admin') return true
     if (!ownUnitId) return false
-    if (!isUnitAdmin && !jabatanBolehUnggah) return false
+    if (!jabatanBolehUnggah) return false
     return unitId === ownUnitId
   }
 
-  const canUpload = isPersonal || role === 'admin' || ((isUnitAdmin || jabatanBolehUnggah) && Boolean(ownUnitId))
+  const canUpload = isPersonal || role === 'admin' || (jabatanBolehUnggah && Boolean(ownUnitId))
 
   /**
    * Boleh mengubah status keberlakuan dokumen ini.
@@ -262,13 +261,13 @@ export function DocumentsPage() {
   /** Boleh mengubah nama, mengatur akses, atau menghapus dokumen ini. */
   const bolehUrus = (document: DocumentItem) => {
     if (!bolehUntukUnit(document.unitKerja?.id ?? null)) return false
-    if (isPersonal || role === 'admin' || isUnitAdmin) return true
+    if (isPersonal || role === 'admin') return true
     return document.uploadedById === user?.id
   }
 
   // Panel massal mengunci dan membuka dokumen seluruh workspace — itu urusan
-  // admin dan admin unit, bukan pemegang izin unggah lewat jabatan.
-  const bolehKelolaMassal = role === 'admin' || isUnitAdmin
+  // admin, bukan pemegang izin unggah lewat jabatan.
+  const bolehKelolaMassal = role === 'admin'
   const isId = language === 'id'
   const [searchParams, setSearchParams] = useSearchParams()
   const initialCollection = searchParams.get('collection') ?? 'All'

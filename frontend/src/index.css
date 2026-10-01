@@ -296,7 +296,6 @@
 /* Users page */
 [data-theme="dark"] .role-badge.admin, [data-theme="dark"] .role-badge.super_admin { background: #2a1c14; color: #ff8a6a; }
 [data-theme="dark"] .role-badge.user, [data-theme="dark"] .role-badge.pegawai { background: var(--success-bg); color: var(--success); }
-[data-theme="dark"] .role-badge.admin_unit { background: var(--warning-bg); color: var(--warning); }
 [data-theme="dark"] .filter-chip { background: var(--bg-card); border-color: var(--border); color: var(--text-secondary); }
 [data-theme="dark"] .filter-chip.active { background: #2a1c14; border-color: var(--brand-600); color: #ff8a6a; }
 [data-theme="dark"] .filter-chip:hover { background: var(--bg-hover); }
@@ -884,7 +883,6 @@ button { cursor: pointer; }
 .role-badge { display: inline-block; padding: 3px 10px; border-radius: var(--radius-xl); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: .05em; }
 .role-badge.admin, .role-badge.super_admin { background: var(--brand-100); color: var(--brand-800); }
 .role-badge.user, .role-badge.pegawai { background: var(--success-bg); color: var(--success); }
-.role-badge.admin_unit { background: var(--warning-bg); color: var(--warning); }
 /* Unit kerja dan jabatan menumpang di bawah baris utamanya, sebentuk dengan
    nama dan @username di kolom orang. */
 .access-cell { display: flex; flex-direction: column; gap: 3px; }
