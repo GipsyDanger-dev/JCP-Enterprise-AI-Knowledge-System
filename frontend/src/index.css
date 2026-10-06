@@ -1354,6 +1354,31 @@ button { cursor: pointer; }
 .upload-file-selected strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-card); font-weight: var(--fw-semibold); }
 .upload-file-selected small { display: block; color: var(--text-muted); font-size: var(--fs-2xs); }
 .upload-file-selected > .icon-button { flex-shrink: 0; margin-left: auto; }
+/* Unggah banyak file: area pilih menyusut jadi tombol "tambah lagi", lalu tiap
+   file punya baris sendiri dengan judul, kategori, dan status. */
+.upload-modal.is-batch { width: min(640px, 100%); max-width: 640px; }
+.upload-file-area.is-compact { padding: 12px 16px; margin-bottom: 14px; }
+.upload-file-area.is-dragging { border-color: var(--brand-500); background: var(--brand-50); }
+.upload-file-more { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--brand-700); font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+.upload-file-more small { color: var(--text-muted); font-weight: normal; font-size: var(--fs-2xs); }
+.upload-queue { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.upload-queue-item { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-card); padding: 10px 12px; transition: border-color .15s, opacity .15s; }
+.upload-queue-item.is-uploading { border-color: var(--brand-500); }
+.upload-queue-item.is-done { opacity: .6; }
+.upload-queue-item.is-error { border-color: var(--brand-600); background: var(--brand-50); }
+.upload-queue-item .upload-file-icon { width: 34px; height: 34px; }
+.upload-queue-state { flex-shrink: 0; color: var(--brand-600); }
+.upload-queue-state.is-done { color: var(--success); }
+.upload-queue-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.upload-queue-fields input { width: 100%; min-width: 0; height: 38px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); color: var(--text-primary); padding: 0 12px; outline: none; font-size: var(--fs-sm); }
+.upload-queue-fields input:focus { border-color: var(--brand-600); box-shadow: 0 0 0 3px var(--brand-100); }
+.upload-queue-fields input:disabled { opacity: .6; }
+.upload-queue-selects { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.upload-queue-selects .select-wrapper select { height: 38px; font-size: var(--fs-sm); }
+.upload-queue-error { margin: 8px 0 0; color: var(--brand-800); font-size: var(--fs-xs); line-height: 1.4; }
+.upload-batch-heading { display: flex; flex-direction: column; gap: 3px; margin: 4px 0 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.upload-batch-heading strong { font-size: var(--fs-sm); color: var(--text-card); }
+.upload-batch-heading span { font-size: 12px; line-height: 1.45; color: var(--text-muted); }
 .upload-field { margin-bottom: 16px; }
 .upload-field label { display: flex; align-items: center; font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-secondary); margin-bottom: 8px; letter-spacing: .02em; }
 .upload-field input { width: 100%; min-width: 0; min-height: 42px; overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-card); color: var(--text-primary); padding: 0 14px; outline: none; font-size: var(--fs-sm); transition: border-color .15s, box-shadow .15s; }
