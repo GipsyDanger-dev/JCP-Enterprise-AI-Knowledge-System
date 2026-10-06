@@ -35,7 +35,7 @@ export function LoginPage() {
   const { login, loginWithGoogle, registerPersonal, verifyPersonalRegistration, requestPasswordReset, verifyPasswordResetCode, resetPassword: submitResetPassword } = useAuth()
   const { language } = useWorkspace()
   const isId = language === 'id'
-  const [accountType, setAccountType] = useState<AccountType>('company')
+  const [accountType, setAccountType] = useState<AccountType>('personal')
   const [personalMode, setPersonalMode] = useState<PersonalMode>('login')
   const [authFlow, setAuthFlow] = useState<AuthFlow>('credentials')
   const [username, setUsername] = useState('')
