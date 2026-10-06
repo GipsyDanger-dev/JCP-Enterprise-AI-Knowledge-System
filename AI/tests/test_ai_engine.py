@@ -276,6 +276,39 @@ class ClarifyEvidenceTests(unittest.TestCase):
         self.assertEqual(hasil["retrieval"], [])
 
 
+class ClarifyLanguageTests(unittest.TestCase):
+    """Pertanyaan balik yang melenceng bahasa tidak boleh sampai ke layar.
+
+    Kejadian nyata: untuk "denda", model menulis pertanyaannya dalam bahasa
+    Rusia sementara pilihannya tetap Indonesia.
+    """
+
+    def test_kalimat_kiril_diganti_kalimat_baku(self):
+        clarify = {
+            "question": "Denda упоминается в нескольких документах. Что именно вы хотите узнать?",
+            "options": ["Denda keterlambatan sewa kos?"],
+        }
+        hasil = clarify_response(clarify, "denda")
+        self.assertEqual(hasil["answer"], 'Bagian mana dari "denda" yang ingin Anda ketahui?')
+        self.assertEqual(
+            hasil["suggestions"],
+            ["Denda keterlambatan sewa kos?", "Jelaskan ringkasan lengkap tentang denda"],
+        )
+
+    def test_pilihan_beraksara_lain_dibuang(self):
+        clarify = {"question": "Denda yang mana?", "options": ["Штраф за аренду", "Denda cicilan motor?"]}
+        hasil = clarify_response(clarify, "denda")
+        self.assertEqual(hasil["answer"], "Denda yang mana?")
+        self.assertEqual(
+            hasil["suggestions"], ["Denda cicilan motor?", "Jelaskan ringkasan lengkap tentang denda"]
+        )
+
+    def test_huruf_beraksen_latin_tetap_lolos(self):
+        clarify = {"question": "Biaya café atau naïve 0,5%/hari — yang mana?", "options": []}
+        self.assertEqual(clarify_response(clarify, "biaya")["answer"], clarify["question"])
+
+
+
 class ClarifyQuotaTests(unittest.TestCase):
     """Bertanya balik hanya layak kalau bahannya memang banyak.
 

@@ -50,6 +50,8 @@ CLARIFY_RULE = (
     "\"<pertanyaan spesifik 3>\"]}\n"
     "Selain itu, jawab seperti biasa dan bungkus jawabannya:\n"
     "{\"type\":\"answer\",\"jawaban\":\"<jawaban lengkap sesuai aturan di atas>\"}\n"
+    "Isi \"pertanyaan\", setiap \"pilihan\", dan \"jawaban\" WAJIB berbahasa "
+    "Indonesia, apa pun bahasa yang dipakai di dalam JSON ini.\n"
     "Setiap pilihan harus bisa dijawab dari konteks yang diberikan. Kalau ragu, "
     "jawab saja seperti biasa; hanya minta penjelasan bila pertanyaannya benar-benar rancu."
 )

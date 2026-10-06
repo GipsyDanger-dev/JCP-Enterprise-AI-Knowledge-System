@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from typing import Any
 
 from config import NO_ANSWER
@@ -160,6 +161,14 @@ def clarify_has_footing(
     return any(score >= minimum_score for score, _ in fresh_matches)
 
 
+def _latin_only(text: str) -> bool:
+    """Semua huruf beraksara Latin? Angka, tanda baca, dan emoji tidak dihitung."""
+    return all(
+        not char.isalpha() or unicodedata.name(char, "").startswith("LATIN")
+        for char in text
+    )
+
+
 def clarify_response(
     clarify: dict[str, Any],
     query: str,
@@ -176,9 +185,19 @@ def clarify_response(
     nol dan bisa berakhir "informasi tidak ditemukan" untuk pertanyaan yang
     baru saja ditawarkan sendiri oleh sistem.
     """
-    escape = f"Jelaskan ringkasan lengkap tentang {query.strip().rstrip('?')}"
+    topic = query.strip().rstrip('?')
+    escape = f"Jelaskan ringkasan lengkap tentang {topic}"
+    # Model yang dipaksa membalas JSON sesekali melenceng bahasa — pernah
+    # menulis pertanyaan baliknya dalam bahasa Rusia sementara pilihannya
+    # tetap Indonesia. Prompt sudah memintanya, tetapi tidak bisa menjamin;
+    # kalimat yang lolos diganti kalimat baku, pilihan yang lolos dibuang.
+    question = clarify["question"]
+    if not _latin_only(question):
+        print("[AI] Pertanyaan balik bukan aksara Latin, diganti kalimat baku")
+        question = f"Bagian mana dari \"{topic}\" yang ingin Anda ketahui?"
+    options = [option for option in clarify["options"] if _latin_only(option)]
     return {
-        "answer": clarify["question"],
+        "answer": question,
         # Ini pertanyaan balik, bukan klaim berdasarkan dokumen: tanpa kutipan,
         # lencana "Evidence verified" ikut tidak muncul. `retrieval` bukan
         # kutipan — ia tidak tampil di layar, hanya dibawa kembali sebagai
@@ -190,7 +209,7 @@ def clarify_response(
             for score, chunk in (matches or [])
             if chunk.get("chunk_id")
         ],
-        "suggestions": [*clarify["options"], escape],
+        "suggestions": [*options, escape],
         # Penanda bagi antarmuka: percakapan sedang menunggu pengguna memilih,
         # bukan sekadar jawaban tanpa kutipan seperti "informasi tidak ditemukan".
         "awaiting_choice": True,
