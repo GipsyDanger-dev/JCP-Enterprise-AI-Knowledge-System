@@ -14,7 +14,7 @@ import urllib.request
 from typing import Any
 
 from config import AI_PROVIDER_API_KEY_ENV, AI_PROVIDER_BASE_URL, DEFAULT_MODEL
-from generation.guardrails import CLARIFY_MARKER
+from generation.guardrails import CLARIFY_MARKER, foreign_script_words
 from generation.prompts import build_messages
 from provider_errors import ProviderConfigurationError, ProviderResponseError
 from provider_retry import read_with_retry
@@ -98,12 +98,62 @@ def generate_answer(query: str, matches: list[tuple[float, dict[str, Any]]],
     ).rstrip("/")
     if not base_url:
         raise ProviderConfigurationError("AI_PROVIDER_BASE_URL")
+    messages = build_messages(
+        query, matches, documents, allow_clarify,
+        workspace_type=workspace_type,
+    )
+    content = _complete(base_url, key, model, messages, allow_clarify)
+    if content.startswith(CLARIFY_MARKER):
+        # Pertanyaan balik punya penggantinya sendiri yang baku dan tanpa biaya
+        # (lihat clarify_response), jadi tidak perlu memanggil model sekali lagi.
+        return content
+
+    # Model sesekali melenceng ke bahasa lain di tengah mode JSON. Sekali ulang
+    # dengan perintah eksplisit biasanya cukup; kalau masih juga, lebih jujur
+    # melapor layanan AI bermasalah daripada menayangkan jawaban yang tidak
+    # bisa dibaca pengguna — atau berbohong "informasi tidak ditemukan".
+    source = _source_text(query, matches, documents)
+    foreign = foreign_script_words(content, source)
+    if not foreign:
+        return content
+    # Jumlahnya saja, bukan katanya: konsol yang tidak UTF-8 akan gagal
+    # mencetak aksara itu, dan baris log tidak boleh menggagalkan jawaban.
+    print(f"[AI] Jawaban memuat {len(foreign)} kata beraksara asing, diulang sekali")
+    retry_messages = [
+        *messages,
+        {"role": "user", "content": LANGUAGE_RETRY_INSTRUCTION},
+    ]
+    content = _complete(base_url, key, model, retry_messages, allow_clarify)
+    if content.startswith(CLARIFY_MARKER) or not foreign_script_words(content, source):
+        return content
+    print("[AI] Jawaban ulang masih memuat aksara asing, dilaporkan sebagai balasan tidak valid")
+    raise ProviderResponseError("chat")
+
+
+LANGUAGE_RETRY_INSTRUCTION = (
+    "Balasan sebelumnya ditulis dalam bahasa selain Bahasa Indonesia. Tulis "
+    "ulang seluruh balasan dalam Bahasa Indonesia. Aksara lain hanya boleh "
+    "muncul bila disalin persis dari konteks dokumen."
+)
+
+
+def _source_text(query: str, matches: list[tuple[float, dict[str, Any]]],
+                 documents: list[dict[str, Any]] | None) -> str:
+    """Semua teks yang memang dikirim ke model: tempat kata asing yang sah berasal."""
+    parts = [query]
+    for _, chunk in matches:
+        parts.extend(str(chunk.get(field) or "") for field in ("text", "section_title", "title", "filename"))
+    if documents:
+        parts.append(json.dumps(documents, ensure_ascii=False, default=str))
+    return "\n".join(parts)
+
+
+def _complete(base_url: str, key: str, model: str,
+              messages: list[dict[str, str]], allow_clarify: bool) -> str:
+    """Satu panggilan chat completion, sudah dibuka amplopnya dan dibersihkan."""
     body_fields: dict[str, Any] = {
         "model": model,
-        "messages": build_messages(
-            query, matches, documents, allow_clarify,
-            workspace_type=workspace_type,
-        ),
+        "messages": messages,
         "temperature": 0.2,
     }
     if allow_clarify:

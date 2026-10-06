@@ -5,8 +5,9 @@ from unittest import mock
 from pathlib import Path
 
 from ai_engine import KnowledgeBase, chunk_pages, generate_answer
-from generation.guardrails import clarify_has_footing, clarify_response, parse_clarify
-from generation.llm import unwrap_clarify_envelope
+from generation.guardrails import clarify_has_footing, clarify_response, foreign_script_words, parse_clarify
+from generation.llm import generate_answer as llm_generate_answer, unwrap_clarify_envelope
+from provider_errors import ProviderResponseError
 from store import clarify_quota_met
 from generation.prompts import build_messages, is_short_topic, looks_like_topic_phrase
 
@@ -308,6 +309,50 @@ class ClarifyLanguageTests(unittest.TestCase):
         self.assertEqual(clarify_response(clarify, "biaya")["answer"], clarify["question"])
 
 
+
+def _chat_response(content: str):
+    """Balasan chat completion palsu yang dibaca generate_answer."""
+    body = json.dumps({"choices": [{"message": {"content": content}}]}).encode()
+    response = mock.MagicMock()
+    response.__enter__.return_value.read.return_value = body
+    return response
+
+
+class AnswerLanguageTests(unittest.TestCase):
+    """Jawaban biasa yang melenceng bahasa diulang sekali, lalu ditolak.
+
+    Bedanya dengan pertanyaan balik: isi dokumen sah memuat aksara lain, jadi
+    yang dianggap melenceng hanya kata yang tidak berasal dari konteks.
+    """
+
+    CHUNK = {"chunk_id": "c-1", "filename": "kontrak.pdf", "text": "Penyewa membayar Rp 1.450.000 per bulan."}
+
+    def ask(self, *replies):
+        with mock.patch(
+            "provider_retry.urllib.request.urlopen",
+            side_effect=[_chat_response(reply) for reply in replies],
+        ) as urlopen:
+            answer = llm_generate_answer("berapa sewa kos?", [(0.7, self.CHUNK)], api_key="k")
+        return answer, urlopen.call_count
+
+    def test_jawaban_indonesia_tidak_diulang(self):
+        self.assertEqual(self.ask("Sewanya Rp 1.450.000 per bulan."), ("Sewanya Rp 1.450.000 per bulan.", 1))
+
+    def test_jawaban_melenceng_diulang_sekali(self):
+        answer, calls = self.ask("Аренда составляет 1 450 000 рупий.", "Sewanya Rp 1.450.000 per bulan.")
+        self.assertEqual((answer, calls), ("Sewanya Rp 1.450.000 per bulan.", 2))
+
+    def test_masih_melenceng_dilaporkan_tidak_valid(self):
+        with self.assertRaises(ProviderResponseError):
+            self.ask("Аренда составляет.", "租金是每月。")
+
+    def test_aksara_dari_dokumen_tidak_dianggap_melenceng(self):
+        source = "Pemilik kos: 王小明 (Wang Xiaoming). Kadar 5 μg/dL."
+        self.assertEqual(foreign_script_words("Pemiliknya 王小明, kadar 5 μg/dL.", source), [])
+
+    def test_aksara_karangan_model_tertangkap(self):
+        source = "Pemilik kos: Wang Xiaoming."
+        self.assertEqual(foreign_script_words("Pemiliknya Wang Xiaoming, 因此 sewa.", source), ["因此"])
 
 class ClarifyQuotaTests(unittest.TestCase):
     """Bertanya balik hanya layak kalau bahannya memang banyak.

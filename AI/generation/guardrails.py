@@ -169,6 +169,28 @@ def _latin_only(text: str) -> bool:
     )
 
 
+_WORD = re.compile(r"\w+")
+
+
+def foreign_script_words(answer: str, source_text: str) -> list[str]:
+    """Kata beraksara non-Latin di jawaban yang tidak berasal dari sumbernya.
+
+    Huruf non-Latin di jawaban belum tentu salah: dokumen bisa saja memuat nama
+    beraksara Tionghoa, kutipan Arab, atau satuan seperti "μg". Yang menandakan
+    model melenceng bahasa adalah kata non-Latin yang TIDAK ada di pertanyaan
+    maupun konteks yang dikirim — model menulisnya sendiri. Satu huruf tunggal
+    (simbol satuan) diabaikan supaya "μg" karangan model tidak dianggap pindah
+    bahasa.
+    """
+    source = source_text.lower()
+    foreign = []
+    for word in _WORD.findall(answer):
+        non_latin = sum(1 for char in word if char.isalpha() and not _latin_only(char))
+        if non_latin >= 2 and word.lower() not in source:
+            foreign.append(word)
+    return foreign
+
+
 def clarify_response(
     clarify: dict[str, Any],
     query: str,
