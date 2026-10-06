@@ -38,7 +38,14 @@ def chunk_pages(
         boundaries = [(0, "")] + [(index, heading) for index, heading in markers if index > 0]
         for marker_index, (start, heading) in enumerate(boundaries):
             end = boundaries[marker_index + 1][0] if marker_index + 1 < len(boundaries) else len(words)
-            text = " ".join(words[start:end]).strip()
+            # Tanpa batas di tengah halaman, teksnya disimpan apa adanya:
+            # blok DOCX memisahkan baris tabel dengan newline, dan menyambung
+            # ulang per kata akan meleburkan "baris A | nilai A" dengan baris
+            # sesudahnya.
+            text = (
+                page_text.strip() if len(boundaries) == 1
+                else " ".join(words[start:end]).strip()
+            )
             if not text:
                 continue
             section = heading or next(

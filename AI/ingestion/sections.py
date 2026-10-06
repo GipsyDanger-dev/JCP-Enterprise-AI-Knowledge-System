@@ -12,9 +12,9 @@ PDF has no reliable structure here, so it returns no sections
 from __future__ import annotations
 
 import re
-import zipfile
 from pathlib import Path
-from xml.etree import ElementTree
+
+from ingestion.parsers import docx_blocks
 
 # Matches "BAB I", "BAB 1", "Bab 2", ...
 _BAB_RE = re.compile(r"^bab\s+[ivxlcdm\d]+", re.IGNORECASE)
@@ -79,31 +79,18 @@ def text_headings(text: str) -> list[tuple[int, str]]:
 
 
 def docx_headings(path: Path) -> dict[int, list[tuple[int, str]]]:
-    """Detect headings from DOCX paragraph styles.
+    """Judul bagian tiap blok DOCX, bernomor sama dengan parsers.read_document.
 
-    Mirrors parsers.read_document numbering: paragraph index == page
-    number. Returns {page_number: [(word_index, heading)]}.
+    Penomorannya diambil dari ``docx_blocks`` yang sama, bukan dihitung ulang.
+    Versi sebelumnya menghitung paragraf kosong sementara parser melewatinya,
+    sehingga setiap judul bergeser ke potongan sesudahnya.
+    Returns {page_number: [(word_index, heading)]}.
     """
-    with zipfile.ZipFile(path) as archive:
-        root = ElementTree.fromstring(archive.read("word/document.xml"))
-    ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-    markers: dict[int, list[tuple[int, str]]] = {}
-    page = 1
-    for paragraph in root.iter():
-        if not paragraph.tag.endswith("}p"):
-            continue
-        style = paragraph.find(f".//{ns}pStyle")
-        style_val = (style.get(f"{ns}val") or "").lower() if style is not None else ""
-        text = "".join(node.text or "" for node in paragraph.iter() if node.tag.endswith("}t")).strip()
-        is_heading = bool(style_val) and (
-            style_val.startswith("heading") or style_val in {"title", "judul", "subtitle"}
-        )
-        if is_heading and text:
-            # Each paragraph is its own "page", so the heading starts at word 0
-            # of that page's text (same numbering as parsers.read_document).
-            markers.setdefault(page, []).append((0, text))
-        page += 1
-    return markers
+    return {
+        index: [(0, heading)]
+        for index, (heading, _) in enumerate(docx_blocks(path), 1)
+        if heading
+    }
 
 
 def extract_sections(suffix: str, path: Path, pages: list[tuple[int, str]]) -> dict[int, list[tuple[int, str]]]:

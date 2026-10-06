@@ -11,11 +11,15 @@ from knowledge_base import ingest
 from retrieval.search import build_retriever
 
 
-def make_docx(path: Path, paragraphs: list[tuple[str, str | None]]) -> None:
-    """Build a minimal valid .docx: paragraphs are (text, style_or_None)."""
+def make_docx(path: Path, paragraphs: list[tuple[str, str | None] | str]) -> None:
+    """Build a minimal valid .docx: paragraphs are (text, style_or_None) or raw body XML."""
     w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
     body_parts = []
-    for text, style in paragraphs:
+    for item in paragraphs:
+        if isinstance(item, str):
+            body_parts.append(item)
+            continue
+        text, style = item
         part = "<w:p>"
         if style:
             part += f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>'
@@ -94,17 +98,80 @@ class SectionExtractionTests(unittest.TestCase):
             make_docx(path, [
                 ("BAB I KETENTUAN UMUM", "Heading1"),
                 ("Biaya hotel maksimal Rp900.000 per malam.", None),
+                ("", None),  # paragraf kosong dulu menggeser judul ke potongan sesudahnya
                 ("Ketentuan Khusus", "Heading1"),
                 ("Bukti pembayaran wajib disimpan.", None),
             ])
             markers = docx_headings(path)
-            self.assertEqual(markers[1][0][1], "BAB I KETENTUAN UMUM")
-            self.assertEqual(markers[3][0][1], "Ketentuan Khusus")
+            self.assertEqual(markers, {1: [(0, "BAB I KETENTUAN UMUM")], 2: [(0, "Ketentuan Khusus")]})
             pages = read_document(path)
             chunks = chunk_pages(pages, "sop.docx", "doc-1", 1, sections=markers)
-            self.assertEqual(chunks[0]["section_title"], "BAB I KETENTUAN UMUM")
-            self.assertEqual(chunks[1]["section_title"], "")  # body paragraph, no heading
-            self.assertEqual(chunks[2]["section_title"], "Ketentuan Khusus")
+            self.assertEqual(
+                [(chunk["section_title"], chunk["text"]) for chunk in chunks],
+                [
+                    ("BAB I KETENTUAN UMUM", "BAB I KETENTUAN UMUM\nBiaya hotel maksimal Rp900.000 per malam."),
+                    ("Ketentuan Khusus", "Ketentuan Khusus\nBukti pembayaran wajib disimpan."),
+                ],
+            )
+
+
+def _cell(text: str) -> str:
+    return f"<w:tc><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:tc>"
+
+
+def _table(rows: list[list[str]]) -> str:
+    return "<w:tbl>" + "".join("<w:tr>" + "".join(_cell(c) for c in row) + "</w:tr>" for row in rows) + "</w:tbl>"
+
+
+class DocxBlockTests(unittest.TestCase):
+    """Label tabel dan nilainya harus berada di potongan yang sama.
+
+    Kejadian nyata: "Kamar rawat inap per hari" dan "Rp 750.000" tersimpan
+    sebagai dua potongan, sehingga AI menemukan labelnya tetapi menjawab
+    angkanya tidak ditemukan.
+    """
+
+    def blocks(self, body):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "polis.docx"
+            make_docx(path, body)
+            return read_document(path), docx_headings(path)
+
+    def test_baris_tabel_menyatukan_label_dan_nilai(self):
+        pages, markers = self.blocks([
+            ("2. Tabel Manfaat Plan B", "Heading2"),
+            _table([
+                ["Jenis manfaat", "Batas manfaat Plan B"],
+                ["Kamar rawat inap per hari", "Rp 750.000, maksimal 90 hari per tahun"],
+                ["ICU per hari", "Rp 1.500.000"],
+            ]),
+        ])
+        self.assertEqual(pages, [(1, (
+            "2. Tabel Manfaat Plan B\n"
+            "Jenis manfaat | Batas manfaat Plan B\n"
+            "Kamar rawat inap per hari | Rp 750.000, maksimal 90 hari per tahun\n"
+            "ICU per hari | Rp 1.500.000"
+        ))])
+        self.assertEqual(markers, {1: [(0, "2. Tabel Manfaat Plan B")]})
+
+    def test_paragraf_dalam_kontrol_konten_ikut_terbaca(self):
+        pages, _ = self.blocks([
+            "<w:sdt><w:sdtContent><w:p><w:r><w:t>Isi di dalam kontrol konten.</w:t></w:r></w:p></w:sdtContent></w:sdt>",
+        ])
+        self.assertEqual(pages, [(1, "Isi di dalam kontrol konten.")])
+
+    def test_dokumen_tanpa_heading_dipecah_per_ukuran(self):
+        paragraph = " ".join(["kata"] * 100)
+        pages, markers = self.blocks([(paragraph, None)] * 5)
+        self.assertEqual([len(text.split()) for _, text in pages], [200, 200, 100])
+        self.assertEqual(markers, {})
+
+    def test_tabel_terpotong_mengulang_kepala_kolom(self):
+        rows = [["Jenis", "Batas"]] + [[f"Manfaat {i}", " ".join(["nilai"] * 40)] for i in range(8)]
+        pages, _ = self.blocks([("Tabel", "Heading1"), _table(rows)])
+        self.assertGreater(len(pages), 1)
+        for _, text in pages[1:]:
+            self.assertEqual(text.splitlines()[:2], ["Tabel", "Jenis | Batas"])
 
 
 class KnowledgeBaseLifecycleTests(unittest.TestCase):
