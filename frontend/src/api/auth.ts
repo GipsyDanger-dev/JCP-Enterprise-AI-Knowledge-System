@@ -53,6 +53,14 @@ export function updateOwnProfile(token: string, data: Partial<OwnProfileResponse
   return request<OwnProfileResponse>('/auth/me/profile', { method: 'PUT', body: data, headers: { Authorization: `Bearer ${token}` } })
 }
 
+export function requestOwnEmailRegistration(token: string, email: string): Promise<VerificationCodeDeliveryResponse> {
+  return request<VerificationCodeDeliveryResponse>('/auth/me/email', { method: 'POST', body: { email }, headers: { Authorization: `Bearer ${token}` } })
+}
+
+export function verifyOwnEmailRegistration(token: string, credentials: EmailCodeRequest): Promise<{ email: string }> {
+  return request<{ email: string }>('/auth/me/email/verify', { method: 'POST', body: credentials, headers: { Authorization: `Bearer ${token}` } })
+}
+
 export function logout(token: string): Promise<void> {
   return request<void>('/auth/logout', { 
     method: 'POST', 

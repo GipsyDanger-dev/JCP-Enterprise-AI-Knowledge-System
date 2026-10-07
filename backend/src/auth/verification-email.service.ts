@@ -4,7 +4,8 @@ import nodemailer, { Transporter } from 'nodemailer';
 type VerificationEmailPurpose =
   | 'PERSONAL_REGISTRATION'
   | 'COMPANY_REGISTRATION'
-  | 'PASSWORD_RESET';
+  | 'PASSWORD_RESET'
+  | 'EMAIL_REGISTRATION';
 
 @Injectable()
 export class VerificationEmailService {
@@ -54,9 +55,11 @@ export class VerificationEmailService {
       : 'Kode reset kata sandi Enterprise AI';
     const action = purpose === 'COMPANY_REGISTRATION'
       ? 'memverifikasi email admin dan membuat workspace perusahaan'
-      : registration
-        ? 'menyelesaikan pendaftaran akun'
-        : 'melanjutkan penggantian kata sandi';
+      : purpose === 'EMAIL_REGISTRATION'
+        ? 'mendaftarkan email ini ke akun Anda'
+        : registration
+          ? 'menyelesaikan pendaftaran akun'
+          : 'melanjutkan penggantian kata sandi';
 
     try {
       await this.transporter.sendMail({

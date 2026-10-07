@@ -259,6 +259,9 @@ enum AuthVerificationPurpose {
   PERSONAL_REGISTRATION
   COMPANY_REGISTRATION
   PASSWORD_RESET
+  /// Akun yang sudah ada tetapi belum punya email — umumnya akun company yang
+  /// dibuat sebelum email dicatat — mendaftarkan email-nya dari halaman profil.
+  EMAIL_REGISTRATION
 }
 
 model User {

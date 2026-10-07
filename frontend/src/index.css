@@ -1438,6 +1438,10 @@ button { cursor: pointer; }
 .settings-field input:focus { border-color: var(--brand-600); box-shadow: 0 0 0 3px var(--brand-100); }
 .settings-field small { display: block; margin-top: 4px; font-size: var(--fs-xs); color: var(--text-dim); }
 .disabled-input { background: var(--bg-subtle) !important; color: var(--text-muted) !important; cursor: not-allowed; }
+.settings-email-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-field input + .settings-email-row { margin-top: 8px; }
+.settings-email-row input { flex: 1 1 180px; min-width: 0; }
+.settings-field small.settings-profile-status { margin-top: 6px; }
 .settings-profile-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 4px; padding-top: 16px; border-top: 1px solid var(--border); }
 .settings-profile-status { margin-right: auto; font-size: var(--fs-sm); }
 .settings-profile-status.error { color: var(--danger-700, #b42318); }

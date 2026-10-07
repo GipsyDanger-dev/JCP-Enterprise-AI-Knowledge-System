@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, GraduationCap, Globe, LoaderCircle, Moon, Palette, PlayCircle, Save, Sun, User } from 'lucide-react'
+import { Check, GraduationCap, Globe, LoaderCircle, Mail, Moon, Palette, PlayCircle, Save, Sun, User } from 'lucide-react'
 import { ShieldCheck } from 'lucide-react'
 import { ApiError, errorMessage } from '@/api/client'
 import { PageHeading } from '@/components/PageHeading'
@@ -12,6 +12,7 @@ import { isNotificationsEnabled, setNotificationsEnabled, isBrowserNotifications
 
 const THEME_KEY = 'jcp-theme'
 const FONT_SIZE_KEY = 'jcp-font-size'
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 type FontSize = 'small' | 'medium' | 'large' | 'super-large'
 
 function getStoredTheme(): 'light' | 'dark' {
@@ -28,7 +29,7 @@ function getStoredFontSize(): FontSize {
 }
 
 export function SettingsPage() {
-  const { user, updateOwnProfile } = useAuth()
+  const { user, updateOwnProfile, requestOwnEmailRegistration, verifyOwnEmailRegistration } = useAuth()
   const { role, language, setLanguage } = useWorkspace()
   const [theme, setTheme] = useState<'light' | 'dark'>(getStoredTheme)
   const [fontSize, setFontSize] = useState<FontSize>(getStoredFontSize)
@@ -43,6 +44,12 @@ export function SettingsPage() {
   const [profileError, setProfileError] = useState('')
   const [profileSaved, setProfileSaved] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
+  const [emailInput, setEmailInput] = useState('')
+  const [emailCode, setEmailCode] = useState('')
+  const [emailCodeSentTo, setEmailCodeSentTo] = useState<string | null>(null)
+  const [emailBusy, setEmailBusy] = useState(false)
+  const [emailError, setEmailError] = useState('')
+  const [emailSaved, setEmailSaved] = useState(false)
   const [tutorialOpen, setTutorialOpen] = useState(false)
   const [tutorialOnLogin, setTutorialOnLogin] = useState(() => (user ? !isTutorialHidden(user.id) : true))
 
@@ -124,6 +131,57 @@ export function SettingsPage() {
     }
   }
 
+  const sendEmailCode = async () => {
+    setEmailError('')
+    const email = emailInput.trim().toLowerCase()
+    if (!EMAIL_PATTERN.test(email)) {
+      setEmailError(isId ? 'Masukkan alamat email yang valid.' : 'Enter a valid email address.')
+      return
+    }
+    setEmailBusy(true)
+    try {
+      const delivery = await requestOwnEmailRegistration(email)
+      setEmailCodeSentTo(delivery.email)
+      setEmailCode('')
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setEmailError(isId ? 'Email ini sudah dipakai akun lain.' : 'This email is already used by another account.')
+      } else if (error instanceof ApiError && error.status === 429) {
+        setEmailError(isId ? 'Kode baru saja dikirim. Tunggu satu menit sebelum mencoba lagi.' : 'A code was just sent. Wait one minute before trying again.')
+      } else {
+        setEmailError(errorMessage(error))
+      }
+    } finally {
+      setEmailBusy(false)
+    }
+  }
+
+  const verifyEmail = async () => {
+    setEmailError('')
+    if (!emailCodeSentTo) return
+    if (!/^\d{6}$/.test(emailCode)) {
+      setEmailError(isId ? 'Masukkan kode verifikasi enam digit.' : 'Enter the six-digit verification code.')
+      return
+    }
+    setEmailBusy(true)
+    try {
+      await verifyOwnEmailRegistration(emailCodeSentTo, emailCode)
+      setEmailSaved(true)
+      setEmailCodeSentTo(null)
+      setEmailCode('')
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 400 || error.status === 429)) {
+        setEmailError(isId ? 'Kode salah, kedaluwarsa, atau sudah terlalu sering dicoba.' : 'The code is invalid, expired, or has been tried too many times.')
+      } else if (error instanceof ApiError && error.status === 409) {
+        setEmailError(isId ? 'Email ini sudah dipakai akun lain.' : 'This email is already used by another account.')
+      } else {
+        setEmailError(errorMessage(error))
+      }
+    } finally {
+      setEmailBusy(false)
+    }
+  }
+
   return (
     <div className="standard-page">
       <PageHeading
@@ -174,6 +232,56 @@ export function SettingsPage() {
                 className={!isPersonal ? 'disabled-input' : undefined}
               />
               <small>{isPersonal ? (isId ? 'Username digunakan untuk masuk.' : 'Your username is used to sign in.') : (isId ? 'Dikelola oleh administrator.' : 'Managed by administrator.')}</small>
+            </div>
+            <div className="settings-field">
+              <label htmlFor="settings-email">Email</label>
+              {user?.email ? <>
+                <input id="settings-email" type="email" value={user.email} disabled className="disabled-input" />
+                <small>{isId ? 'Email terdaftar untuk akun ini dan tidak dapat diubah.' : 'The email registered to this account. It cannot be changed.'}</small>
+              </> : emailCodeSentTo ? <>
+                <input id="settings-email" type="email" value={emailCodeSentTo} disabled className="disabled-input" />
+                <div className="settings-email-row">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    aria-label={isId ? 'Kode verifikasi' : 'Verification code'}
+                    placeholder="000000"
+                    value={emailCode}
+                    onChange={(event) => { setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setEmailError('') }}
+                    maxLength={6}
+                    disabled={emailBusy}
+                    autoFocus
+                  />
+                  <button type="button" className="primary-button" onClick={verifyEmail} disabled={emailBusy}>
+                    {emailBusy ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />}
+                    {isId ? 'Verifikasi' : 'Verify'}
+                  </button>
+                  <button type="button" className="secondary-button" onClick={() => { setEmailCodeSentTo(null); setEmailCode(''); setEmailError('') }} disabled={emailBusy}>
+                    {isId ? 'Ganti email' : 'Change email'}
+                  </button>
+                </div>
+                <small>{isId ? `Masukkan kode 6 digit yang dikirim ke ${emailCodeSentTo}. Kode berlaku 10 menit.` : `Enter the 6-digit code sent to ${emailCodeSentTo}. The code is valid for 10 minutes.`}</small>
+              </> : <>
+                <div className="settings-email-row">
+                  <input
+                    id="settings-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder={isId ? 'nama@perusahaan.com' : 'name@company.com'}
+                    value={emailInput}
+                    onChange={(event) => { setEmailInput(event.target.value); setEmailError('') }}
+                    disabled={emailBusy}
+                  />
+                  <button type="button" className="primary-button" onClick={sendEmailCode} disabled={emailBusy}>
+                    {emailBusy ? <LoaderCircle size={15} className="spin" /> : <Mail size={15} />}
+                    {isId ? 'Kirim kode' : 'Send code'}
+                  </button>
+                </div>
+                <small>{isId ? 'Akun ini belum punya email. Daftarkan sekali untuk menerima kode reset password; setelah terdaftar email tidak dapat diubah.' : 'This account has no email yet. Register one to receive password reset codes; once registered it cannot be changed.'}</small>
+              </>}
+              {emailError && <small className="settings-profile-status error" role="alert">{emailError}</small>}
+              {emailSaved && user?.email && <small className="settings-profile-status success" role="status">{isId ? 'Email berhasil didaftarkan.' : 'Email registered.'}</small>}
             </div>
             {!isPersonal && <>
               <div className="settings-field">

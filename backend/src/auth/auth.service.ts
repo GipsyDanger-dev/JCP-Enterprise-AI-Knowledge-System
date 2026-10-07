@@ -673,6 +673,73 @@ export class AuthService {
     }
   }
 
+  /**
+   * Email tidak bisa diganti dari profil; endpoint ini hanya mengisi akun yang
+   * belum punya email sama sekali — biasanya akun company yang dibuat sebelum
+   * email dicatat. Kode dikirim ke alamat itu dulu supaya tidak ada yang bisa
+   * mengklaim email milik orang lain lalu memakainya untuk reset kata sandi.
+   */
+  async requestOwnEmailRegistration(actor: JwtPayload, emailInput: string) {
+    const email = emailInput.trim().toLowerCase();
+    await this.assertCanRegisterOwnEmail(actor.sub, email);
+    await this.issueVerificationCode(email, AuthVerificationPurpose.EMAIL_REGISTRATION, { userId: actor.sub });
+    return {
+      codeSent: true as const,
+      email,
+      expiresInSeconds: VERIFICATION_CODE_TTL_MS / 1000,
+      resendAfterSeconds: VERIFICATION_CODE_COOLDOWN_MS / 1000,
+    };
+  }
+
+  async verifyOwnEmailRegistration(actor: JwtPayload, emailInput: string, code: string) {
+    const email = emailInput.trim().toLowerCase();
+    const challenge = await this.verifyCode(email, AuthVerificationPurpose.EMAIL_REGISTRATION, code);
+    // Kode untuk alamat yang sama bisa saja diminta akun lain; hanya peminta
+    // terakhir yang boleh memakainya.
+    if (challenge.userId !== actor.sub) throw new BadRequestException('Invalid or expired verification code');
+    await this.assertCanRegisterOwnEmail(actor.sub, email);
+
+    try {
+      return await this.prisma.$transaction(async (transaction) => {
+        // Syarat email: null ikut di klausa update supaya dua verifikasi yang
+        // berbarengan tidak saling menimpa.
+        const { count } = await transaction.user.updateMany({
+          where: { id: actor.sub, email: null },
+          data: { email },
+        });
+        if (count === 0) throw new ConflictException('This account already has an email');
+        await transaction.authVerificationCode.delete({ where: { id: challenge.id } });
+        await transaction.auditLog.create({
+          data: {
+            actorType: AuditActorType.USER,
+            actorUserId: actor.sub,
+            action: AuditAction.USER_UPDATED,
+            targetType: 'USER',
+            targetId: actor.sub,
+            workspaceId: actor.workspaceId,
+            metadata: { emailRegistered: true },
+          },
+        });
+        return { email };
+      });
+    } catch (error: unknown) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('This email is already registered to another account');
+      }
+      throw error;
+    }
+  }
+
+  private async assertCanRegisterOwnEmail(userId: string, email: string) {
+    const [user, emailOwner] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
+      this.prisma.user.findUnique({ where: { email }, select: { id: true } }),
+    ]);
+    if (!user) throw new UnauthorizedException('Authentication required');
+    if (user.email) throw new ConflictException('This account already has an email');
+    if (emailOwner) throw new ConflictException('This email is already registered to another account');
+  }
+
   private async assertWorkspaceAvailable(workspace: { id: string; subscriptionStatus: 'PENDING_PAYMENT' | 'TRIAL' | 'ACTIVE' | 'EXPIRED'; trialEndsAt: Date | null }) {
     if (workspace.subscriptionStatus === 'PENDING_PAYMENT') throw new UnauthorizedException('Workspace payment is pending');
     if (workspace.subscriptionStatus === 'TRIAL' && workspace.trialEndsAt && workspace.trialEndsAt <= new Date()) {

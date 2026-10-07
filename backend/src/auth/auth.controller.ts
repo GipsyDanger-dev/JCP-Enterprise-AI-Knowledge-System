@@ -23,6 +23,7 @@ import { RegisterPersonalDto } from './dto/register-personal.dto';
 import { RegisterCompanyDto } from './dto/register-company.dto';
 import { CheckCompanyAvailabilityDto } from './dto/check-company-availability.dto';
 import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
+import { RegisterOwnEmailDto } from './dto/register-own-email.dto';
 import { EmailCodeDto } from './dto/email-code.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -164,5 +165,28 @@ export class AuthController {
   @ApiConflictResponse({ description: 'The username is already registered' })
   updateOwnProfile(@Body() input: UpdateOwnProfileDto, @CurrentUser() user: AuthenticatedUser) {
     return this.authService.updateOwnProfile(user, input);
+  }
+
+  @Post('me/email')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Send a verification code to register an email on an account that has none' })
+  @ApiAcceptedResponse({ description: 'Verification code queued for delivery' })
+  @ApiConflictResponse({ description: 'The account already has an email, or the email belongs to another account' })
+  registerOwnEmail(@Body() input: RegisterOwnEmailDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.authService.requestOwnEmailRegistration(user, input.email);
+  }
+
+  @Post('me/email/verify')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify the emailed code and save the email on the current account' })
+  @ApiOkResponse({ description: 'The registered email' })
+  @ApiBadRequestResponse({ description: 'Invalid or expired verification code' })
+  @ApiConflictResponse({ description: 'The account already has an email, or the email belongs to another account' })
+  verifyOwnEmail(@Body() input: EmailCodeDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.authService.verifyOwnEmailRegistration(user, input.email, input.code);
   }
 }

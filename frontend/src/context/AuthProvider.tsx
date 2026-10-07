@@ -13,6 +13,8 @@ import {
   registerCompany as apiRegisterCompany,
   verifyCompanyRegistration as apiVerifyCompanyRegistration,
   updateOwnProfile as apiUpdateOwnProfile,
+  requestOwnEmailRegistration as apiRequestOwnEmailRegistration,
+  verifyOwnEmailRegistration as apiVerifyOwnEmailRegistration,
 } from '@/api/auth'
 import type { ApiUser, OwnProfileResponse } from '@/api/types'
 import { markTutorialPending } from '@/utils/tutorial'
@@ -170,6 +172,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return updated
   }, [])
 
+  const requestOwnEmailRegistration = useCallback(async (email: string) => {
+    const currentToken = localStorage.getItem(TOKEN_KEY)
+    if (!currentToken) throw new Error('Authentication required')
+    return apiRequestOwnEmailRegistration(currentToken, email)
+  }, [])
+
+  const verifyOwnEmailRegistration = useCallback(async (email: string, code: string) => {
+    const currentToken = localStorage.getItem(TOKEN_KEY)
+    if (!currentToken) throw new Error('Authentication required')
+    const registered = await apiVerifyOwnEmailRegistration(currentToken, { email, code })
+    setUser((current) => current ? { ...current, email: registered.email } : current)
+  }, [])
+
   const logout = useCallback(async () => {
     const currentToken = localStorage.getItem(TOKEN_KEY)
     if (currentToken) {
@@ -233,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token, logout])
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, registerPersonal, verifyPersonalRegistration, requestPasswordReset, verifyPasswordResetCode, resetPassword, registerCompany, verifyCompanyRegistration, updateOwnProfile, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, registerPersonal, verifyPersonalRegistration, requestPasswordReset, verifyPasswordResetCode, resetPassword, registerCompany, verifyCompanyRegistration, updateOwnProfile, requestOwnEmailRegistration, verifyOwnEmailRegistration, logout }}>
       {children}
     </AuthContext.Provider>
   )

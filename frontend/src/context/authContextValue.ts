@@ -27,6 +27,9 @@ export interface AuthContextValue {
   }) => Promise<VerificationCodeDeliveryResponse>
   verifyCompanyRegistration: (email: string, code: string) => Promise<LoginResponse | CompanyCheckoutResponse>
   updateOwnProfile: (data: Partial<OwnProfileResponse>) => Promise<OwnProfileResponse>
+  /** Hanya untuk akun yang belum punya email; email yang sudah ada tidak bisa diganti. */
+  requestOwnEmailRegistration: (email: string) => Promise<VerificationCodeDeliveryResponse>
+  verifyOwnEmailRegistration: (email: string, code: string) => Promise<void>
   logout: () => void
 }
 
