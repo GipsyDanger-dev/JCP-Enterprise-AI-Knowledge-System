@@ -313,13 +313,14 @@ export function DocumentsPage() {
   }, [documents, requestedDocumentId, selectedDoc])
 
   useEffect(() => {
-    if (!accessDoc || !token || unitKerjaList.length > 0) return
+    // Akun pribadi tidak punya unit kerja; dialognya hanya memuat kategori.
+    if (!accessDoc || !token || isPersonal || unitKerjaList.length > 0) return
     let batal = false
     getUserReferenceData(token)
       .then((data) => { if (!batal) setUnitKerjaList(data.unitKerja) })
       .catch(() => { if (!batal) setUnitKerjaList([]) })
     return () => { batal = true }
-  }, [accessDoc, token, unitKerjaList.length])
+  }, [accessDoc, token, isPersonal, unitKerjaList.length])
 
   useEffect(() => {
     let batal = false
@@ -419,12 +420,16 @@ export function DocumentsPage() {
     setAccessSaving(true)
     setAccessError(null)
     try {
-      const updated = await updateDocumentAccess(accessDoc.id, {
-        categoryId: accessCategoryId || null,
-        // null berarti kuncinya dilepas: dokumen kembali terbuka untuk semua
-        // pegawai. Dibedakan dari tidak mengirim field sama sekali.
-        unitKerjaId: accessRestrict ? accessUnitId : null,
-      }, token)
+      const updated = await updateDocumentAccess(accessDoc.id, isPersonal
+        // Akun pribadi hanya mengubah kategori; penanda unit tidak dikirim
+        // sama sekali supaya server membiarkannya apa adanya.
+        ? { categoryId: accessCategoryId || null }
+        : {
+          categoryId: accessCategoryId || null,
+          // null berarti kuncinya dilepas: dokumen kembali terbuka untuk semua
+          // pegawai. Dibedakan dari tidak mengirim field sama sekali.
+          unitKerjaId: accessRestrict ? accessUnitId : null,
+        }, token)
       applyDocumentAccess(updated)
       setAccessDoc(null)
     } catch (error) {
@@ -522,7 +527,7 @@ export function DocumentsPage() {
                 {bolehUbahStatus(document) && <button className="icon-button" title={isId ? 'Ubah status keberlakuan' : 'Change legal status'} onClick={(event) => { event.stopPropagation(); bukaDialogStatus(document) }}><Scale size={15} /></button>}
                 {bolehUrus(document) && <button className="icon-button" title={isId ? 'Ubah nama dokumen' : 'Rename document'} onClick={(event) => { event.stopPropagation(); setRenameDoc(document); setRenameTitle(document.name); setRenameError(null) }}><Pencil size={15} /></button>}
                 <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>
-                {isPersonal ? <button className="icon-button danger" title={isId ? 'Hapus dokumen' : 'Delete document'} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button> : bolehUrus(document)
+                {isPersonal ? <><button className="icon-button" title={isId ? 'Ubah kategori' : 'Change category'} onClick={(e) => { e.stopPropagation(); openAccessDialog(document) }}><FolderOpen size={16} /></button><button className="icon-button danger" title={isId ? 'Hapus dokumen' : 'Delete document'} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></> : bolehUrus(document)
                   ? <><button className="icon-button" title={isId ? 'Atur akses dokumen' : 'Manage document access'} onClick={(e) => { e.stopPropagation(); openAccessDialog(document) }}><Building2 size={16} /></button><button className="icon-button danger" title={`Delete ${document.name}`} onClick={(e) => { e.stopPropagation(); handleDelete(document.id, document.name) }}><Trash2 size={16} /></button></>
                   : <><button className="icon-button" title={`Open ${document.name}`} onClick={(e) => { e.stopPropagation(); setSelectedDoc(document) }}><ArrowUpRight size={16} /></button></>}
               </td>
@@ -636,7 +641,7 @@ export function DocumentsPage() {
           <div className="modal-card" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h2>{isId ? 'Atur akses dokumen' : 'Document access'}</h2>
+                <h2>{isPersonal ? (isId ? 'Ubah kategori' : 'Change category') : (isId ? 'Atur akses dokumen' : 'Document access')}</h2>
                 <p className="modal-copy">{accessDoc.name}</p>
               </div>
               <button className="icon-button" onClick={() => setAccessDoc(null)} disabled={accessSaving}><X size={18} /></button>
@@ -658,13 +663,17 @@ export function DocumentsPage() {
                   ))}
                 </div>
                 <p className="field-hint">
-                  {isId
-                    ? 'Penanda subjek untuk pencarian dan filter. Tidak membatasi siapa pun.'
-                    : 'A subject label for search and filtering. It restricts nobody.'}
+                  {isPersonal
+                    ? (categories.length === 0
+                      ? (isId ? 'Belum ada kategori. Buat dulu lewat tombol "Kelola kategori".' : 'No categories yet. Create one with "Manage categories" first.')
+                      : (isId ? 'Klik kategori yang aktif sekali lagi untuk melepasnya.' : 'Click the active category again to clear it.'))
+                    : (isId
+                      ? 'Penanda subjek untuk pencarian dan filter. Tidak membatasi siapa pun.'
+                      : 'A subject label for search and filtering. It restricts nobody.')}
                 </p>
               </div>
 
-              <div className="upload-field">
+              {!isPersonal && <div className="upload-field">
                 <label><Building2 size={13} style={{ marginRight: 4, verticalAlign: -1 }} />{isId ? 'Batasi ke unit kerja' : 'Restrict to work unit'}</label>
                 <label className="upload-restrict-toggle">
                   <input
@@ -690,7 +699,7 @@ export function DocumentsPage() {
                     ? 'Terkunci berarti hanya unit itu yang bisa membuka dokumennya dan mendapat jawabannya dari Asisten AI. Lepas centang untuk membukanya kembali bagi seluruh pegawai.'
                     : 'Locked means only that unit can open the document and get answers from it in the AI assistant. Uncheck to reopen it to every employee.'}
                 </p>
-              </div>
+              </div>}
               {accessError && <div className="upload-error-msg" role="alert" ref={accessErrorRef}>{accessError}</div>}
             </div>
             <div className="modal-actions">
