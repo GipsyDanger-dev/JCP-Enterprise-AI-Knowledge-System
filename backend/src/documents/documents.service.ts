@@ -395,8 +395,10 @@ export class DocumentsService {
           unitKerjaId: nextUnitKerjaId,
           // `collection` adalah label warisan yang dipakai filter di antarmuka.
           // Ikut disesuaikan supaya dokumen tidak menghilang dari filter
-          // kategori barunya setelah dipindahkan.
-          collection: category?.name ?? document.collection,
+          // kategori barunya setelah dipindahkan. Kategori yang dilepas
+          // mengembalikannya ke bawaan unggah; kalau tidak, dokumen masih
+          // muncul di filter kategori yang baru saja ditinggalkannya.
+          collection: category?.name ?? (document.categoryId ? 'Umum' : document.collection),
         },
         select: DOCUMENT_SUMMARY_SELECT,
       });
