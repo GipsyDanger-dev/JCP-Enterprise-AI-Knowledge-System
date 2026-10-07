@@ -72,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             isPlatformOwner: profile.isPlatformOwner,
             displayName: profile.displayName || profile.username,
             username: profile.username,
+            email: profile.email ?? null,
             employeeNumber: profile.employeeNumber,
             division: profile.division,
             jobTitle: profile.jobTitle,

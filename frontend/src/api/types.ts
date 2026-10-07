@@ -148,6 +148,7 @@ export interface LoginResponse {
 /** Response aktual GET /auth/me adalah payload JWT secara langsung. */
 export interface MeResponse {
   accountType: ApiAccountType
+  email?: string | null
   workspaceId: string
   isPlatformOwner?: boolean
   sub: string
