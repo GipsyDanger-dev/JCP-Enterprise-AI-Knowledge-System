@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bell, ChevronDown, Loader2, LogOut, Menu, Moon, Search, Sun, User } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
+import { LogoMark } from '@/components/Logo'
 import { listNotifications, markNotificationsRead, type AppNotification } from '@/api/notifications'
 
 export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
@@ -88,7 +89,10 @@ export function Topbar({ onMenuOpen }: { onMenuOpen: () => void }) {
 
   return (
     <header className="topbar">
-      <button className="menu-button" title="Open navigation" onClick={onMenuOpen}><Menu size={20} /></button>
+      <button className="menu-button" title={isId ? 'Buka navigasi' : 'Open navigation'} aria-label={isId ? 'Buka navigasi' : 'Open navigation'} onClick={onMenuOpen}><Menu size={20} /></button>
+      {/* Hanya di HP, saat kolom cari dan sidebar tersembunyi: tanpa ini
+          bilah atasnya kosong di antara tombol menu dan ikon di kanan. */}
+      <Link to="/" className="topbar-brand" aria-label="Enterprise AI"><LogoMark size={26} /><span>Enterprise AI</span></Link>
       <form className="search-shell" onSubmit={handleSearch}>
         <Search size={17} />
         <input

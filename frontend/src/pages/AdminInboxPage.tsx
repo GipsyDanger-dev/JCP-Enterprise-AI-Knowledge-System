@@ -165,7 +165,7 @@ export function AdminInboxPage() {
   }
 
   return (
-    <div className="admin-inbox-page">
+    <div className={`admin-inbox-page${selectedConv ? ' has-selection' : ''}`}>
       <PageHeading
         eyebrow={isId ? 'Pesan' : 'Messages'}
         title={isId ? 'Kotak masuk' : 'Inbox'}

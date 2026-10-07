@@ -105,6 +105,10 @@
      jendela sebesar layar terasa melar di akhir. */
   --ease-panel: .24s cubic-bezier(.4, 0, .2, 1);
 
+  /* Tinggi topbar. Halaman setinggi layar (chat, pesan, kotak masuk) dihitung
+     darinya, jadi saat topbar mengecil di HP halaman itu ikut menyesuaikan. */
+  --topbar-h: 58px;
+
   color: var(--text-primary);
   background: var(--bg-page);
   font-family: var(--font-sans);
@@ -339,7 +343,9 @@
 [data-theme="dark"] .secondary-button:hover { background: var(--bg-hover); }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
+/* Cegah iOS memperbesar teks sendiri saat HP diputar mendatar. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; min-width: 320px; min-height: 100vh; min-height: 100dvh; }
 button, input { font: inherit; }
 button { cursor: pointer; }
 
@@ -392,6 +398,7 @@ button { cursor: pointer; }
 .user-photo-avatar { object-fit: cover; }
 .avatar.small { width: 26px; height: 26px; }
 .mobile-close { display: none; }
+.sidebar-backdrop { display: none; }
 
 /* Edit user photo upload */
 .edit-photo-field { display: flex; align-items: center; gap: 12px; }
@@ -426,7 +433,7 @@ button { cursor: pointer; }
 
 /* ============ Topbar ============ */
 .workspace { grid-column: 2; grid-row: 1; min-width: 0; transition: padding .3s cubic-bezier(.4,0,.2,1); }
-.topbar { height: 58px; padding: 0 28px; border-bottom: 1px solid var(--border); background: var(--topbar-bg); display: flex; align-items: center; position: sticky; top: 0; z-index: 10; }
+.topbar { height: var(--topbar-h); padding: 0 28px; border-bottom: 1px solid var(--border); background: var(--topbar-bg); display: flex; align-items: center; position: sticky; top: 0; z-index: 10; }
 .menu-button { display: none; }
 .search-shell { width: min(520px, 50vw); height: 34px; margin: 0 auto; display: flex; align-items: center; gap: 9px; background: var(--bg-page); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0 11px; color: var(--text-muted); flex-shrink: 0; }
 .search-shell input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text-strong); font-size: var(--fs-md); }
@@ -641,6 +648,7 @@ button { cursor: pointer; }
 .data-table tbody tr:last-child td { border-bottom: 0; }
 .data-table tbody tr:hover { background: var(--bg-panel); }
 .document-name { display: flex; align-items: center; gap: 9px; color: var(--text-card); }
+.doc-row-actions { display: flex; gap: 4px; align-items: center; }
 .document-name > span { width: 30px; height: 30px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--brand-400); background: transparent; }
 .document-division-badge { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: var(--radius-pill); background: var(--violet-bg); color: var(--violet); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); vertical-align: middle; }
 .person-cell { display: flex; align-items: center; gap: 9px; }
@@ -649,7 +657,7 @@ button { cursor: pointer; }
 .person-cell small { color: var(--text-secondary); font-size: var(--tbl-meta, var(--fs-2xs)); margin-top: 3px; }
 
 /* ============ Chat ============ */
-.chat-page { margin: 0; height: calc(100dvh - 58px); min-height: 520px; display: flex; flex-direction: column; overflow: hidden; padding: 22px clamp(28px, 5vw, 70px) 18px; }
+.chat-page { margin: 0; height: calc(100dvh - var(--topbar-h)); min-height: 520px; display: flex; flex-direction: column; overflow: hidden; padding: 22px clamp(28px, 5vw, 70px) 18px; }
 .chat-workspace-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding: 0 4px 16px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0; }
 .chat-page .page-heading { margin: 0; text-align: left; }
 .chat-page .page-heading > div:first-child { max-width: 100%; }
@@ -1070,7 +1078,10 @@ button { cursor: pointer; }
   font-size: 13px;
   cursor: pointer;
 }
-.upload-restrict-toggle input { width: 15px; height: 15px; cursor: pointer; }
+/* Dua kelas supaya menang atas `.upload-field input` (bidang teks selebar
+   kolom) yang ditulis lebih bawah; tanpanya centang ini melar jadi kotak
+   setinggi 42px. */
+.upload-field .upload-restrict-toggle input { flex: none; width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; cursor: pointer; accent-color: var(--brand-600); }
 
 /* Manajemen dokumen: satu baris per dokumen dengan pilihan unit kerjanya,
    plus centang untuk mengubah beberapa sekaligus. */
@@ -1568,12 +1579,14 @@ button { cursor: pointer; }
 .doc-preview-chunk label { display: block; font-size: 9px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .08em; font-weight: var(--fw-heavy); }
 .doc-preview-chunk p { margin: 0; font-size: var(--fs-sm); color: var(--text-body); line-height: 1.65; }
 
-.page-content { min-height: calc(100vh - 58px); }
-.chat-page { height: calc(100vh - 58px); overflow: hidden; }
-.agent-panel { min-height: calc(100vh - 58px); height: calc(100vh - 58px); }
+/* dvh, bukan vh: di HP 100vh sudah termasuk bilah alamat browser, sehingga
+   bagian bawah halaman — termasuk kotak ketik chat — tertutup bilah itu. */
+.page-content { min-height: calc(100dvh - var(--topbar-h)); }
+.chat-page { height: calc(100dvh - var(--topbar-h)); overflow: hidden; }
+.agent-panel { min-height: calc(100dvh - var(--topbar-h)); height: calc(100dvh - var(--topbar-h)); }
 
 /* ============ Messaging (Employee ↔ Admin) ============ */
-.messaging-page { display: flex; flex-direction: column; height: calc(100vh - 58px); overflow: hidden; }
+.messaging-page { display: flex; flex-direction: column; height: calc(100dvh - var(--topbar-h)); overflow: hidden; }
 .messaging-header { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--bg-card); flex-shrink: 0; }
 .messaging-header-info { display: flex; align-items: center; gap: 10px; }
 .messaging-header-info strong { display: block; font-size: var(--fs-md); }
@@ -1659,7 +1672,7 @@ button { cursor: pointer; }
 }
 
 /* ============ Admin Inbox ============ */
-.admin-inbox-page { display: flex; flex-direction: column; height: calc(100dvh - 58px); overflow: hidden; padding: 22px clamp(28px, 4vw, 58px) 20px; }
+.admin-inbox-page { display: flex; flex-direction: column; height: calc(100dvh - var(--topbar-h)); overflow: hidden; padding: 22px clamp(28px, 4vw, 58px) 20px; }
 .admin-inbox-page .page-heading { align-items: flex-end; margin-bottom: 16px; padding: 0 2px; }
 .admin-inbox-page .page-heading h1 { margin-top: 4px; font-size: var(--fs-3xl); line-height: 1.25; letter-spacing: 0; }
 .admin-inbox-page .page-heading p { margin-top: 5px; font-size: var(--fs-md); }
@@ -1705,7 +1718,7 @@ button { cursor: pointer; }
   .search-shell { flex: 1; width: auto; max-width: 480px; }
 
   .overview-layout { grid-template-columns: 1fr; }
-  .agent-panel { position: static; height: calc(100vh - 58px); min-height: 0; border-left: 0; border-top: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
+  .agent-panel { position: static; height: calc(100dvh - var(--topbar-h)); min-height: 0; border-left: 0; border-top: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
   .agent-body { min-height: 0; flex: 1; overflow-y: auto; }
   .agent-composer { margin: 8px; flex-shrink: 0; }
   .agent-intro { padding-top: 20px; }
@@ -1718,12 +1731,20 @@ button { cursor: pointer; }
 
 /* ============ Responsive: mobile (≤760px) ============ */
 @media (max-width: 760px) {
-  .doc-viewer-overlay { padding: 10px; }
-  .doc-viewer { width: 100%; height: calc(100dvh - 20px); border-radius: 12px; }
-  .doc-viewer-header { align-items: flex-start; padding: 16px; gap: 12px; }
+  /* Penampil dokumen memakai seluruh layar: bingkai 10px di sekelilingnya
+     hanya memakan ruang baca yang sudah sempit. */
+  .doc-viewer-overlay { padding: 0; }
+  .doc-viewer { width: 100%; height: 100dvh; border: 0; border-radius: 0; animation: sheetUp .26s cubic-bezier(.2, .8, .2, 1); }
+  /* Judul dapat dua baris penuh, tombol aksi turun ke bawahnya, dan tombol
+     tutup menempel di pojok — dulu ketiganya berebut satu baris sehingga
+     judulnya terpotong jadi satu kata. */
+  .doc-viewer-header { position: relative; grid-template-columns: minmax(0, 1fr); align-items: flex-start; padding: calc(14px + env(safe-area-inset-top)) 60px 12px 16px; gap: 10px; }
   .doc-viewer-title { gap: 10px; }
-  .doc-viewer-actions { flex-wrap: wrap; justify-content: flex-end; }
-  .doc-viewer-content { padding: 16px; }
+  .doc-viewer-title h2 { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .doc-viewer-actions { flex-wrap: wrap; justify-content: flex-start; }
+  .doc-viewer-actions > .icon-button:last-child { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: 8px; }
+  .doc-viewer-actions .danger-button { min-height: 42px; }
+  .doc-viewer-content { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
 
   /* Login */
   .login-centered { display: block; height: 100dvh; min-height: 100dvh; overflow: hidden; }
@@ -1751,17 +1772,24 @@ button { cursor: pointer; }
   .pricing-checkout-bar { grid-template-columns: 1fr; }
   .pricing-checkout-actions { grid-template-columns: 1fr; }
 
-  .app-shell { grid-template-columns: 1fr; height: 100vh; overflow: hidden; }
-  .workspace { grid-column: 1; grid-row: 1; overflow-y: auto; min-height: 0; }
+  /* Body yang menggulir, bukan kotak setinggi 100vh di dalamnya. Dengan
+     begitu bilah alamat browser HP bisa menyusut saat menggulir, dan bagian
+     bawah halaman tidak terpotong di balik bilah itu. */
+  .app-shell { grid-template-columns: 1fr; min-height: 100dvh; }
+  .workspace { grid-column: 1; grid-row: 1; min-width: 0; }
   .sidebar { grid-row: 1; grid-column: 1; }
-  .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: min(320px, 100vw); max-width: 100vw; transform: translateX(-100%); box-shadow: var(--shadow-drawer); transition: transform .3s cubic-bezier(.4,0,.2,1); z-index: 100; padding: 20px 14px 15px; }
-  .sidebar.open { transform: translateX(0); }
+  /* Laci tertutup disembunyikan betul (visibility), bukan cuma digeser ke
+     luar layar: bayangannya dulu tetap bocor sebagai pita abu-abu di tepi
+     kiri setiap halaman, dan tautannya masih bisa terkena Tab. */
+  .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: min(300px, 86vw); max-width: 100vw; height: 100dvh; transform: translateX(-100%); visibility: hidden; box-shadow: none; transition: transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s ease, visibility 0s linear .3s; z-index: 100; padding: calc(20px + env(safe-area-inset-top)) 14px calc(15px + env(safe-area-inset-bottom)); overscroll-behavior: contain; }
+  .sidebar.open { transform: translateX(0); visibility: visible; box-shadow: var(--shadow-drawer); transition: transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s ease, visibility 0s; }
   .mobile-close { display: grid; position: absolute; right: 14px; top: 18px; width: 36px; height: 36px; place-items: center; border: 0; background: var(--bg-subtle); border-radius: var(--radius-md); color: var(--text-secondary); z-index: 10; cursor: pointer; }
   .mobile-close:hover { background: var(--bg-hover); color: var(--text-primary); }
-  .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 99; animation: fadeIn .2s ease; }
+  .sidebar-backdrop { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 99; opacity: 0; pointer-events: none; transition: opacity .3s ease; -webkit-tap-highlight-color: transparent; }
+  .sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
 
   /* Topbar: mobile */
-  .topbar { padding: 0 17px; }
+  .topbar { padding: 0 12px 0 10px; gap: 6px; }
   .menu-button { display: grid; position: static; flex-shrink: 0; }
   .search-shell { width: auto; flex: 1; margin: 0; max-width: none; }
   .top-actions { position: static; }
@@ -1778,8 +1806,7 @@ button { cursor: pointer; }
   .top-actions { position: static; }
   .top-profile { display: none; }
 
-  .overview-main, .standard-page, .chat-page, .employee-page { padding: 29px 18px 42px; overflow-y: auto; }
-  .chat-page { height: calc(100dvh - 58px); min-height: 0; padding: 18px 16px 12px; }
+  .chat-page { min-height: 0; padding: 18px 16px calc(12px + env(safe-area-inset-bottom)); }
   .chat-workspace-header { align-items: flex-start; gap: 12px; padding: 0 2px 12px; }
   .chat-page .page-heading h1 { font-size: var(--fs-2xl); }
   .chat-trust-status { padding: 6px 8px; font-size: var(--fs-2xs); }
@@ -1789,10 +1816,7 @@ button { cursor: pointer; }
   .conversation { gap: 14px; }
   .user-message { max-width: 82%; }
   .citations-track > .source-card { width: min(220px, 70%); }
-  .chat-composer { width: 100%; }
-  .page-heading { flex-direction: column; }
-  .heading-actions { width: 100%; }
-  .heading-actions button { flex: 1; }
+  .chat-composer { width: 100%; margin-bottom: 0; }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
   .collection-grid { grid-template-columns: 1fr; }
   .metric-card { min-height: 110px; padding: 14px; border-right: 0; border-bottom: 1px solid var(--border-soft); }
@@ -1814,8 +1838,10 @@ button { cursor: pointer; }
   .table-toolbar .secondary-button { width: 100%; }
 
   /* --- Page headings --- */
-  .overview-main, .standard-page, .chat-page, .employee-page, .messaging-page { padding: 24px 16px 40px; }
-  .page-heading { flex-direction: column; gap: 14px; }
+  .overview-main, .standard-page, .employee-page { padding: 24px 16px calc(40px + env(safe-area-inset-bottom)); }
+  /* stretch, bukan center bawaan: judul yang pendek dulu ikut ke tengah dan
+     terlihat menjorok dibanding halaman lain. */
+  .page-heading { flex-direction: column; align-items: stretch; gap: 14px; }
   .page-heading h1 { font-size: var(--fs-4xl); }
   .heading-actions { width: 100%; display: flex; gap: 8px; }
   .heading-actions button { flex: 1; }
@@ -1832,22 +1858,33 @@ button { cursor: pointer; }
   .employee-ask-copy h2 { font-size: var(--fs-2xl); }
   .employee-ask form { min-height: 44px; }
   .employee-prompts { display: grid; gap: 6px; }
-  .employee-prompts button { justify-content: space-between; border-radius: var(--radius-md); font-size: var(--fs-xs); }
+  .employee-prompts button { justify-content: space-between; border-radius: var(--radius-md); font-size: var(--fs-xs); text-align: left; padding: 9px 11px; }
   .recent-grid, .employee-sidebar { grid-template-columns: 1fr; }
   .settings-info-grid { grid-template-columns: 1fr; }
   .settings-theme-grid { grid-template-columns: 1fr; }
   .help-contact-grid { grid-template-columns: 1fr; }
-  .admin-inbox-page { padding: 0 16px; }
-  .admin-inbox-page .page-heading { margin-bottom: 12px; }
-  .inbox-layout { grid-template-columns: 1fr; height: calc(100vh - 178px); margin: 0; border-radius: var(--radius-xl); max-width: none; }
+  .admin-inbox-page { padding: 16px 12px calc(12px + env(safe-area-inset-bottom)); }
+  .admin-inbox-page .page-heading { flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .admin-inbox-page .page-heading p { display: none; }
+  /* Satu panel dalam satu waktu: daftar percakapan, atau isi percakapan
+     yang dipilih. Judul halaman ikut disimpan selama membalas supaya ruang
+     pesannya lega. */
+  .admin-inbox-page.has-selection .page-heading { display: none; }
+  .inbox-layout { grid-template-columns: 1fr; margin: 0; border-radius: var(--radius-xl); max-width: none; }
   .inbox-list-hidden-mobile { display: none; }
+  .inbox-chat:not(.inbox-chat-active) { display: none; }
+  .inbox-chat-header { padding: 10px 12px; gap: 10px; }
+  .inbox-messages { padding: 16px 12px; }
   .inbox-chat-active { grid-column: 1; display: flex; flex-direction: column; min-height: 0; }
   .inbox-back-btn { display: grid; }
   .inbox-chat { min-height: 0; flex: 1; display: flex; flex-direction: column; }
   .inbox-messages { flex: 1; min-height: 0; }
   .messaging-bubble { max-width: 85%; }
   .messaging-composer { margin: 0 12px 8px; }
-  .messaging-page { padding: 0; }
+  .messaging-page { padding: 0 0 env(safe-area-inset-bottom); }
+  .messaging-header { padding: 10px 12px; }
+  .messaging-body { padding: 12px; }
+  .mc-composer { margin: 0 12px 10px; }
 }
 
 /* ============ Responsive: small mobile (≤480px) ============ */
@@ -1858,32 +1895,125 @@ button { cursor: pointer; }
   .login-account-switch small { display: none; }
   .login-card-header h1 { font-size: 27px; }
   .onboarding-choice-grid, .register-two-col { grid-template-columns: 1fr; }
-  .topbar { padding: 0 10px; height: 48px; }
   .top-actions { gap: 2px; }
-  .overview-main, .standard-page, .chat-page, .employee-page { padding: 22px 14px 36px; overflow-y: auto; }
-  .chat-page { padding: 16px 12px 10px; }
+  .overview-main, .standard-page, .employee-page { padding: 20px 14px calc(36px + env(safe-area-inset-bottom)); }
+  .chat-page { padding: 14px 12px calc(10px + env(safe-area-inset-bottom)); }
   .heading-actions { flex-wrap: wrap; }
   .heading-actions button { flex: 1 1 100%; }
   .employee-ask { padding: 14px; }
   .employee-ask-copy h2 { font-size: var(--fs-xl); }
-  .chat-composer { margin: 12px 0 0; padding: 10px; }
-  .chat-composer input { height: 48px; font-size: 16px; }
-  .chat-composer button { width: 48px; height: 48px; }
+  .chat-composer { margin: 10px 0 0; padding: 6px; }
+  .chat-composer input { height: 44px; }
+  .chat-composer button { width: 44px; height: 44px; }
   .chat-empty h2 { font-size: var(--fs-xl); }
   .user-message { max-width: 90%; }
   .messaging-bubble { max-width: 90%; }
   .messaging-composer, .mc-composer { margin: 0 10px 10px; }
-  .mc-input-row input { height: 48px; font-size: 16px; }
+  .mc-input-row input { height: 44px; }
   .mc-input-row > button:not(.mc-attach-btn),
-  .mc-attach-btn { width: 48px; height: 48px; }
-  .inbox-layout { margin: 0 10px; }
-  .inbox-list { max-height: 35vh; }
+  .mc-attach-btn { width: 44px; height: 44px; }
   .data-table table { min-width: 500px; }
   .data-table th, .data-table td { padding: 0 8px; font-size: var(--fs-2xs); height: 48px; }
   .settings-section { padding: 16px 14px; }
   .settings-font-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-field input { height: 38px; }
   .login-card-centered { padding: 24px 16px 20px; }
+}
+
+/* ============ HP: sentuhan & kenyamanan ============ */
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* Area gulir di dalam halaman tidak meneruskan gulirannya ke halaman di
+   belakangnya begitu mentok — tanpa ini, menggulir daftar pesan sampai habis
+   ikut menyeret seluruh halaman. */
+.chat-canvas, .messaging-body, .inbox-messages, .inbox-list, .modal-body, .doc-viewer-content, .topbar-dropdown { overscroll-behavior: contain; }
+
+.topbar-brand { display: none; }
+
+@media (max-width: 760px) {
+  :root { --topbar-h: 52px; }
+  .topbar-brand { display: inline-flex; align-items: center; gap: 8px; min-width: 0; margin-right: auto; color: var(--text-strong); font-size: 15px; font-weight: var(--fw-heavy); text-decoration: none; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+  .topbar-brand svg { flex-shrink: 0; }
+  .topbar-brand span { overflow: hidden; text-overflow: ellipsis; }
+  [data-theme="dark"] .topbar-brand { color: var(--text-strong); }
+
+  /* iOS memperbesar layar setiap kali kolom isian di bawah 16px disentuh,
+     dan tidak mengecilkannya lagi setelah selesai mengetik. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]), select, textarea { font-size: max(16px, var(--fs-lg)) !important; }
+  .login-code-wrap input { font-size: 19px !important; }
+
+  /* Target ketuk minimal ~40px; ikon 32px terlalu kecil untuk jari. */
+  .menu-button, .topbar-shortcut, .icon-button { width: 40px; height: 40px; }
+  .mobile-close { width: 40px; height: 40px; }
+  .nav-item { min-height: 44px; }
+  .primary-button, .secondary-button { min-height: 42px; }
+  .filter-chip { min-height: 36px; padding: 0 14px; }
+  .users-filter { gap: 6px; }
+  .announcement-readers-toggle { min-height: 36px; }
+  .admin-inbox-page .heading-actions { width: auto; }
+
+  /* Dropdown topbar selebar layar dan bergulir sendiri bila panjang. */
+  .topbar-dropdown { position: fixed; top: calc(var(--topbar-h) + 6px); left: 10px; right: 10px; min-width: 0; max-height: calc(100dvh - var(--topbar-h) - 24px); overflow-y: auto; }
+  .dropdown-item { padding: 11px 12px; }
+
+  /* Dialog naik dari bawah sebagai lembar (bottom sheet): tombolnya berada
+     dalam jangkauan jempol dan seluruh lebar layar terpakai. */
+  .modal-overlay { place-items: end center; padding: env(safe-area-inset-top) 0 0; }
+  .modal-card { width: 100%; max-width: none; max-height: calc(100dvh - 16px - env(safe-area-inset-top)); border-bottom: 0; border-radius: 18px 18px 0 0; animation: sheetUp .28s cubic-bezier(.2, .8, .2, 1); }
+  .modal-header { padding: 18px 18px 0; }
+  .modal-body { padding: 16px 18px; }
+  .doc-detail-modal .modal-body { padding: 4px 18px 18px; }
+  .modal-actions, .doc-detail-actions { padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); border-radius: 0; }
+  .modal-actions:not(.tutorial-actions) > button, .doc-detail-actions > button { flex: 1 1 0; justify-content: center; min-height: 44px; }
+  .doc-detail-grid { padding: 14px 16px; }
+
+  /* Tabel dokumen menjadi kartu: nama utuh di baris pertama, koleksi dan
+     tanggal di bawahnya, lalu status dan tombol aksi. Menggeser tabel tujuh
+     kolom ke samping dengan jari terlalu repot untuk daftar yang paling sering
+     dibuka. */
+  .data-table table.doc-table { min-width: 0; display: block; }
+  .doc-table thead { display: none; }
+  .doc-table tbody { display: block; }
+  .doc-table tr { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border-soft); }
+  .doc-table tbody tr:last-child { border-bottom: 0; }
+  /* Pemisah baris tak terlihat: badge dan tombol aksi selalu mulai di baris
+     baru, berapa pun panjang nama koleksinya. */
+  .doc-table tr::after { content: ''; flex-basis: 100%; height: 8px; order: 2; }
+  .data-table .doc-table td { height: auto; padding: 0; border: 0; font-size: var(--fs-xs); }
+  .data-table .doc-table td:nth-child(1) { flex: 1 0 100%; order: 0; margin-bottom: 4px; font-size: var(--fs-sm); }
+  .doc-table td:nth-child(2), .doc-table td:nth-child(3) { order: 1; color: var(--text-muted); }
+  .doc-table td:nth-child(3)::before { content: '·'; margin-right: 10px; }
+  .doc-table td:nth-child(4), .doc-table td:nth-child(5) { order: 3; }
+  .doc-table td:nth-child(6) { display: none; }
+  .doc-table td.doc-row-actions { order: 3; margin-left: auto; gap: 2px; }
+  .doc-table .document-name { align-items: flex-start; }
+  .doc-table .document-name strong { line-height: 1.35; overflow-wrap: anywhere; }
+  .doc-table td.empty-row { flex: 1 0 100%; padding: 20px 0; }
+}
+
+/* Perangkat sentuh tidak punya hover: efek hover yang menggeser elemen
+   tertinggal "nyangkut" setelah diketuk, jadi diganti umpan balik tekan. */
+@media (hover: none) {
+  button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
+  .collection-item:hover, .recent-item:hover, .topbar-shortcut:hover,
+  .chat-composer button:hover:not(:disabled), .login-submit:hover:not(:disabled),
+  .inbox-item:hover .inbox-item-avatar { transform: none; }
+  .primary-button, .secondary-button, .icon-button, .topbar-shortcut, .nav-item, .filter-chip,
+  .collection-item, .recent-item, .inbox-item, .home-announcement, .employee-prompts button,
+  .chat-empty button, .chat-suggestions button, .question-list button { transition: transform .1s ease, background var(--ease-fast), border-color var(--ease-fast), color var(--ease-fast); }
+  .primary-button:active, .secondary-button:active, .icon-button:active, .topbar-shortcut:active,
+  .nav-item:active, .filter-chip:active, .collection-item:active, .recent-item:active,
+  .inbox-item:active, .home-announcement:active, .employee-prompts button:active,
+  .chat-empty button:active, .chat-suggestions button:active, .question-list button:active { transform: scale(.97); }
+  /* Tombol sunting/hapus pesan muncul saat hover di desktop; di layar sentuh
+     tidak ada hover, jadi tombolnya ditampilkan tetap di bawah pesan. */
+  .message-actions { position: static; opacity: .75; transform: none; margin-top: 2px; }
+  .message-actions button { width: 32px; height: 28px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-card, .doc-viewer { animation: none; }
+  .sidebar, .sidebar-backdrop { transition: none; }
 }
 /* Compact source inspection and calmer message surfaces. */
 .source-card { width: 100%; text-align: left; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 12px; cursor: pointer; display: flex; gap: 12px; justify-content: space-between; color: inherit; }

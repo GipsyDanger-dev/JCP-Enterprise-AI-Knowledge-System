@@ -492,7 +492,7 @@ export function DocumentsPage() {
         )}
       </div>
       <DataTable>
-        <table>
+        <table className="doc-table">
           <thead><tr><th>{isId ? 'Dokumen' : 'Document'}</th><th>{isId ? 'Koleksi' : 'Collection'}</th><th>{isId ? 'Diperbarui' : 'Updated'}</th><th>{isId ? 'Keberlakuan' : 'Legal status'}</th><th>{isId ? 'Pemrosesan' : 'Processing'}</th><th>Chunks</th><th aria-label={isId ? 'Aksi' : 'Actions'} /></tr></thead>
           <tbody>{filtered.length === 0 ? (
             <tr><td colSpan={7} className="empty-row">Tidak ada dokumen ditemukan.</td></tr>
@@ -518,7 +518,7 @@ export function DocumentsPage() {
               </td>
               <td><StatusBadge status={document.status} /></td>
               <td>{document.chunks ?? '—'}</td>
-              <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <td className="doc-row-actions">
                 {bolehUbahStatus(document) && <button className="icon-button" title={isId ? 'Ubah status keberlakuan' : 'Change legal status'} onClick={(event) => { event.stopPropagation(); bukaDialogStatus(document) }}><Scale size={15} /></button>}
                 {bolehUrus(document) && <button className="icon-button" title={isId ? 'Ubah nama dokumen' : 'Rename document'} onClick={(event) => { event.stopPropagation(); setRenameDoc(document); setRenameTitle(document.name); setRenameError(null) }}><Pencil size={15} /></button>}
                 <button className="icon-button" title={isId ? `Unduh ${document.name}` : `Download ${document.name}`} onClick={(e) => { e.stopPropagation(); downloadDocument(document.id, document.name, token ?? undefined) }}><Download size={15} /></button>

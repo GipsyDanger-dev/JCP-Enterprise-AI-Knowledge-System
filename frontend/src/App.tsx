@@ -34,6 +34,19 @@ function ThemeInitializer() {
       ? fontSize
       : 'medium'
     document.documentElement.setAttribute('data-font-size', resolvedFontSize)
+
+    // Bilah status/alamat browser HP diwarnai sesuai tema aplikasi. Tema bisa
+    // diganti dari beberapa tempat, jadi atributnya yang diamati, bukan
+    // masing-masing tombolnya.
+    const root = document.documentElement
+    const syncThemeColor = () => {
+      const meta = document.querySelector('meta[name="theme-color"]')
+      meta?.setAttribute('content', root.getAttribute('data-theme') === 'dark' ? '#121215' : '#ffffff')
+    }
+    syncThemeColor()
+    const observer = new MutationObserver(syncThemeColor)
+    observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => observer.disconnect()
   }, [])
   return null
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { isTutorialHidden, setTutorialHidden, takeTutorialPending } from '@/utils/tutorial'
 import { Sidebar } from './Sidebar'
@@ -33,9 +33,30 @@ export function DashboardLayout() {
     localStorage.setItem(SIDEBAR_KEY, String(next))
   }
 
+  // Halaman baru dibuka dari atas. Tanpa ini posisi gulir halaman sebelumnya
+  // terbawa, dan di HP pengguna mendarat di tengah halaman yang baru.
+  const { pathname } = useLocation()
+  useEffect(() => { window.scrollTo(0, 0) }, [pathname])
+
+  // Selama laci navigasi terbuka di HP, halaman di belakangnya tidak ikut
+  // bergulir, dan tombol Escape menutupnya seperti dialog lain.
+  useEffect(() => {
+    if (!menuOpen) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = previous
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
+
   return (
     <main className={['app-shell', collapsed ? 'sidebar-collapsed' : ''].filter(Boolean).join(' ')}>
-      {menuOpen && <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} />}
+      {/* Selalu dirender supaya bisa memudar keluar bersama laci yang menutup,
+          bukan hilang seketika sementara lacinya masih bergeser. */}
+      <div className={menuOpen ? 'sidebar-backdrop open' : 'sidebar-backdrop'} aria-hidden="true" onClick={() => setMenuOpen(false)} />
       <Sidebar menuOpen={menuOpen} collapsed={collapsed} onToggle={toggleSidebar} onClose={() => setMenuOpen(false)} />
       <section className="workspace">
         <Topbar onMenuOpen={() => setMenuOpen(true)} />
