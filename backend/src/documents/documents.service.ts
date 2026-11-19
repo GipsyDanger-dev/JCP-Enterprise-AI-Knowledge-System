@@ -128,6 +128,8 @@ export class DocumentsService {
     // lama tetap masuk akal tanpa perlu diubah sekarang.
     const collection = category?.name ?? input.collection?.trim() ?? 'Umum';
 
+    // Isi file ikut ditulis di transaksi ini (bytea). File hingga 100 MB ke
+    // database jarak jauh bisa jauh melewati 20 detik, jadi batasnya 2 menit.
     await this.prisma.$transaction(async (transaction) => {
       await transaction.document.create({
         data: {
@@ -188,7 +190,7 @@ export class DocumentsService {
           fileSize: file.size,
         },
       });
-    }, { maxWait: 10_000, timeout: 20_000 });
+    }, { maxWait: 10_000, timeout: 120_000 });
     this.queueSignal.notify();
 
     return {

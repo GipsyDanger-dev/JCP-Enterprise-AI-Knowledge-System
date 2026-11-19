@@ -73,7 +73,7 @@ export class DocumentsController {
   })
   @ApiCreatedResponse({ description: 'Document, version, binary file, and queued job created' })
   @ApiBadRequestResponse({ description: 'Missing, invalid, empty, or oversized file' })
-  @ApiPayloadTooLargeResponse({ description: 'The uploaded file exceeds the 10 MB limit' })
+  @ApiPayloadTooLargeResponse({ description: 'The uploaded file exceeds the 100 MB limit' })
   @ApiConflictResponse({ description: 'The same file is already active' })
   @ApiForbiddenResponse({ description: 'Bukan admin, atau mengunggah untuk unit kerja/kategori di luar wewenangnya' })
   create(

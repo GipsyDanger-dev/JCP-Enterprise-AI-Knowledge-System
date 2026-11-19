@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useScrollToError } from '@/hooks/useScrollToError'
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024
+const MAX_FILE_SIZE = 100 * 1024 * 1024
 const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'txt']
 // Batas satu antrean. Server menerima satu file per permintaan, jadi angka ini
 // bukan batas teknis — hanya menjaga daftar tetap bisa diperiksa satu per satu
@@ -142,7 +142,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
         continue
       }
       if (file.size > MAX_FILE_SIZE) {
-        rejected.push(`${file.name} — ${isId ? 'lebih dari 10 MB' : 'larger than 10 MB'}`)
+        rejected.push(`${file.name} — ${isId ? 'lebih dari 100 MB' : 'larger than 100 MB'}`)
         continue
       }
       if (items.length + accepted.length >= MAX_FILES) {
@@ -155,7 +155,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
 
     if (accepted.length) setItems((current) => [...current, ...accepted])
     setError(rejected.length
-      ? `${isId ? 'Tidak ditambahkan' : 'Not added'}: ${rejected.join('; ')}. ${isId ? 'Hanya PDF, DOCX, dan TXT maks 10 MB.' : 'Only PDF, DOCX, and TXT up to 10 MB.'}`
+      ? `${isId ? 'Tidak ditambahkan' : 'Not added'}: ${rejected.join('; ')}. ${isId ? 'Hanya PDF, DOCX, dan TXT maks 100 MB.' : 'Only PDF, DOCX, and TXT up to 100 MB.'}`
       : null)
   }
 
@@ -259,7 +259,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
               <div className="upload-file-empty">
                 <Upload size={24} />
                 <p>{isId ? 'Klik atau seret file ke sini' : 'Click or drop files here'}</p>
-                <small>{isId ? `PDF, DOCX, atau TXT, maks 10MB per file, hingga ${MAX_FILES} file sekaligus` : `PDF, DOCX, or TXT, max 10 MB each, up to ${MAX_FILES} files at once`}</small>
+                <small>{isId ? `PDF, DOCX, atau TXT, maks 100 MB per file, hingga ${MAX_FILES} file sekaligus` : `PDF, DOCX, or TXT, max 100 MB each, up to ${MAX_FILES} files at once`}</small>
               </div>
             )}
           </div>

@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { extname, posix } from 'node:path';
 
-export const MAX_DOCUMENT_FILE_SIZE = 10 * 1024 * 1024;
+export const MAX_DOCUMENT_FILE_SIZE = 100 * 1024 * 1024;
 
 export interface UploadedDocumentFile {
   originalname: string;
@@ -22,7 +22,7 @@ export function validateDocumentFile(file?: UploadedDocumentFile): UploadedDocum
   if (!file) throw new BadRequestException('A PDF or DOCX file is required');
   if (file.size === 0) throw new BadRequestException('The uploaded file is empty');
   if (file.size > MAX_DOCUMENT_FILE_SIZE) {
-    throw new BadRequestException('The uploaded file exceeds the 10 MB limit');
+    throw new BadRequestException('The uploaded file exceeds the 100 MB limit');
   }
 
   const filename = safeFilename(file.originalname);
